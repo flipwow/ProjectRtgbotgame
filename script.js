@@ -20,11 +20,14 @@ const AVAILABLE_PETS = [
 
 let currentPetId = 'cat';
 
-// ===== Tic-Tac-Toe state =====
-let tttMode = 'solo';          // 'solo' | 'duo'
+// ===== Tic-Tac-Toe + Online =====
+let tttMode = 'solo';          // 'solo' | 'duo' | 'online'
 let tttBoard = Array(9).fill(null);
 let tttCurrent = 'X';
 let tttGameOver = false;
+let mySymbol = null;
+let socket = null;
+let currentRoomId = null;
 
 if (tg) {
     tg.ready();
@@ -294,16 +297,27 @@ function startTttGame(mode) {
     document.getElementById('games-menu').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'none';
     document.getElementById('game-tictactoe').style.display = 'flex';
-    resetTtt();
+    
+    if (mode !== 'online') {
+        resetTtt();
+    }
 }
 
 function closeGame() {
+    if (socket) {
+        socket.close();
+        socket = null;
+    }
     document.getElementById('game-tictactoe').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'none';
     document.getElementById('games-menu').style.display = 'flex';
 }
 
 function backTttModes() {
+    if (socket) {
+        socket.close();
+        socket = null;
+    }
     document.getElementById('game-tictactoe').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'flex';
 }
@@ -328,6 +342,7 @@ function resetTtt() {
     tttBoard = Array(9).fill(null);
     tttCurrent = 'X';
     tttGameOver = false;
+    mySymbol = null;
     updateTttUI();
     document.getElementById('ttt-status').textContent = 'Ходит: X (Крестики)';
 }
@@ -335,6 +350,19 @@ function resetTtt() {
 function makeMove(index) {
     if (tttGameOver || tttBoard[index] !== null) return;
 
+    // Онлайн режим
+    if (tttMode === 'online') {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        if (tttCurrent !== mySymbol) return;
+
+        socket.send(JSON.stringify({
+            type: 'move',
+            index: index
+        }));
+        return;
+    }
+
+    // Solo / Duo
     tttBoard[index] = tttCurrent;
     updateTttUI();
 
@@ -354,7 +382,6 @@ function makeMove(index) {
     tttCurrent = tttCurrent === 'X' ? 'O' : 'X';
     document.getElementById('ttt-status').textContent = `Ходит: ${tttCurrent}`;
 
-    // Ход бота в solo-режиме
     if (tttMode === 'solo' && tttCurrent === 'O' && !tttGameOver) {
         setTimeout(botMove, 450);
     }
@@ -364,7 +391,6 @@ function botMove() {
     const empty = tttBoard.map((v, i) => v === null ? i : null).filter(v => v !== null);
     if (empty.length === 0) return;
 
-    // Простой AI: сначала пытается выиграть, потом блокирует, иначе случайно
     let move = findBestMove('O') ?? findBestMove('X') ?? empty[Math.floor(Math.random() * empty.length)];
     makeMove(move);
 }
@@ -389,30 +415,103 @@ function updateTttUI() {
     document.querySelectorAll('.ttt-cell').forEach((cell, i) => {
         cell.textContent = tttBoard[i] || '';
         cell.style.color = tttBoard[i] === 'X' ? '#ec4899' : '#8b5cf6';
-        cell.disabled = tttGameOver || tttBoard[i] !== null;
+        cell.disabled = tttGameOver || tttBoard[i] !== null || (tttMode === 'online' && tttCurrent !== mySymbol);
     });
 }
 
-// ===== Автозапуск дуэли из ссылки =====
+// ===== Онлайн подключение =====
+function connectToRoom(roomId) {
+    currentRoomId = roomId;
+    tttMode = 'online';
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/game/${roomId}`;
+
+    socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+        console.log('Подключено к комнате', roomId);
+        document.getElementById('ttt-status').textContent = 'Ожидание соперника...';
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'joined') {
+            mySymbol = data.symbol;
+            tttBoard = data.board;
+            tttCurrent = data.current;
+            updateTttUI();
+
+            if (data.status === 'waiting') {
+                document.getElementById('ttt-status').textContent = `Ты играешь за ${mySymbol}. Ожидание соперника...`;
+            } else {
+                document.getElementById('ttt-status').textContent = `Ты: ${mySymbol} | Ходит: ${tttCurrent}`;
+            }
+        }
+
+        if (data.type === 'start' || data.type === 'update') {
+            tttBoard = data.board;
+            tttCurrent = data.current;
+            tttGameOver = data.status === 'finished';
+            updateTttUI();
+
+            if (data.status === 'finished') {
+                if (data.winner === 'draw') {
+                    document.getElementById('ttt-status').textContent = 'Ничья! 🤝';
+                } else {
+                    const isWin = data.winner === mySymbol;
+                    document.getElementById('ttt-status').textContent = isWin 
+                        ? `Ты победил! 🎉` 
+                        : `Победил ${data.winner}`;
+                    if (isWin && tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
+                }
+            } else {
+                const turnText = tttCurrent === mySymbol ? 'Твой ход!' : `Ход соперника (${tttCurrent})`;
+                document.getElementById('ttt-status').textContent = `Ты: ${mySymbol} | ${turnText}`;
+            }
+        }
+
+        if (data.type === 'error') {
+            document.getElementById('ttt-status').textContent = data.message;
+        }
+    };
+
+    socket.onclose = () => {
+        console.log('Соединение закрыто');
+    };
+
+    socket.onerror = (err) => {
+        console.error('WebSocket error', err);
+        document.getElementById('ttt-status').textContent = 'Ошибка соединения';
+    };
+}
+
+// ===== Автозапуск из ссылки =====
 function checkDuelParams() {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
-    const challenger = params.get('challenger');
+    const room = params.get('room');
     const startParam = tg?.initDataUnsafe?.start_param || '';
 
-    if (mode === 'duo' || startParam.startsWith('duo')) {
+    if ((mode === 'online' && room) || startParam.startsWith('online_')) {
+        const roomId = room || startParam.replace('online_', '');
+        
         switchTab('play');
-
+        
         setTimeout(() => {
-            startTttGame('duo');
-
-            if (challenger) {
-                const status = document.getElementById('ttt-status');
-                if (status) {
-                    status.textContent = `Дуэль! Ходит: X (Крестики)`;
-                }
-            }
+            document.getElementById('games-menu').style.display = 'none';
+            document.getElementById('tictactoe-modes').style.display = 'none';
+            document.getElementById('game-tictactoe').style.display = 'flex';
+            
+            connectToRoom(roomId);
         }, 300);
+    }
+    else if (mode === 'duo' || startParam.startsWith('duo')) {
+        switchTab('play');
+        setTimeout(() => startTttGame('duo'), 300);
     }
 }
 
