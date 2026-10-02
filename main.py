@@ -317,7 +317,6 @@ async def api_toggle_item(request):
     if item_id not in inventory:
         return web.json_response({"error": "Item not owned"}, status=403)
 
-    # Находим часть тела для нового предмета, чтобы реализовать взаимоисключение (по 1 вещи на слот)
     target_item_part = None
     for cat_name, items in SHOP_ITEMS.items():
         if item_id in items:
@@ -328,7 +327,6 @@ async def api_toggle_item(request):
         equipped.remove(item_id)
         action = "unequipped"
     else:
-        # Убираем другие надетые предметы с этой же части тела
         new_equipped = []
         for eq_id in equipped:
             eq_part = "body"
@@ -371,7 +369,6 @@ async def api_buy_item(request):
 
     user_info = users[username]
 
-    # Находим товар в каталоге
     item = None
     cat_key = None
     for c_name, items in SHOP_ITEMS.items():
@@ -415,7 +412,6 @@ async def api_buy_item(request):
 
 
 async def index_handler(request):
-    """Отдает главную HTML-страницу мини-приложения из корневой папки."""
     index_path = os.path.join(PUBLIC_DIR, "index.html")
     if os.path.exists(index_path):
         return web.FileResponse(index_path)
@@ -445,15 +441,11 @@ async def webapp_cors(request, handler):
 async def start_webapp_api():
     app = web.Application(middlewares=[webapp_cors])
 
-    # API маршруты
     app.router.add_get("/api/me", api_profile)
     app.router.add_post("/api/equip/{item_id}", api_toggle_item)
     app.router.add_post("/api/buy/{item_id}", api_buy_item)
-
-    # Главная страница
     app.router.add_get("/", index_handler)
 
-    # Раздача статики (index.html, style.css, script.js) из корня проекта
     if os.path.exists(PUBLIC_DIR):
         app.router.add_static("/", PUBLIC_DIR, name="public")
 
@@ -597,8 +589,6 @@ async def unified_menu_router(callback: CallbackQuery):
 
     user_info = get_or_create_user(username)
     user_role = user_info.get("role", "noob")
-    inventory = user_info.get("inventory", [])
-    equipped = user_info.get("equipped", [])
 
     if data == "menu_hub":
         await callback.message.edit_text(
@@ -756,7 +746,7 @@ async def unified_menu_router(callback: CallbackQuery):
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="◀️️ В главное меню", callback_data="menu_hub"
+                        text="◀ В главное меню", callback_data="menu_hub"
                     )
                 ]
             ]
@@ -980,17 +970,19 @@ async def handle_text(message: Message):
         elif user_role == "dura":
             role_instruction = f"[КОНТЕКСТ: Пишет VIP (@{username}), RP: {user_rp}, R$: {user_cash}, на питомце надето: {eq_str}. Тон: дерзкий вайб.]"
         elif user_role in ["peshka", "slave"]:
-            role_instruction = f"[КОНТЕKСТ: Пишет свита (@{username}), RP: {user_rp}, R$: {user_cash}, на питомце надето: {eq_str}. Тон: снисходительный.]"
+            role_instruction = f"[КОНТЕКСТ: Пишет свита (@{username}), RP: {user_rp}, R$: {user_cash}, на питомце надето: {eq_str}. Тон: снисходительный.]"
         else:
             role_instruction = f"[КОНТЕКСТ: Пишет новичок-NPC (@{username}), RP: {user_rp}, R$: {user_cash}, на питомце надето: {eq_str}. Презрение.]"
 
         chat_id = message.chat.id
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}"
 
-        chat_sessions[chat_id] = client.chats.create(
-            model="gemini-2.5-flash",
-            config={"system_instruction": dynamic_system_prompt},
-        )
+        # ИСПРАВЛЕНИЕ: Использование актуального интерфейса SDK для чатов
+        if chat_id not in chat_sessions:
+            chat_sessions[chat_id] = client.chats.create(
+                model="gemini-2.5-flash",
+                config={"system_instruction": dynamic_system_prompt},
+            )
 
         chat = chat_sessions[chat_id]
         full_message = f"(Справочно для времени: в Москве {moscow_time})\n\nСообщение пользователя: {text}"
@@ -999,7 +991,7 @@ async def handle_text(message: Message):
         await message.reply(response.text)
 
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"Ошибка в handle_text: {e}")
         if message.chat.id in chat_sessions:
             del chat_sessions[message.chat.id]
         await message.answer("Что-то пошло не так... даже у королевы бывают сбои 💅")
