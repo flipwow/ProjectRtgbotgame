@@ -40,26 +40,36 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 chat_sessions = {}
 
-# Магазин использует УНИКАЛЬНЫЕ ID в качестве ключей
+# Магазин использует УНИКАЛЬНЫЕ ID в качестве ключей и указывает часть тела (part)
 SHOP_ITEMS = {
     "sale": {
-        "collar": {"name": "💍 Ошейник из страз", "price": 30},
-        "cap_pink": {"name": "🧢 Розовая кепка", "price": 20},
-        "cap_black": {"name": "🧢 Черная кепка с черепом", "price": 25},
-        "glasses_pink": {"name": "🕶 Розовые очки", "price": 25},
-        "glasses_matrix": {"name": "🕶️ Солнечные очки Матрица", "price": 40},
-        "cool_glasses": {"name": "🕶️ Крутые пиксельные очки", "price": 55},
+        "collar": {"name": "💍 Ошейник из страз", "price": 30, "part": "body"},
+        "cap_pink": {"name": "🧢 Розовая кепка", "price": 20, "part": "head"},
+        "cap_black": {"name": "🧢 Черная кепка с черепом", "price": 25, "part": "head"},
+        "glasses_pink": {"name": "🕶 Розовые очки", "price": 25, "part": "head"},
+        "glasses_matrix": {
+            "name": "🕶️ Солнечные очки Матрица",
+            "price": 40,
+            "part": "head",
+        },
+        "cool_glasses": {
+            "name": "🕶️ Крутые пиксельные очки",
+            "price": 55,
+            "part": "head",
+        },
     },
     "luxury": {
         "crown": {
             "name": "👑 Золотая корона",
             "price": 150,
             "min_role": ["dura", "boss"],
+            "part": "head",
         },
         "leash": {
             "name": "💎 Бриллиантовый поводок",
             "price": 300,
             "min_role": ["boss"],
+            "part": "body",
         },
     },
 }
@@ -167,7 +177,6 @@ def get_webapp_user(request):
     users = load_users()
     found_username = None
 
-    # Ищем пользователя по telegram_id в базе, чтобы синхронизировать баланс
     for uname, udata in users.items():
         if str(udata.get("telegram_id")) == tg_id:
             found_username = uname
@@ -190,12 +199,39 @@ def get_webapp_user(request):
             users[found_username]["telegram_id"] = tg_id
         save_users(users)
     else:
-        # Обновляем telegram_id на всякий случай
         if "telegram_id" not in users[found_username]:
             users[found_username]["telegram_id"] = tg_id
             save_users(users)
 
     return found_username, telegram_user
+
+
+def get_full_shop_catalog(user_info):
+    """Возвращает полный каталог магазина с информацией о том, куплен ли товар и доступен ли по роли."""
+    catalog = []
+    inventory = user_info.get("inventory", [])
+    user_role = user_info.get("role", "noob")
+
+    for cat_name, items in SHOP_ITEMS.items():
+        for item_id, item_data in items.items():
+            min_roles = item_data.get("min_role", [])
+            is_allowed = True
+            if min_roles and user_role not in min_roles:
+                is_allowed = False
+
+            catalog.append(
+                {
+                    "id": item_id,
+                    "name": item_data["name"],
+                    "price": item_data["price"],
+                    "part": item_data.get("part", "body"),
+                    "category": cat_name,
+                    "owned": item_id in inventory,
+                    "allowed": is_allowed,
+                    "min_role": min_roles,
+                }
+            )
+    return catalog
 
 
 def get_inventory_details(user_info):
@@ -222,6 +258,7 @@ def get_inventory_details(user_info):
                 "id": item_id,
                 "name": item["name"],
                 "price": item["price"],
+                "part": item.get("part", "body"),
                 "category": category,
                 "equipped": item_id in equipped,
             }
@@ -255,6 +292,7 @@ async def api_profile(request):
             "max_rp": RP_CEILINGS.get(role, 200),
             "currency": user_info.get("r_currency", 0),
             "inventory": get_inventory_details(user_info),
+            "catalog": get_full_shop_catalog(user_info),
             "equipped": user_info.get("equipped", []),
         }
     )
@@ -279,10 +317,28 @@ async def api_toggle_item(request):
     if item_id not in inventory:
         return web.json_response({"error": "Item not owned"}, status=403)
 
+    # Находим часть тела для нового предмета, чтобы реализовать взаимоисключение (по 1 вещи на слот)
+    target_item_part = None
+    for cat_name, items in SHOP_ITEMS.items():
+        if item_id in items:
+            target_item_part = items[item_id].get("part", "body")
+            break
+
     if item_id in equipped:
         equipped.remove(item_id)
         action = "unequipped"
     else:
+        # Убираем другие надетые предметы с этой же части тела
+        new_equipped = []
+        for eq_id in equipped:
+            eq_part = "body"
+            for cat_name, items in SHOP_ITEMS.items():
+                if eq_id in items:
+                    eq_part = items[eq_id].get("part", "body")
+                    break
+            if eq_part != target_item_part:
+                new_equipped.append(eq_id)
+        equipped = new_equipped
         equipped.append(item_id)
         action = "equipped"
 
@@ -296,6 +352,64 @@ async def api_toggle_item(request):
             "action": action,
             "equipped": equipped,
             "inventory": get_inventory_details(user_info),
+        }
+    )
+
+
+async def api_buy_item(request):
+    username, telegram_user = get_webapp_user(request)
+
+    if not username:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    item_id = request.match_info["item_id"]
+    users = load_users()
+
+    if username not in users:
+        get_or_create_user(username)
+        users = load_users()
+
+    user_info = users[username]
+
+    # Находим товар в каталоге
+    item = None
+    cat_key = None
+    for c_name, items in SHOP_ITEMS.items():
+        if item_id in items:
+            item = items[item_id]
+            cat_key = c_name
+            break
+
+    if not item:
+        return web.json_response({"error": "Item not found"}, status=404)
+
+    price = item["price"]
+    current_cash = user_info.get("r_currency", 0)
+    inventory = user_info.get("inventory", [])
+    user_role = user_info.get("role", "noob")
+
+    if item_id in inventory:
+        return web.json_response({"error": "Already owned"}, status=400)
+
+    if cat_key == "luxury" and user_role not in item.get("min_role", []):
+        return web.json_response({"error": "Role not allowed"}, status=403)
+
+    if current_cash < price:
+        return web.json_response({"error": "Not enough currency"}, status=400)
+
+    user_info["r_currency"] = current_cash - price
+    inventory.append(item_id)
+    user_info["inventory"] = inventory
+
+    users[username] = user_info
+    save_users(users)
+
+    return web.json_response(
+        {
+            "success": True,
+            "currency": user_info["r_currency"],
+            "inventory": get_inventory_details(user_info),
+            "catalog": get_full_shop_catalog(user_info),
         }
     )
 
@@ -334,6 +448,7 @@ async def start_webapp_api():
     # API маршруты
     app.router.add_get("/api/me", api_profile)
     app.router.add_post("/api/equip/{item_id}", api_toggle_item)
+    app.router.add_post("/api/buy/{item_id}", api_buy_item)
 
     # Главная страница
     app.router.add_get("/", index_handler)
@@ -498,7 +613,6 @@ async def unified_menu_router(callback: CallbackQuery):
         role_name = ROLES_HIERARCHY.get(user_role, {}).get("name", user_role)
         user_cash = user_info.get("r_currency", 0)
 
-        # Текст профиля без инвентаря и надетых вещей (они теперь в Mini App)
         text = (
             f"👑 **Королевское досье питомца @{username}** 👑\n\n"
             f"• **Статус:** {role_name}\n"
@@ -524,123 +638,6 @@ async def unified_menu_router(callback: CallbackQuery):
         )
         await callback.message.edit_text(
             text, reply_markup=keyboard, parse_mode="Markdown"
-        )
-
-    elif data == "shop_sale":
-        user_cash = user_info.get("r_currency", 0)
-        buttons = []
-        for item_id, info in SHOP_ITEMS["sale"].items():
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"{info['name']} — {info['price']} R$",
-                        callback_data=f"buy_sale_{item_id}",
-                    )
-                ]
-            )
-        buttons.append(
-            [InlineKeyboardButton(text="◀️ Назад в бутик", callback_data="menu_shop")]
-        )
-
-        await callback.message.edit_text(
-            f"🏷️ **Категория: Sale**\nБаланс: `{user_cash} R$`",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-            parse_mode="Markdown",
-        )
-
-    elif data == "shop_luxury":
-        user_cash = user_info.get("r_currency", 0)
-        buttons = []
-        for item_id, info in SHOP_ITEMS["luxury"].items():
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=f"{info['name']} — {info['price']} R$",
-                        callback_data=f"buy_lux_{item_id}",
-                    )
-                ]
-            )
-        buttons.append(
-            [InlineKeyboardButton(text="◀ Назад в бутик", callback_data="menu_shop")]
-        )
-
-        await callback.message.edit_text(
-            f"👑 **Категория: Luxury** (Нужен статус dura / boss)\nБаланс: `{user_cash} R$`",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-            parse_mode="Markdown",
-        )
-
-    elif data.startswith("buy_"):
-        parts = data.split("_")
-        category_type = parts[1]
-        item_id = "_".join(parts[2:])
-
-        cat_key = "sale" if category_type == "sale" else "luxury"
-
-        username = (user.username or "").lower()
-        if not username:
-            username = f"id_{user.id}"
-
-        item = SHOP_ITEMS[cat_key][item_id]
-        price = item["price"]
-        item_name = item["name"]
-
-        users = load_users()
-        if username not in users:
-            get_or_create_user(username)
-            users = load_users()
-
-        user_info = users[username]
-        current_cash = user_info.get("r_currency", 0)
-        inventory = user_info.get("inventory", [])
-        user_role = user_info.get("role", "noob")
-
-        if item_id in inventory:
-            await callback.answer(
-                "У твоего питомца уже есть эта шмотка! 💅", show_alert=True
-            )
-            return
-
-        if cat_key == "luxury" and user_role not in item.get("min_role", []):
-            await callback.answer(
-                "Куда лезешь? Этот товар только для VIP (dura / boss)! 🛑",
-                show_alert=True,
-            )
-            return
-
-        if current_cash < price:
-            await callback.answer(
-                f"Не хватает R$! Нужно {price} R$, а у тебя всего {current_cash} R$. 📉",
-                show_alert=True,
-            )
-            return
-
-        user_info["r_currency"] = current_cash - price
-        if item_id not in user_info["inventory"]:
-            user_info["inventory"].append(item_id)
-
-        users[username] = user_info
-        save_users(users)
-
-        new_cash = user_info["r_currency"]
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="🎮 Надеть в гардеробе", callback_data="menu_dressup"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="🏠 В главное меню", callback_data="menu_hub"
-                    )
-                ],
-            ]
-        )
-        await callback.message.edit_text(
-            f"✅ **Покупка успешна!**\n\nТы приобрел: **{item_name}**\nОстаток: `{new_cash} R$`",
-            reply_markup=keyboard,
-            parse_mode="Markdown",
         )
 
     elif data == "menu_convert":
@@ -759,118 +756,13 @@ async def unified_menu_router(callback: CallbackQuery):
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="◀️ В главное меню", callback_data="menu_hub"
+                        text="◀️️ В главное меню", callback_data="menu_hub"
                     )
                 ]
             ]
         )
         await callback.message.edit_text(
             report, reply_markup=keyboard, parse_mode="Markdown"
-        )
-
-    elif data == "menu_dressup":
-        eq_text = (
-            " + ".join([get_item_name(e) for e in equipped])
-            if equipped
-            else "Голышом (без шмоток 🥶)"
-        )
-
-        if not inventory:
-            desc = (
-                "У тебя пока пусто в инвентаре! Сначала купи шмотки в бутик-разделе 🛍️"
-            )
-            buttons = [
-                [
-                    InlineKeyboardButton(
-                        text="🛍️ Перейти в бутик", callback_data="menu_shop"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="◀️ В главное меню", callback_data="menu_hub"
-                    )
-                ],
-            ]
-        else:
-            desc = "Нажми на вещь, чтобы надеть её или снять с питомца:"
-            buttons = []
-            for item_id in inventory:
-                is_equipped = item_id in equipped
-                item_display_name = get_item_name(item_id)
-                btn_text = f"{'🟢 [НАДЕТО] ' if is_equipped else '⚪ [СНЯТО] '}{item_display_name}"
-                buttons.append(
-                    [
-                        InlineKeyboardButton(
-                            text=btn_text, callback_data=f"dress_toggle_{item_id}"
-                        )
-                    ]
-                )
-
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text="◀️ В главное меню", callback_data="menu_hub"
-                    )
-                ]
-            )
-
-        outfit_screen = (
-            f"👗 **Королевская гардеробная питомца** 👗\n\n"
-            f"🧸 **Текущий лук:** `{eq_text}`\n\n"
-            f"{desc}"
-        )
-        await callback.message.edit_text(
-            outfit_screen,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-            parse_mode="Markdown",
-        )
-
-    elif data.startswith("dress_toggle_"):
-        item_id = data.replace("dress_toggle_", "", 1)
-
-        if item_id in equipped:
-            equipped.remove(item_id)
-        else:
-            equipped.append(item_id)
-
-        user_info["equipped"] = equipped
-        users = load_users()
-        users[username] = user_info
-        save_users(users)
-
-        eq_text = (
-            " + ".join([get_item_name(e) for e in equipped])
-            if equipped
-            else "Голышом (без шмоток 🥶)"
-        )
-        buttons = []
-        for name_id in inventory:
-            is_equipped = name_id in equipped
-            item_display_name = get_item_name(name_id)
-            btn_text = (
-                f"{'🟢 [НАДЕТО] ' if is_equipped else '⚪ [СНЯТО] '}{item_display_name}"
-            )
-            buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=btn_text, callback_data=f"dress_toggle_{name_id}"
-                    )
-                ]
-            )
-
-        buttons.append(
-            [InlineKeyboardButton(text="◀️ В главное меню", callback_data="menu_hub")]
-        )
-
-        outfit_screen = (
-            f"👗 **Королевская гардеробная питомца** 👗\n\n"
-            f"🧸 **Текущий лук:** `{eq_text}`\n\n"
-            f"Нажми на вещь, чтобы надеть её или снять с питомца:"
-        )
-        await callback.message.edit_text(
-            outfit_screen,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-            parse_mode="Markdown",
         )
 
 

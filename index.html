@@ -52,7 +52,7 @@
                 </button>
             </section>
 
-            <!-- Вкладка 2: Гардероб (примерка) -->
+            <!-- Вкладка 2: Гардероб (примерка с горизонтальными подвкладками по частям тела) -->
             <section id="tab-wardrobe" class="tab-content">
                 <div class="section-heading">
                     <div>
@@ -61,16 +61,36 @@
                     </div>
                 </div>
 
-                <div class="category-tabs" id="categoryTabs">
-                    <button class="category-tab active" data-category="all">Все</button>
-                    <button class="category-tab" data-category="sale">Sale</button>
-                    <button class="category-tab" data-category="luxury">Luxury</button>
+                <div class="category-tabs" id="wardrobeCategoryTabs">
+                    <button class="category-tab active" data-part="all">Все</button>
+                    <button class="category-tab" data-part="head">Голова</button>
+                    <button class="category-tab" data-part="body">Тело</button>
+                    <button class="category-tab" data-part="legs">Ноги</button>
+                    <button class="category-tab" data-part="arms">Руки</button>
                 </div>
 
                 <div class="items-grid" id="itemsGrid"></div>
             </section>
 
-            <!-- Вкладка 3: Правила игры -->
+            <!-- Вкладка 3: Магазин (дизайн гардероба, покупка за R$) -->
+            <section id="tab-shop" class="tab-content">
+                <div class="section-heading">
+                    <div>
+                        <span class="vip-tag">БУТИК РИТУШКИ</span>
+                        <h3>Магазин</h3>
+                    </div>
+                </div>
+
+                <div class="category-tabs" id="shopCategoryTabs">
+                    <button class="category-tab active" data-shopcat="all">Все</button>
+                    <button class="category-tab" data-shopcat="sale">Sale</button>
+                    <button class="category-tab" data-shopcat="luxury">Luxury</button>
+                </div>
+
+                <div class="items-grid" id="shopItemsGrid"></div>
+            </section>
+
+            <!-- Вкладка 4: Правила игры -->
             <section id="tab-rules" class="tab-content">
                 <div class="pet-section-header">
                     <span class="vip-tag">ПРАВИЛА ИГРЫ</span>
@@ -86,7 +106,7 @@
                 </div>
             </section>
 
-            <!-- Вкладка 4: Профиль -->
+            <!-- Вкладка 5: Профиль -->
             <section id="tab-profile" class="tab-content">
                 <h3>Информация</h3>
                 <div class="glass-card info-card">
@@ -96,7 +116,7 @@
             </section>
         </main>
 
-        <!-- Нижняя навигация -->
+        <!-- Нижняя навигация (включает Магазин) -->
         <nav class="bottom-nav glass-card">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
@@ -105,6 +125,10 @@
             <button class="nav-item" onclick="switchTab('wardrobe')">
                 <span class="nav-icon">👗</span>
                 <span>Гардероб</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('shop')">
+                <span class="nav-icon">🛍️</span>
+                <span>Магазин</span>
             </button>
             <button class="nav-item" onclick="switchTab('rules')">
                 <span class="nav-icon">📜</span>

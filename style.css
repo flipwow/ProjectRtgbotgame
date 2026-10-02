@@ -224,18 +224,6 @@ body {
     color: white;
 }
 
-.action-btn {
-    width: 100%;
-    padding: 8px;
-    border: none;
-    border-radius: 10px;
-    background: var(--accent-gradient);
-    color: white;
-    font-weight: 600;
-    font-size: 12px;
-    cursor: pointer;
-}
-
 .info-card { padding: 14px; line-height: 1.5; font-size: 13px; }
 .status-active { color: #4ade80; font-weight: 600; }
 
