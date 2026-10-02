@@ -108,7 +108,7 @@ WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8080
 
 # Укажи здесь адрес, с которого открывается Mini App.
-WEBAPP_ORIGIN = "https://flipwow.github.io"
+WEBAPP_ORIGIN = " https://flipwow.github.io/ProjectRtgbotgame/"
 
 
 def validate_telegram_init_data(init_data: str):
