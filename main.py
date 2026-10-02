@@ -19,8 +19,11 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
+    InlineQuery,
     CallbackQuery,
     FSInputFile,
+    InputTextMessageContent,
+    InlineQueryResultArticle,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,

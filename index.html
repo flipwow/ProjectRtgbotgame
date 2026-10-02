@@ -222,3 +222,23 @@
     </div>
 </body>
 </html>
+
+<!-- Пример добавления кнопки вызова в блок крестиков-ноликов или общее меню -->
+<div id="ttt-mode-selector" class="mode-selector">
+    <button class="btn-mode" onclick="startTttGame('solo')">👤 С ботом</button>
+    <button class="btn-mode duo-btn" onclick="openChallengeModal()">⚔️ Дуэль с другом</button>
+</div>
+
+<!-- Модальное окно или блок подтверждения вызова друга -->
+<div id="challenge-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>⚔️ Вызов на дуэль</h3>
+        <p>Выберите игру для дуэли:</p>
+        <select id="challenge-game-select">
+            <option value="ttt">Крестики-нолики</option>
+            <!-- Здесь можно добавить другие игры, если они есть -->
+        </select>
+        <button class="btn-primary" onclick="shareChallengeLink()">🔗 Отправить вызов в чат</button>
+        <button class="btn-secondary" onclick="closeChallengeModal()">Отмена</button>
+    </div>
+</div>

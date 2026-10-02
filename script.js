@@ -494,3 +494,47 @@ function resetTtt() {
     updateTttStatus();
     renderTttBoard();
 }
+
+// Открытие модального окна выбора дуэли
+function openChallengeModal() {
+    const modal = document.getElementById('challenge-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeChallengeModal() {
+    const modal = document.getElementById('challenge-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// Отправка вызова через Telegram WebApp (поделиться инлайн-запросом в чат)
+function shareChallengeLink() {
+    const gameSelect = document.getElementById('challenge-game-select');
+    const gameType = gameSelect ? gameSelect.value : 'ttt';
+    
+    // Формируем текст или инлайн-запрос для вызова друга
+    // Telegram позволяет использовать switchInlineQuery для отправки ссылки-приглашения в любой чат
+    const query = `challenge_${gameType}_${tg?.initDataUnsafe?.user?.id || 'user'}`;
+    
+    if (typeof tg !== 'undefined' && tg.switchInlineQuery) {
+        // Открывает меню выбора чата для отправки инлайн-результата
+        tg.switchInlineQuery(query, ['users', 'groups', 'channels']);
+    } else {
+        alert('Функция доступна только внутри Telegram!');
+    }
+    closeChallengeModal();
+}
+
+// При загрузке страницы проверяем, открыта ли игра по вызову (параметры URL)
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode');
+    const game = urlParams.get('game');
+    
+    if (mode === 'duo') {
+        // Если открыто по ссылке дуэли, сразу запускаем нужную игру в режиме duo
+        if (game === 'ttt' || !game) {
+            // Переключаемся на вкладку игры, если нужно, и запускаем duo
+            startTttGame('duo');
+        }
+    }
+});
