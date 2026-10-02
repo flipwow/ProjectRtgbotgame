@@ -271,12 +271,26 @@ def get_inventory_details(user_info):
 
 async def api_profile(request):
     username, telegram_user = get_webapp_user(request)
-
     if not username:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     user_info = get_or_create_user(username)
     role = user_info.get("role", "noob")
+
+    # Собираем реестр всех пользователей для вкладки «Чат»
+    all_users = load_users()
+    registry_list = []
+    for uname, udata in all_users.items():
+        u_role = udata.get("role", "noob")
+        registry_list.append(
+            {
+                "username": uname,
+                "role_name": ROLES_HIERARCHY.get(u_role, {}).get("name", u_role),
+                "rp": udata.get("rp", 0),
+                "currency": udata.get("r_currency", 0),
+                "equipped_count": len(udata.get("equipped", [])),
+            }
+        )
 
     return web.json_response(
         {
@@ -296,6 +310,7 @@ async def api_profile(request):
             "inventory": get_inventory_details(user_info),
             "catalog": get_full_shop_catalog(user_info),
             "equipped": user_info.get("equipped", []),
+            "registry": registry_list,  # Передаем реестр участников
         }
     )
 

@@ -72,7 +72,7 @@
                 <div class="items-grid" id="itemsGrid"></div>
             </section>
 
-           <!-- Вкладка 3: Play (Мини-игры) -->
+            <!-- Вкладка 3: Play (Мини-игры) -->
             <section id="tab-play" class="tab-content">
                 <div class="pet-section-header">
                     <span class="vip-tag">RITUSHKA ARCADE</span>
@@ -121,7 +121,7 @@
 
                     <div class="glass-card game-card" onclick="openChallengeModal()" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                         <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">⚔️️ Дуэль по ссылке</h4>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">⚔ Дуэль по ссылке</h4>
                             <p style="font-size: 12px; color: var(--text-secondary);">Вызвать друга через чат Telegram</p>
                         </div>
                         <button class="category-tab active" style="pointer-events: none;">Вызвать</button>
@@ -170,23 +170,17 @@
                 <div class="items-grid" id="shopItemsGrid"></div>
             </section>
 
-            <!-- Вкладка 5: Профиль -->
-            <section id="tab-profile" class="tab-content">
-                <h3 style="margin-bottom: 10px;">Информация</h3>
-                <div class="glass-card info-card" style="margin-bottom: 14px;">
-                    <p><strong>ID пользователя:</strong> <span id="profile-id">-</span></p>
-                    <p><strong>Статус:</strong> <span class="status-active">Активен</span></p>
+            <!-- Вкладка 5: Реестр чата (Взаимодействие с людьми) -->
+            <section id="tab-chat" class="tab-content">
+                <div class="section-heading" style="margin-bottom: 12px;">
+                    <div>
+                        <span class="vip-tag">РЕЕСТР ЧАТА</span>
+                        <h3>Жители тусовки 👥</h3>
+                        <p class="subtitle">Взаимодействуй с другими участниками</p>
+                    </div>
                 </div>
-
-                <div class="pet-section-header" style="text-align: left; margin-bottom: 8px;">
-                    <span class="vip-tag">ПРАВИЛА ИГРЫ</span>
-                    <h3 style="font-size: 16px;">Свод законов Ритушки</h3>
-                </div>
-                <div class="glass-card info-card" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-                    <p>👑 <strong>1. Уважение к хозяйке:</strong> Великая Ритушка всегда права. Споры караются обнулением RP.</p>
-                    <p>💎 <strong>2. Фарм RP:</strong> Общайся в чате с ботом, чтобы повышать репутацию и копить кристаллы (R$).</p>
-                    <p>👗 <strong>3. Шмотки:</strong> Покупай уникальные статусы и кастомизируй своего питомца в гардеробе.</p>
-                    <p>🚫 <strong>4. Спам:</strong> Запрещено спамить сообщениями чаще чем раз в 3 секунды — влетит бан фарм-ресурса на 15 минут!</p>
+                <div id="chatUsersList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Динамически заполнится из скрипта -->
                 </div>
             </section>
         </main>
@@ -209,9 +203,9 @@
                 <span class="nav-icon">🛍️</span>
                 <span>Магазин</span>
             </button>
-            <button class="nav-item" onclick="switchTab('profile')">
-                <span class="nav-icon">👤</span>
-                <span>Профиль</span>
+            <button class="nav-item" onclick="switchTab('chat')">
+                <span class="nav-icon">👥</span>
+                <span>Чат</span>
             </button>
         </nav>
     </div>
@@ -224,6 +218,20 @@
                 <button class="close-modal-btn" onclick="closePetSelector()">✕</button>
             </div>
             <div class="pet-choices-grid" id="petChoicesGrid"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно профиля участника чата -->
+    <div id="userProfileModal" class="pet-modal-overlay" style="display: none;">
+        <div class="pet-modal-content glass-card">
+            <div class="pet-modal-header">
+                <h3 id="modalUsername">Профиль</h3>
+                <button class="close-modal-btn" onclick="closeUserProfileModal()">✕</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; margin-bottom: 16px;" id="modalUserDetails">
+                <!-- Заполняется динамически -->
+            </div>
+            <button class="wardrobe-shortcut-btn" onclick="closeUserProfileModal()" style="width: 100%; padding: 10px; font-size: 13px;">Закрыть</button>
         </div>
     </div>
 

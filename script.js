@@ -4,7 +4,8 @@ let userData = {
     currency: 0,
     inventory: [],
     catalog: [],
-    equipped: []
+    equipped: [],
+    registry: []
 };
 
 let selectedWardrobePart = 'all';
@@ -25,7 +26,6 @@ if (tg) {
     const user = tg.initDataUnsafe?.user;
     if (user) {
         document.getElementById('username').textContent = user.first_name || 'Пользователь';
-        document.getElementById('profile-id').textContent = user.id;
         if (user.photo_url) {
             document.getElementById('user-avatar').src = user.photo_url;
         }
@@ -36,9 +36,7 @@ async function fetchUserData() {
     try {
         const initData = tg?.initData || '';
         const response = await fetch('/api/me', {
-            headers: {
-                'X-Telegram-Init-Data': initData
-            }
+            headers: { 'X-Telegram-Init-Data': initData }
         });
         
         if (response.ok) {
@@ -47,12 +45,14 @@ async function fetchUserData() {
             userData.inventory = data.inventory || [];
             userData.catalog = data.catalog || [];
             userData.equipped = data.equipped || [];
+            userData.registry = data.registry || [];
 
             document.getElementById('user-balance').textContent = userData.currency;
             
             updatePetView();
             renderWardrobe();
             renderShop();
+            renderChatRegistry();
         } else {
             console.error('Ошибка авторизации в API');
         }
@@ -73,11 +73,68 @@ function switchTab(tabName) {
     if (tabName === 'wardrobe') navButtons[1].classList.add('active');
     if (tabName === 'play') navButtons[2].classList.add('active');
     if (tabName === 'shop') navButtons[3].classList.add('active');
-    if (tabName === 'profile') navButtons[4].classList.add('active');
+    if (tabName === 'chat') navButtons[4].classList.add('active');
 
     if (tabName === 'home') {
         updatePetView();
+    } else if (tabName === 'chat') {
+        fetchUserData(); // Обновляем реестр при переходе во вкладку
     }
+}
+
+function renderChatRegistry() {
+    const container = document.getElementById('chatUsersList');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!userData.registry || userData.registry.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">В реестре пока никого нет 💅</p>';
+        return;
+    }
+
+    userData.registry.forEach(member => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.style.cssText = 'padding: 12px; display: flex; align-items: center; justify-content: space-between;';
+
+        card.innerHTML = `
+            <div>
+                <h4 style="font-size: 14px; margin-bottom: 2px;">@${member.username}</h4>
+                <p style="font-size: 11px; color: var(--text-secondary);">${member.role_name} • RP: ${member.rp}</p>
+            </div>
+            <button class="category-tab active" style="padding: 6px 12px; font-size: 11px;">Профиль</button>
+        `;
+
+        card.onclick = () => {
+            showUserProfileModal(member);
+        };
+
+        container.appendChild(card);
+    });
+}
+
+function showUserProfileModal(member) {
+    const modal = document.getElementById('userProfileModal');
+    const title = document.getElementById('modalUsername');
+    const details = document.getElementById('modalUserDetails');
+
+    if (!modal || !title || !details) return;
+
+    title.textContent = `@${member.username}`;
+    details.innerHTML = `
+        <p><strong>Статус:</strong> ${member.role_name}</p>
+        <p><strong>Репутация (RP):</strong> ${member.rp}</p>
+        <p><strong>Валюта:</strong> ${member.currency} R$</p>
+        <p><strong>Надето вещей:</strong> ${member.equipped_count || 0}</p>
+    `;
+
+    modal.style.display = 'flex';
+}
+
+function closeUserProfileModal() {
+    const modal = document.getElementById('userProfileModal');
+    if (modal) modal.style.display = 'none';
 }
 
 function openPetSelector() {
@@ -90,9 +147,7 @@ function openPetSelector() {
 
 function closePetSelector() {
     const modal = document.getElementById('petSelectorModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    if (modal) modal.style.display = 'none';
 }
 
 function renderPetChoices() {
@@ -113,9 +168,7 @@ function renderPetChoices() {
             currentPetId = pet.id;
             updatePetView();
             closePetSelector();
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.notificationOccurred('success');
-            }
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         };
 
         grid.appendChild(card);
@@ -135,37 +188,17 @@ function updatePetView() {
         equippedPreview.textContent = 'Ничего не надето';
     } else {
         let accessoriesHtml = '';
-        equippedItems.forEach(item => {
-            let icon = '✨';
-            if (item.id.includes('cap') || item.id.includes('crown')) icon = '👑';
-            else if (item.id.includes('glasses')) icon = '🕶';
-            else if (item.id.includes('collar') || item.id.includes('leash')) icon = '💎';
-            
-            accessoriesHtml += `<span style="font-size: 24px; position: absolute; top: -5px; right: 25px;">${icon}</span>`;
+        equippedItems.forEach(() => {
+            accessoriesHtml += `<span style="font-size: 24px; position: absolute; top: -5px; right: 25px;">✨</span>`;
         });
-
         petDisplay.innerHTML = `<div style="position: relative; display: inline-block;">${petHtml}${accessoriesHtml}</div>`;
         equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
     }
-
-    petDisplay.onclick = () => {
-        const img = petDisplay.querySelector('.pet-avatar-img');
-        if (img) {
-            img.style.transform = 'scale(1.15) rotate(5deg)';
-            setTimeout(() => {
-                img.style.transform = 'scale(1)';
-            }, 200);
-        }
-        if (tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('medium');
-        }
-    };
 }
 
 function renderWardrobe() {
     const grid = document.getElementById('itemsGrid');
     if (!grid) return;
-
     grid.innerHTML = '';
 
     const filtered = userData.inventory.filter(item => {
@@ -183,13 +216,8 @@ function renderWardrobe() {
         const card = document.createElement('div');
         card.className = `item-card ${isEquipped ? 'equipped' : ''}`;
 
-        let icon = '✨';
-        if (item.id.includes('cap') || item.id.includes('crown')) icon = '👑';
-        else if (item.id.includes('glasses')) icon = '🕶';
-        else icon = '💎';
-
         card.innerHTML = `
-            <div class="item-art">${icon}</div>
+            <div class="item-art">✨</div>
             <div class="item-name">${item.name}</div>
             <div class="item-status-badge">${isEquipped ? 'Надето ✓' : 'Надеть'}</div>
         `;
@@ -218,7 +246,6 @@ function renderWardrobe() {
 function renderShop() {
     const grid = document.getElementById('shopItemsGrid');
     if (!grid) return;
-
     grid.innerHTML = '';
 
     const filtered = userData.catalog.filter(item => {
@@ -226,47 +253,22 @@ function renderShop() {
         return item.category === selectedShopCategory;
     });
 
-    if (filtered.length === 0) {
-        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">В магазине ничего нет.</p>';
-        return;
-    }
-
     filtered.forEach(item => {
         const card = document.createElement('div');
         card.className = `item-card ${item.owned ? 'equipped' : ''}`;
 
-        let icon = '✨';
-        if (item.id.includes('cap') || item.id.includes('crown')) icon = '👑';
-        else if (item.id.includes('glasses')) icon = '🕶';
-        else icon = '💎';
-
         let badgeText = `${item.price} R$`;
-        if (item.owned) {
-            badgeText = 'Куплено ✓';
-        } else if (!item.allowed) {
-            badgeText = 'Нужен VIP 🛑';
-        }
+        if (item.owned) badgeText = 'Куплено ✓';
+        else if (!item.allowed) badgeText = 'Нужен VIP 🛑';
 
         card.innerHTML = `
-            <div class="item-art">${icon}</div>
+            <div class="item-art">🛍️</div>
             <div class="item-name">${item.name}</div>
             <div class="item-status-badge">${badgeText}</div>
         `;
 
         card.addEventListener('click', async () => {
-            if (item.owned) {
-                tg?.showAlert?.('У тебя уже есть эта вещь! Проверь гардероб 💅');
-                return;
-            }
-            if (!item.allowed) {
-                tg?.showAlert?.('Этот товар доступен только для VIP-статусов (dura / boss)! 🛑');
-                return;
-            }
-            if (userData.currency < item.price) {
-                tg?.showAlert?.(`Не хватает R$! Нужно ${item.price} R$, а у тебя всего ${userData.currency} R$. 📉`);
-                return;
-            }
-
+            if (item.owned || !item.allowed) return;
             try {
                 const res = await fetch(`/api/buy/${item.id}`, {
                     method: 'POST',
@@ -277,14 +279,9 @@ function renderShop() {
                     userData.currency = data.currency;
                     userData.inventory = data.inventory;
                     userData.catalog = data.catalog;
-
                     document.getElementById('user-balance').textContent = userData.currency;
                     renderShop();
                     renderWardrobe();
-                    tg?.showAlert?.(`Успешная покупка: ${item.name}! 🎉`);
-                } else {
-                    const err = await res.json();
-                    tg?.showAlert?.(`Ошибка покупки: ${err.error || 'неизвестно'}`);
                 }
             } catch (e) {
                 console.error('Ошибка при покупке:', e);
@@ -295,229 +292,58 @@ function renderShop() {
     });
 }
 
-// Автоматический перехват параметров URL и навешивание слушателей
 window.addEventListener('DOMContentLoaded', () => {
-    const wardrobeTabsContainer = document.getElementById('wardrobeCategoryTabs');
-    if (wardrobeTabsContainer) {
-        wardrobeTabsContainer.addEventListener('click', event => {
+    const wardrobeTabs = document.getElementById('wardrobeCategoryTabs');
+    if (wardrobeTabs) {
+        wardrobeTabs.addEventListener('click', event => {
             const tab = event.target.closest('[data-part]');
             if (!tab) return;
-
             selectedWardrobePart = tab.dataset.part;
-            wardrobeTabsContainer.querySelectorAll('.category-tab').forEach(btn => {
-                btn.classList.toggle('active', btn === tab);
-            });
+            wardrobeTabs.querySelectorAll('.category-tab').forEach(b => b.classList.toggle('active', b === tab));
             renderWardrobe();
         });
     }
 
-    const shopTabsContainer = document.getElementById('shopCategoryTabs');
-    if (shopTabsContainer) {
-        shopTabsContainer.addEventListener('click', event => {
+    const shopTabs = document.getElementById('shopCategoryTabs');
+    if (shopTabs) {
+        shopTabs.addEventListener('click', event => {
             const tab = event.target.closest('[data-shopcat]');
             if (!tab) return;
-
             selectedShopCategory = tab.dataset.shopcat;
-            shopTabsContainer.querySelectorAll('.category-tab').forEach(btn => {
-                btn.classList.toggle('active', btn === tab);
-            });
+            shopTabs.querySelectorAll('.category-tab').forEach(b => b.classList.toggle('active', b === tab));
             renderShop();
         });
-    }
-
-    // Обработка параметров URL при старте (дуэль)
-    const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('mode');
-    const challenger = urlParams.get('challenger');
-
-    if (mode === 'duo' && challenger) {
-        switchTab('play');
-        startTttGame('duo');
     }
 
     fetchUserData();
 });
 
-// --- ЛОГИКА МИНИ-ИГР ВО ВКЛАДКЕ PLAY ---
-
-function openGameMenu(gameName) {
-    if (gameName === 'tictactoe') {
+// Мини-игры и дуэли
+function openGameMenu(name) {
+    if (name === 'tictactoe') {
         document.getElementById('games-menu').style.display = 'none';
         document.getElementById('tictactoe-modes').style.display = 'flex';
-        document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️';
-    } else if (gameName === 'fortune') {
-        alert('Скоро открытие Колеса Фортуны! 💅');
     }
 }
-
 function startTttGame(mode) {
-    tttMode = mode; // 'solo' или 'duo'
+    tttMode = mode;
     document.getElementById('games-menu').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'none';
     document.getElementById('game-tictactoe').style.display = 'flex';
-    document.getElementById('play-subtitle').textContent = mode === 'solo' ? 'Игра против бота 🤖' : 'Крестики-нолики на двоих 👥';
-    resetTtt();
 }
-
-function backTttModes() {
-    document.getElementById('game-tictactoe').style.display = 'none';
-    document.getElementById('tictactoe-modes').style.display = 'flex';
-    document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️️';
-}
-
 function closeGame() {
     document.getElementById('game-tictactoe').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'none';
     document.getElementById('games-menu').style.display = 'flex';
-    document.getElementById('play-subtitle').textContent = 'Выбирай развлечение и играй 🎮';
 }
-
-// --- ЛОГИКА КРЕСТИКОВ-НОЛИКОВ ---
-let tttBoard = ['', '', '', '', '', '', '', '', ''];
-let tttCurrentPlayer = 'X';
-let tttIsActive = true;
-let tttMode = 'duo';
-
-const winningCombinations = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],
-    [0, 4, 8], [2, 4, 6]
-];
-
-function makeMove(index) {
-    if (!tttIsActive || tttBoard[index] !== '') return;
-    if (tttMode === 'solo' && tttCurrentPlayer === 'O') return;
-
-    tttBoard[index] = tttCurrentPlayer;
-    
-    if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('light');
-    }
-
-    renderTttBoard();
-    
-    if (checkTttWinOrDraw()) return;
-
-    tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
-    updateTttStatus();
-
-    if (tttMode === 'solo' && tttCurrentPlayer === 'O' && tttIsActive) {
-        setTimeout(botMove, 500);
-    }
+function backTttModes() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'flex';
 }
-
-function botMove() {
-    if (!tttIsActive) return;
-
-    let emptyCells = [];
-    tttBoard.forEach((cell, idx) => {
-        if (cell === '') emptyCells.push(idx);
-    });
-
-    if (emptyCells.length === 0) return;
-
-    let randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    tttBoard[randomIndex] = 'O';
-
-    if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('medium');
-    }
-
-    renderTttBoard();
-
-    if (checkTttWinOrDraw()) return;
-
-    tttCurrentPlayer = 'X';
-    updateTttStatus();
-}
-
-function renderTttBoard() {
-    const cells = document.querySelectorAll('.ttt-cell');
-    cells.forEach((cell, index) => {
-        cell.textContent = tttBoard[index];
-        cell.style.color = tttBoard[index] === 'X' ? '#ec4899' : '#8b5cf6';
-    });
-}
-
-function checkTttWinOrDraw() {
-    let roundWon = false;
-
-    for (let i = 0; i < winningCombinations.length; i++) {
-        const [a, b, c] = winningCombinations[i];
-        if (tttBoard[a] && tttBoard[a] === tttBoard[b] && tttBoard[a] === tttBoard[c]) {
-            roundWon = true;
-            break;
-        }
-    }
-
-    const statusText = document.getElementById('ttt-status');
-
-    if (roundWon) {
-        if (tttMode === 'solo') {
-            statusText.textContent = tttCurrentPlayer === 'X' ? 'Вы победили! 🎉' : 'Бот победил! 🤖';
-        } else {
-            statusText.textContent = `Победил игрок ${tttCurrentPlayer} 🎉`;
-        }
-        tttIsActive = false;
-        if (tg?.HapticFeedback) {
-            tg.HapticFeedback.notificationOccurred('success');
-        }
-        return true;
-    }
-
-    if (!tttBoard.includes('')) {
-        statusText.textContent = `Ничья! 🤝`;
-        tttIsActive = false;
-        return true;
-    }
-
-    return false;
-}
-
-function updateTttStatus() {
-    const statusText = document.getElementById('ttt-status');
-    if (!statusText) return;
-
-    if (tttMode === 'solo') {
-        statusText.textContent = tttCurrentPlayer === 'X' ? 'Ваш ход (Х)' : 'Бот думает... (О)';
-    } else {
-        statusText.textContent = `Ходит: ${tttCurrentPlayer} (${tttCurrentPlayer === 'X' ? 'Крестики' : 'Нолики'})`;
-    }
-}
-
-function resetTtt() {
-    tttBoard = ['', '', '', '', '', '', '', '', ''];
-    tttCurrentPlayer = 'X';
-    tttIsActive = true;
-    updateTttStatus();
-    renderTttBoard();
-}
-
-// Управление модальным окном дуэли
-function openChallengeModal() {
-    const modal = document.getElementById('challenge-modal');
-    if (modal) modal.style.display = 'flex';
-}
-
-function closeChallengeModal() {
-    const modal = document.getElementById('challenge-modal');
-    if (modal) modal.style.display = 'none';
-}
-
-// Отправка вызова через Telegram WebApp (через inline-запрос в чат)
+function openChallengeModal() { document.getElementById('challenge-modal').style.display = 'flex'; }
+function closeChallengeModal() { document.getElementById('challenge-modal').style.display = 'none'; }
 function shareChallengeLink() {
-    const gameSelect = document.getElementById('challenge-game-select');
-    const gameType = gameSelect ? gameSelect.value : 'ttt';
-    
-    // Берем реальный ID пользователя из Telegram, а если его нет — заглушку
     const userId = tg?.initDataUnsafe?.user?.id || '0';
-    const query = `challenge_${gameType}_${userId}`;
-    
-    if (tg?.switchInlineQuery) {
-        // Передаем параметры без ограничений по типу чатов
-        tg.switchInlineQuery(query);
-    } else {
-        alert('Функция доступна только внутри Telegram!');
-    }
+    if (tg?.switchInlineQuery) tg.switchInlineQuery(`challenge_ttt_${userId}`);
     closeChallengeModal();
 }
