@@ -118,6 +118,14 @@
                         </div>
                         <button class="category-tab active" style="pointer-events: none;">Выбрать</button>
                     </div>
+
+                    <div class="glass-card game-card" onclick="openChallengeModal()" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <div>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">⚔️️ Дуэль по ссылке</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Вызвать друга через чат Telegram</p>
+                        </div>
+                        <button class="category-tab active" style="pointer-events: none;">Вызвать</button>
+                    </div>
                 </div>
 
                 <!-- Игровое поле Крестиков-ноликов -->
@@ -208,8 +216,6 @@
         </nav>
     </div>
 
-    <script src="script.js"></script>
-
     <!-- Модальное окно смены питомца -->
     <div id="petSelectorModal" class="pet-modal-overlay" style="display: none;">
         <div class="pet-modal-content glass-card">
@@ -220,25 +226,27 @@
             <div class="pet-choices-grid" id="petChoicesGrid"></div>
         </div>
     </div>
+
+    <!-- Модальное окно вызова друга на дуэль -->
+    <div id="challenge-modal" class="pet-modal-overlay" style="display: none;">
+        <div class="pet-modal-content glass-card">
+            <div class="pet-modal-header">
+                <h3>⚔️ Вызов на дуэль</h3>
+                <button class="close-modal-btn" onclick="closeChallengeModal()">✕</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+                <p style="font-size: 13px; color: var(--text-secondary);">Выберите игру для дуэли:</p>
+                <select id="challenge-game-select" style="background: var(--card-bg); border: 1px solid var(--card-border); color: white; padding: 10px; border-radius: 12px; outline: none;">
+                    <option value="ttt" style="background: #181925;">Крестики-нолики</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="wardrobe-shortcut-btn" onclick="shareChallengeLink()" style="flex: 1; padding: 10px; font-size: 13px;">🔗 Отправить</button>
+                <button class="close-modal-btn" onclick="closeChallengeModal()" style="width: auto; padding: 0 16px; border-radius: 14px; font-size: 13px;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
-
-<!-- Пример добавления кнопки вызова в блок крестиков-ноликов или общее меню -->
-<div id="ttt-mode-selector" class="mode-selector">
-    <button class="btn-mode" onclick="startTttGame('solo')">👤 С ботом</button>
-    <button class="btn-mode duo-btn" onclick="openChallengeModal()">⚔️ Дуэль с другом</button>
-</div>
-
-<!-- Модальное окно или блок подтверждения вызова друга -->
-<div id="challenge-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h3>⚔️ Вызов на дуэль</h3>
-        <p>Выберите игру для дуэли:</p>
-        <select id="challenge-game-select">
-            <option value="ttt">Крестики-нолики</option>
-            <!-- Здесь можно добавить другие игры, если они есть -->
-        </select>
-        <button class="btn-primary" onclick="shareChallengeLink()">🔗 Отправить вызов в чат</button>
-        <button class="btn-secondary" onclick="closeChallengeModal()">Отмена</button>
-    </div>
-</div>

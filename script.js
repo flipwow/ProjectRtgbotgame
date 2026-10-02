@@ -128,7 +128,7 @@ function updatePetView() {
     const equippedItems = userData.inventory.filter(item => userData.equipped.includes(item.id));
 
     const activePet = AVAILABLE_PETS.find(p => p.id === currentPetId) || AVAILABLE_PETS[0];
-    let petHtml = `<img src="${activePet.img}" alt="${activePet.name}" class="pet-avatar-img">`;
+    let petHtml = `<img src="${activePet.img}" alt="${activePet.name}" class="pet-avatar-img" style="width: 100px; height: 100px; object-fit: contain;">`;
 
     if (equippedItems.length === 0) {
         petDisplay.innerHTML = petHtml;
@@ -295,7 +295,7 @@ function renderShop() {
     });
 }
 
-// Автоматический перехват параметров URL для дуэли при запуске
+// Автоматический перехват параметров URL и навешивание слушателей
 window.addEventListener('DOMContentLoaded', () => {
     const wardrobeTabsContainer = document.getElementById('wardrobeCategoryTabs');
     if (wardrobeTabsContainer) {
@@ -362,7 +362,7 @@ function startTttGame(mode) {
 function backTttModes() {
     document.getElementById('game-tictactoe').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'flex';
-    document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️';
+    document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️️';
 }
 
 function closeGame() {
@@ -386,12 +386,11 @@ const winningCombinations = [
 
 function makeMove(index) {
     if (!tttIsActive || tttBoard[index] !== '') return;
-
     if (tttMode === 'solo' && tttCurrentPlayer === 'O') return;
 
     tttBoard[index] = tttCurrentPlayer;
     
-    if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
+    if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
 
@@ -418,10 +417,9 @@ function botMove() {
     if (emptyCells.length === 0) return;
 
     let randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    
     tttBoard[randomIndex] = 'O';
 
-    if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
+    if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('medium');
     }
 
@@ -461,7 +459,7 @@ function checkTttWinOrDraw() {
             statusText.textContent = `Победил игрок ${tttCurrentPlayer} 🎉`;
         }
         tttIsActive = false;
-        if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
+        if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
         return true;
@@ -495,7 +493,7 @@ function resetTtt() {
     renderTttBoard();
 }
 
-// Открытие модального окна выбора дуэли
+// Управление модальным окном дуэли
 function openChallengeModal() {
     const modal = document.getElementById('challenge-modal');
     if (modal) modal.style.display = 'flex';
@@ -506,35 +504,16 @@ function closeChallengeModal() {
     if (modal) modal.style.display = 'none';
 }
 
-// Отправка вызова через Telegram WebApp (поделиться инлайн-запросом в чат)
+// Отправка вызова через Telegram WebApp (через inline-запрос в чат)
 function shareChallengeLink() {
     const gameSelect = document.getElementById('challenge-game-select');
     const gameType = gameSelect ? gameSelect.value : 'ttt';
-    
-    // Формируем текст или инлайн-запрос для вызова друга
-    // Telegram позволяет использовать switchInlineQuery для отправки ссылки-приглашения в любой чат
     const query = `challenge_${gameType}_${tg?.initDataUnsafe?.user?.id || 'user'}`;
     
-    if (typeof tg !== 'undefined' && tg.switchInlineQuery) {
-        // Открывает меню выбора чата для отправки инлайн-результата
+    if (tg?.switchInlineQuery) {
         tg.switchInlineQuery(query, ['users', 'groups', 'channels']);
     } else {
         alert('Функция доступна только внутри Telegram!');
     }
     closeChallengeModal();
 }
-
-// При загрузке страницы проверяем, открыта ли игра по вызову (параметры URL)
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('mode');
-    const game = urlParams.get('game');
-    
-    if (mode === 'duo') {
-        // Если открыто по ссылке дуэли, сразу запускаем нужную игру в режиме duo
-        if (game === 'ttt' || !game) {
-            // Переключаемся на вкладку игры, если нужно, и запускаем duo
-            startTttGame('duo');
-        }
-    }
-});

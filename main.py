@@ -110,10 +110,7 @@ def load_users():
         return {}
 
 
-def save_user_to_json(user_id, user_data):
-    users = load_users()
-    # Превращаем user_id в строку, так как ключи в JSON всегда строки
-    users[str(user_id)] = user_data
+def save_users(users):
     with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
@@ -124,7 +121,6 @@ def save_user_to_json(user_id, user_data):
 
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8080
-
 WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
 
@@ -214,7 +210,6 @@ def get_webapp_user(request):
 
 
 def get_full_shop_catalog(user_info):
-    """Возвращает полный каталог магазина с информацией о том, куплен ли товар и доступен ли по роли."""
     catalog = []
     inventory = user_info.get("inventory", [])
     user_role = user_info.get("role", "noob")
@@ -947,9 +942,7 @@ async def inline_challenge_handler(inline_query: InlineQuery):
         game_type = parts[1] if len(parts) > 1 else "ttt"
         challenger_id = parts[2] if len(parts) > 2 else "0"
 
-        # Ссылка, по которой второй игрок перейдет в Mini App для дуэли
         webapp_url = f"{WEBAPP_ORIGIN}?mode=duo&game={game_type}&challenger={challenger_id}&chat_id={inline_query.from_user.id}"
-
         result_id = f"duel_{game_type}_{inline_query.from_user.id}"
 
         articles = [
@@ -1048,7 +1041,7 @@ async def handle_text(message: Message):
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}\n\n(Справочно для времени: в Москве {moscow_time})"
 
         response = client.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model="gemini-2.5-flash",
             contents=text,
             config={
                 "system_instruction": dynamic_system_prompt,
