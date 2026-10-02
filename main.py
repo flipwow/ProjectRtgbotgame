@@ -978,7 +978,7 @@ async def handle_text(message: Message):
 
         # Прямой запрос к модели без сохранения зависающих сессий чата
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash-lite",
             contents=text,
             config={
                 "system_instruction": dynamic_system_prompt,
