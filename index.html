@@ -1,78 +1,115 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Mini App</title>
-    <!-- Подключаем стили -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Подключаем Telegram Web App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head>
-<body>
-    <div class="app-container">
-        <!-- Шапка профиля -->
-        <header class="profile-header glass-card">
-            <div class="profile-info">
-                <div class="avatar-wrapper">
-                    <img id="user-avatar" src="https://via.placeholder.com/60" alt="Avatar">
-                </div>
-                <div>
-                    <h2 id="username">Загрузка...</h2>
-                    <div class="balance-badge">
-                        <span class="coin-icon">💎</span>
-                        <span id="user-balance">0</span>
-                    </div>
-                </div>
-            </div>
-        </header>
+const tg = window.Telegram?.WebApp;
 
-        <!-- Основной контент (Вкладки) -->
-        <main class="content-area">
-            <!-- Вкладка: Магазин -->
-            <section id="tab-shop" class="tab-content active">
-                <h3>Магазин стилей</h3>
-                <div id="shop-items" class="items-grid">
-                    <!-- Сюда товары будут подгружаться через JS -->
-                </div>
-            </section>
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
 
-            <!-- Вкладка: Гардероб -->
-            <section id="tab-wardrobe" class="tab-content">
-                <h3>Мой гардероб</h3>
-                <div id="wardrobe-items" class="items-grid">
-                    <!-- Сюда купленные вещи будут подгружаться через JS -->
-                </div>
-            </section>
+// Демо-каталог предметов (в будущем подтянется из бэкенда)
+let userInventory = [
+    { id: 'cap_pink', name: 'Розовая кепка', icon: '🧢', category: 'head', equipped: true },
+    { id: 'glasses_pink', name: 'Розовые очки', icon: '🕶️', category: 'glasses', equipped: false },
+    { id: 'collar', name: 'Ошейник из страз', icon: '💎', category: 'accessory', equipped: false }
+];
 
-            <!-- Вкладка: Профиль -->
-            <section id="tab-profile" class="tab-content">
-                <h3>Информация</h3>
-                <div class="glass-card info-card">
-                    <p><strong>ID пользователя:</strong> <span id="profile-id">-</span></p>
-                    <p><strong>Статус:</strong> <span class="status-active">Активен</span></p>
-                </div>
-            </section>
-        </main>
+let selectedCategory = 'all';
 
-        <!-- Нижняя навигация -->
-        <nav class="bottom-nav glass-card">
-            <button class="nav-item active" onclick="switchTab('shop')">
-                <span class="nav-icon">🛍️</span>
-                <span>Магазин</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('wardrobe')">
-                <span class="nav-icon">👗</span>
-                <span>Гардероб</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('profile')">
-                <span class="nav-icon">👤</span>
-                <span>Профиль</span>
-            </button>
-        </nav>
-    </div>
+// Переключение вкладок
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
 
-    <!-- Подключаем логику -->
-    <script src="script.js"></script>
-</body>
-</html>
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    
+    // Находим нужную кнопку навигации и подсвечиваем
+    const navButtons = document.querySelectorAll('.nav-item');
+    if (tabName === 'home') navButtons[0].classList.add('active');
+    if (tabName === 'wardrobe') navButtons[1].classList.add('active');
+    if (tabName === 'shop') navButtons[2].classList.add('active');
+    if (tabName === 'profile') navButtons[3].classList.add('active');
+
+    if (tabName === 'home') {
+        updatePetView();
+    }
+}
+
+// Обновление отображения питомца на главной
+function updatePetView() {
+    const petDisplay = document.getElementById('petDisplay');
+    const equippedPreview = document.getElementById('equippedPreview');
+
+    const equippedItems = userInventory.filter(item => item.equipped);
+
+    if (equippedItems.length === 0) {
+        petDisplay.innerHTML = `<span class="pet-emoji">🐾</span>`;
+        equippedPreview.textContent = 'Ничего не надето (голышом 🥶)';
+    } else {
+        // Показываем базовую лапку + иконки надетых вещей
+        let iconsHtml = `<span class="pet-emoji">🐾</span>`;
+        equippedItems.forEach(item => {
+            iconsHtml += `<span style="font-size: 40px; margin-left: -10px;">${item.icon}</span>`;
+        });
+        petDisplay.innerHTML = iconsHtml;
+        equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
+    }
+}
+
+// Отрисовка гардероба (примерка)
+function renderWardrobe() {
+    const grid = document.getElementById('itemsGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    const filtered = userInventory.filter(item => 
+        selectedCategory === 'all' || item.category === selectedCategory
+    );
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px;">В этой категории пока нет вещей. Загляни в бутик! 🛍️</p>';
+        return;
+    }
+
+    filtered.forEach(item => {
+        const card = document.createElement('div');
+        card.className = `item-card ${item.equipped ? 'equipped' : ''}`;
+
+        card.innerHTML = `
+            <div class="item-art">${item.icon}</div>
+            <div class="item-name">${item.name}</div>
+            <div class="item-status-badge">${item.equipped ? 'Надето ✓' : 'Надеть'}</div>
+        `;
+
+        card.addEventListener('click', () => {
+            // Переключаем статус вещи
+            item.equipped = !item.equipped;
+            renderWardrobe();
+            updatePetView();
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+// Обработка кликов по категориям в гардеробе
+document.addEventListener('DOMContentLoaded', () => {
+    const tabsContainer = document.getElementById('categoryTabs');
+    if (tabsContainer) {
+        tabsContainer.addEventListener('click', event => {
+            const tab = event.target.closest('[data-category]');
+            if (!tab) return;
+
+            selectedCategory = tab.dataset.category;
+
+            tabsContainer.querySelectorAll('.category-tab').forEach(btn => {
+                btn.classList.toggle('active', btn === tab);
+            });
+
+            renderWardrobe();
+        });
+    }
+
+    // Инициализация при старте
+    updatePetView();
+    renderWardrobe();
+});
