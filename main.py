@@ -452,7 +452,9 @@ def get_main_hub_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="👤 Профиль", callback_data="menu_profile"),
-                InlineKeyboardButton(text="🛍 Бутик", callback_data="menu_shop"),
+                InlineKeyboardButton(
+                    text="👥 Реестр чата", callback_data="menu_registry"
+                ),
             ],
             [
                 InlineKeyboardButton(text="🔄 Обмен RP", callback_data="menu_convert"),
@@ -713,6 +715,35 @@ async def unified_menu_router(callback: CallbackQuery):
             f"🔄 **Конвертация RP в R$**\n\nОбмен прошел успешно! 🎉\nТвой RP: `{rp}` | R$: `{user_cash}`\nВыбери сумму:",
             reply_markup=keyboard,
             parse_mode="Markdown",
+        )
+
+    elif data == "menu_registry":
+        users_data = load_users()
+        if not users_data:
+            registry_text = "👥 **Реестр питомцев пуст...** Никто еще не зарегистрировался в базе 💅"
+        else:
+            registry_lines = []
+            for uname, udata in users_data.items():
+                role_key = udata.get("role", "noob")
+                role_name = ROLES_HIERARCHY.get(role_key, {}).get("name", role_key)
+                rp = udata.get("rp", 0)
+                registry_lines.append(f"• @{uname} — **{role_name}** (RP: `{rp}`)")
+
+            registry_text = "👥 **Список зарегистрированных в базе:**\n\n" + "\n".join(
+                registry_lines
+            )
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="◀️ В главное меню", callback_data="menu_hub"
+                    )
+                ]
+            ]
+        )
+        await callback.message.edit_text(
+            registry_text, reply_markup=keyboard, parse_mode="Markdown"
         )
 
     elif data == "menu_roles":
