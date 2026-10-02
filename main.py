@@ -467,30 +467,21 @@ async def unified_menu_router(callback: CallbackQuery):
         role_name = ROLES_HIERARCHY.get(user_role, {}).get("name", user_role)
         user_cash = user_info.get("r_currency", 0)
 
-        inv_text = (
-            ", ".join([get_item_name(i) for i in inventory])
-            if inventory
-            else "Пусто (голышом 🙄)"
-        )
-        eq_text = (
-            ", ".join([get_item_name(e) for e in equipped])
-            if equipped
-            else "Ничего не надето"
-        )
-
+        # Убрали текст про инвентарь и надетые вещи, теперь они в Mini App!
         text = (
             f"👑 **Королевское досье питомца @{username}** 👑\n\n"
             f"• **Статус:** {role_name}\n"
             f"• **Репутация (RP):** `{rp} / {max_rp}`\n"
-            f"• **Валюта (R$):** `{user_cash} R$`\n"
-            f"• **Надето на питомце:** {eq_text}\n"
-            f"• **Инвентарь:** {inv_text}"
+            f"• **Валюта (R$):** `{user_cash} R$`"
         )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="🎮 Переодеть питомца", callback_data="menu_dressup"
+                        text="🎮 Открыть гардероб в игре",
+                        web_app=WebAppInfo(
+                            url="https://projectrtgbotgame.onrender.com"
+                        ),
                     )
                 ],
                 [
@@ -502,27 +493,6 @@ async def unified_menu_router(callback: CallbackQuery):
         )
         await callback.message.edit_text(
             text, reply_markup=keyboard, parse_mode="Markdown"
-        )
-
-    elif data == "menu_shop" or data == "shop_main":
-        user_cash = user_info.get("r_currency", 0)
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="🏷 Sale", callback_data="shop_sale"),
-                    InlineKeyboardButton(text="💎 Luxury", callback_data="shop_luxury"),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="◀️ В главное меню", callback_data="menu_hub"
-                    )
-                ],
-            ]
-        )
-        await callback.message.edit_text(
-            f"🛍️ **Бутик Ритушки**\nТвой баланс: `{user_cash} R$`\n\nВыбирай категорию товаров:",
-            reply_markup=keyboard,
-            parse_mode="Markdown",
         )
 
     elif data == "shop_sale":

@@ -1,5 +1,12 @@
 const tg = window.Telegram?.WebApp;
 
+let userData = {
+    currency: 0,
+    inventory: [],
+    equipped: []
+};
+let selectedCategory = 'all';
+
 if (tg) {
     tg.ready();
     tg.expand();
@@ -13,14 +20,34 @@ if (tg) {
     }
 }
 
-// Демо-инвентарь (вещи в гардеробе)
-let userInventory = [
-    { id: 'cap_pink', name: 'Розовая кепка', icon: '🧢', category: 'head', equipped: true },
-    { id: 'glasses_pink', name: 'Розовые очки', icon: '🕶️', category: 'glasses', equipped: false },
-    { id: 'collar', name: 'Ошейник из страз', icon: '💎', category: 'accessory', equipped: false }
-];
+// Загрузка данных с бэкенда (из users.json через API)
+async function fetchUserData() {
+    try {
+        const initData = tg?.initData || '';
+        const response = await fetch('/api/me', {
+            headers: {
+                'X-Telegram-Init-Data': initData
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            userData.currency = data.currency || 0;
+            userData.inventory = data.inventory || [];
+            userData.equipped = data.equipped || [];
 
-let selectedCategory = 'all';
+            // Обновляем баланс на экране
+            document.getElementById('user-balance').textContent = userData.currency;
+            
+            updatePetView();
+            renderWardrobe();
+        } else {
+            console.error('Ошибка авторизации в API');
+        }
+    } catch (e) {
+        console.error('Не удалось загрузить данные профиля:', e);
+    }
+}
 
 // Переключение вкладок
 function switchTab(tabName) {
@@ -44,7 +71,7 @@ function switchTab(tabName) {
 function updatePetView() {
     const petDisplay = document.getElementById('petDisplay');
     const equippedPreview = document.getElementById('equippedPreview');
-    const equippedItems = userInventory.filter(item => item.equipped);
+    const equippedItems = userData.inventory.filter(item => userData.equipped.includes(item.id));
 
     if (equippedItems.length === 0) {
         petDisplay.innerHTML = `<span class="pet-emoji">🐾</span>`;
@@ -52,43 +79,69 @@ function updatePetView() {
     } else {
         let iconsHtml = `<span class="pet-emoji">🐾</span>`;
         equippedItems.forEach(item => {
-            iconsHtml += `<span style="font-size: 36px; margin-left: -8px;">${item.icon}</span>`;
+            // Подбираем иконку под ID вещи
+            let icon = '✨';
+            if (item.id.includes('cap')) icon = '🧢';
+            else if (item.id.includes('glasses')) icon = '🕶️';
+            else if (item.id.includes('collar')) icon = '💎';
+            else if (item.id.includes('crown')) icon = '👑';
+            
+            iconsHtml += `<span style="font-size: 36px; margin-left: -8px;">${icon}</span>`;
         });
         petDisplay.innerHTML = iconsHtml;
         equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
     }
 }
 
-// Отрисовка гардероба
+// Отрисовка гардероба (вещей из инвентаря)
 function renderWardrobe() {
     const grid = document.getElementById('itemsGrid');
     if (!grid) return;
 
     grid.innerHTML = '';
 
-    const filtered = userInventory.filter(item => 
-        selectedCategory === 'all' || item.category === selectedCategory
-    );
+    const filtered = userData.inventory.filter(item => {
+        if (selectedCategory === 'all') return true;
+        return item.category === selectedCategory;
+    });
 
     if (filtered.length === 0) {
-        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">Здесь пока пусто</p>';
+        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">Инвентарь пуст. Купи что-нибудь в бутик-разделе! 🛍️</p>';
         return;
     }
 
     filtered.forEach(item => {
+        const isEquipped = userData.equipped.includes(item.id);
         const card = document.createElement('div');
-        card.className = `item-card ${item.equipped ? 'equipped' : ''}`;
+        card.className = `item-card ${isEquipped ? 'equipped' : ''}`;
+
+        let icon = '✨';
+        if (item.id.includes('cap')) icon = '🧢';
+        else if (item.id.includes('glasses')) icon = '🕶️️';
+        else if (item.id.includes('collar')) icon = '💎';
+        else if (item.id.includes('crown')) icon = '👑';
 
         card.innerHTML = `
-            <div class="item-art">${item.icon}</div>
+            <div class="item-art">${icon}</div>
             <div class="item-name">${item.name}</div>
-            <div class="item-status-badge">${item.equipped ? 'Надето ✓' : 'Надеть'}</div>
+            <div class="item-status-badge">${isEquipped ? 'Надето ✓' : 'Надеть'}</div>
         `;
 
-        card.addEventListener('click', () => {
-            item.equipped = !item.equipped;
-            renderWardrobe();
-            updatePetView();
+        card.addEventListener('click', async () => {
+            try {
+                const res = await fetch(`/api/equip/${item.id}`, {
+                    method: 'POST',
+                    headers: { 'X-Telegram-Init-Data': tg?.initData || '' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    userData.equipped = data.equipped;
+                    renderWardrobe();
+                    updatePetView();
+                }
+            } catch (e) {
+                console.error('Ошибка при переодевании:', e);
+            }
         });
 
         grid.appendChild(card);
@@ -111,6 +164,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    updatePetView();
-    renderWardrobe();
+    fetchUserData();
 });
