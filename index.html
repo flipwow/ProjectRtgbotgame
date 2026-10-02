@@ -121,9 +121,9 @@
                     </div>
                 </div>
 
-                <!-- Игровое поле Крестиков-ноликов -->
-                <button class="category-tab" onclick="backTttModes()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">← К выбору режима</button>
-                    <button class="category-tab" onclick="backToTttModes()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">← К выбору режима</button>
+                <!-- Игровое поле Крестиков-ноликов (скрыто по умолчанию, управляется скриптом) -->
+                <div id="game-tictactoe" style="display: none; flex-direction: column; gap: 10px;">
+                    <button class="category-tab" onclick="backTttModes()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">← К выбору режима</button>
                     
                     <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;">
                         <div id="ttt-status" style="font-size: 13px; font-weight: 600; color: #c4b5fd;">Ходит: Х (Крестики)</div>
@@ -136,7 +136,7 @@
                             <button class="ttt-cell" onclick="makeMove(4)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
                             <button class="ttt-cell" onclick="makeMove(5)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
                             <button class="ttt-cell" onclick="makeMove(6)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMatch(7) || makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
                             <button class="ttt-cell" onclick="makeMove(8)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
                         </div>
 
