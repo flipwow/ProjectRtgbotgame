@@ -435,7 +435,9 @@ def get_main_hub_keyboard():
             [
                 InlineKeyboardButton(
                     text="🎮 RituhaGame",
-                    web_app=WebAppInfo(url="https://flipwow.github.io/TGbotGame/"),
+                    web_app=WebAppInfo(
+                        url="https://flipwow.github.io/ProjectRtgbotgame/"
+                    ),
                 )
             ],
         ]
