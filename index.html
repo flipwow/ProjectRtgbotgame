@@ -45,9 +45,10 @@
                     </div>
                 </div>
 
-                <button class="wardrobe-shortcut-btn" onclick="switchTab('wardrobe')">
-                    <span class="btn-icon">👗</span>
-                    <span>Перейти в гардероб</span>
+                <!-- Кнопка смены питомца вместо гардероба -->
+                <button class="wardrobe-shortcut-btn" onclick="openPetSelector()">
+                    <span class="btn-icon">🔄</span>
+                    <span>Сменить питомца</span>
                     <span class="arrow">→</span>
                 </button>
             </section>
@@ -142,5 +143,19 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- Модальное окно смены питомца -->
+    <div id="petSelectorModal" class="pet-modal-overlay" style="display: none;">
+        <div class="pet-modal-content glass-card">
+            <div class="pet-modal-header">
+                <h3>Выбери питомца 🐾</h3>
+                <button class="close-modal-btn" onclick="closePetSelector()">✕</button>
+            </div>
+            <div class="pet-choices-grid" id="petChoicesGrid">
+                <!-- Список питомцев генерируется динамически через JS -->
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
