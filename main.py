@@ -980,7 +980,7 @@ async def handle_text(message: Message):
         # ИСПРАВЛЕНИЕ: Использование актуального интерфейса SDK для чатов
         if chat_id not in chat_sessions:
             chat_sessions[chat_id] = client.chats.create(
-                model="gemini-2.5-flash",
+                model="gemini-3.5-flash-lite",
                 config={"system_instruction": dynamic_system_prompt},
             )
 
