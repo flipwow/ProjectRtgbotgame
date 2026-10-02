@@ -850,21 +850,36 @@ async def cmd_duel(message: Message):
     user = message.from_user
     username = (user.username or user.first_name or "user").lower()
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⚔️ Принять вызов",
-                    web_app=WebAppInfo(
-                        url=f"{WEBAPP_ORIGIN}?mode=duo&challenger={user.id}"
-                    ),
-                )
+    # В личке можно использовать web_app, в группе — только url
+    if message.chat.type == "private":
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="⚔️ Принять вызов",
+                        web_app=WebAppInfo(
+                            url=f"{WEBAPP_ORIGIN}?mode=duo&challenger={user.id}"
+                        ),
+                    )
+                ]
             ]
-        ]
-    )
+        )
+    else:
+        # Для групп используем обычную ссылку (откроется Mini App)
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="⚔️ Принять вызов",
+                        url=f"{WEBAPP_ORIGIN}?mode=duo&challenger={user.id}",
+                    )
+                ]
+            ]
+        )
 
     await message.answer(
-        f"👑 **@{username} вызывает на дуэль в крестики-нолики!**\n\nКто смелый? Жми кнопку ниже, чтобы войти в игру и сразиться 💅✨",
+        f"👑 **@{username} вызывает на дуэль в крестики-нолики!**\n\n"
+        f"Кто смелый? Жми кнопку ниже, чтобы войти в игру и сразиться 💅✨",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
