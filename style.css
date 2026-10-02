@@ -34,7 +34,6 @@ body {
     flex-direction: column;
     position: relative;
     padding: 16px;
-    /* Увеличиваем отступ снизу, чтобы навигация не перекрывала контент */
     padding-bottom: calc(var(--nav-height) + 60px); 
 }
 
@@ -86,7 +85,7 @@ body {
     flex: 1;
     overflow-y: auto;
     position: relative;
-    padding-bottom: 30px; /* Добавим воздуха внизу */
+    padding-bottom: 30px;
 }
 
 .tab-content {
@@ -118,15 +117,47 @@ body {
     min-height: 200px;
     margin-bottom: 14px;
     background: radial-gradient(circle at 50% 35%, rgba(236, 72, 153, 0.12), transparent 70%), var(--card-bg);
+    position: relative;
+    overflow: hidden;
+}
+
+.pet-card::before {
+    content: '';
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
+    border-radius: 50%;
+    z-index: 1;
+    animation: petGlow 3s ease-in-out infinite;
+}
+
+@keyframes petGlow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
 }
 
 .pet-display {
-    font-size: 56px;
-    margin-bottom: 10px;
+    position: relative;
+    z-index: 2;
+    animation: petIdle 2.5s ease-in-out infinite;
     display: flex;
-    gap: 6px;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    font-size: 56px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.pet-display:active {
+    transform: scale(0.9) rotate(-5deg);
+}
+
+@keyframes petIdle {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-6px) scale(1.03); }
 }
 
 .equipped-list-preview {
@@ -136,6 +167,8 @@ body {
     background: rgba(139, 92, 246, 0.1);
     padding: 6px 12px;
     border-radius: 10px;
+    position: relative;
+    z-index: 2;
 }
 
 .wardrobe-shortcut-btn {
@@ -238,6 +271,7 @@ body {
     justify-content: space-around;
     align-items: center;
     padding: 0 4px;
+    z-index: 50;
 }
 
 .nav-item {
@@ -256,63 +290,6 @@ body {
 .nav-icon { font-size: 18px; }
 .nav-item.active { color: #ec4899; }
 
-/* Анимация дыхания / покачивания для питомца */
-@keyframes petIdle {
-    0%, 100% {
-        transform: translateY(0) scale(1);
-    }
-    50% {
-        transform: translateY(-6px) scale(1.03);
-    }
-}
-
-/* Анимация мягкого свечения за питомцем */
-@keyframes petGlow {
-    0%, 100% {
-        opacity: 0.4;
-    }
-    50% {
-        opacity: 0.8;
-    }
-}
-
-.pet-card {
-    position: relative;
-    overflow: hidden;
-}
-
-/* Эффект легкого свечения позади питомца */
-.pet-card::before {
-    content: '';
-    position: absolute;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
-    border-radius: 50%;
-    z-index: 1;
-    animation: petGlow 3s ease-in-out infinite;
-}
-
-.pet-display {
-    position: relative;
-    z-index: 2;
-    animation: petIdle 2.5s ease-in-out infinite;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 56px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-}
-
-/* Эффект при клике на питомца (живое взаимодействие) */
-.pet-display:active {
-    transform: scale(0.9) rotate(-5deg);
-}
-
-/* Стили модального окна смены питомца */
 .pet-modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;

@@ -45,7 +45,6 @@
                     </div>
                 </div>
 
-                <!-- Кнопка смены питомца вместо гардероба -->
                 <button class="wardrobe-shortcut-btn" onclick="openPetSelector()">
                     <span class="btn-icon">🔄</span>
                     <span>Сменить питомца</span>
@@ -53,7 +52,7 @@
                 </button>
             </section>
 
-            <!-- Вкладка 2: Гардероб (примерка с горизонтальными подвкладками по частям тела) -->
+            <!-- Вкладка 2: Гардероб -->
             <section id="tab-wardrobe" class="tab-content">
                 <div class="section-heading">
                     <div>
@@ -86,12 +85,12 @@
                     <div class="glass-card game-card" onclick="openGameMenu('tictactoe')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                         <div>
                             <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">С ботом или на одном экране</p>
+                            <p style="font-size: 12px; color: var(--text-secondary);">С ботом или дуэль с другом</p>
                         </div>
                         <button class="category-tab active" style="pointer-events: none;">Играть</button>
                     </div>
 
-                    <div class="glass-card game-card" onclick="openGame('fortune')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <div class="glass-card game-card" onclick="openGameMenu('fortune')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                         <div>
                             <h4 style="font-size: 15px; margin-bottom: 4px;">🎰 Колесо Фортуны</h4>
                             <p style="font-size: 12px; color: var(--text-secondary);">Испытай удачу и выиграй R$</p>
@@ -121,7 +120,7 @@
                     </div>
                 </div>
 
-                <!-- Игровое поле Крестиков-ноликов (скрыто по умолчанию, управляется скриптом) -->
+                <!-- Игровое поле Крестиков-ноликов -->
                 <div id="game-tictactoe" style="display: none; flex-direction: column; gap: 10px;">
                     <button class="category-tab" onclick="backTttModes()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">← К выбору режима</button>
                     
@@ -145,7 +144,7 @@
                 </div>
             </section>
 
-            <!-- Вкладка 4: Магазин (дизайн гардероба, покупка за R$) -->
+            <!-- Вкладка 4: Магазин -->
             <section id="tab-shop" class="tab-content">
                 <div class="section-heading">
                     <div>
@@ -163,7 +162,7 @@
                 <div class="items-grid" id="shopItemsGrid"></div>
             </section>
 
-            <!-- Вкладка 5: Профиль (включая правила игры) -->
+            <!-- Вкладка 5: Профиль -->
             <section id="tab-profile" class="tab-content">
                 <h3 style="margin-bottom: 10px;">Информация</h3>
                 <div class="glass-card info-card" style="margin-bottom: 14px;">
@@ -184,7 +183,7 @@
             </section>
         </main>
 
-        <!-- Нижняя навигация (5 кнопок: Питомец, Гардероб, Play, Магазин, Профиль) -->
+        <!-- Нижняя навигация -->
         <nav class="bottom-nav glass-card">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>

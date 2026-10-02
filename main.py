@@ -54,7 +54,7 @@ SHOP_ITEMS = {
             "part": "head",
         },
         "cool_glasses": {
-            "name": "🕶️ Крутые пиксельные очки",
+            "name": "🕶️️ Крутые пиксельные очки",
             "price": 55,
             "part": "head",
         },
@@ -833,6 +833,31 @@ async def cmd_lvlup(message: Message):
     )
 
 
+@router.message(Command("duel"))
+async def cmd_duel(message: Message):
+    user = message.from_user
+    username = (user.username or user.first_name).lower()
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⚔️ Принять вызов",
+                    web_app=WebAppInfo(
+                        url=f"{WEBAPP_ORIGIN}?mode=duo&challenger={user.id}"
+                    ),
+                )
+            ]
+        ]
+    )
+
+    await message.answer(
+        f"👑 **@{username} вызывает на дуэль в крестики-нолики!**\n\nКто смелый? Жми кнопку ниже, чтобы войти в игру и сразиться 💅✨",
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
+
+
 @router.message(Command("approve"))
 async def cmd_approve_role(message: Message):
     ADMIN_ID = 8990488378
@@ -977,7 +1002,6 @@ async def handle_text(message: Message):
 
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}\n\n(Справочно для времени: в Москве {moscow_time})"
 
-        # Прямой запрос к модели без сохранения зависающих сессий чата
         response = client.models.generate_content(
             model="gemini-3.5-flash-lite",
             contents=text,

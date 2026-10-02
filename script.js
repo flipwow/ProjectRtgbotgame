@@ -10,7 +10,6 @@ let userData = {
 let selectedWardrobePart = 'all';
 let selectedShopCategory = 'all';
 
-// Список доступных питомцев (вы можете заменить ссылки на свои картинки или локальные файлы)
 const AVAILABLE_PETS = [
     { id: 'cat', name: 'Милый котенок', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z2dXZvZnM2dnR6aXJ3ZXpxbWZ0NHJ1cTF4aTZ4ajN6bmR4YmdzaiZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/Geimx3k8w1V9C/giphy.gif' },
     { id: 'bunny', name: 'Зайка', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1dzF3ZHFhY3M3dDF2Z3lscml0anZ6aWJneGhkeXJ4aTlhczFjYyZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/3NtY188QaxDjC/giphy.gif' },
@@ -18,7 +17,7 @@ const AVAILABLE_PETS = [
     { id: 'panda', name: 'Пандочка', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTB6a3Z5dGoxdTZhNjdyNGk4MG55dHRyZndrMGF5NDJmdXExbnM4NyZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyM/giphy.gif' }
 ];
 
-let currentPetId = 'cat'; // Питомец по умолчанию
+let currentPetId = 'cat';
 
 if (tg) {
     tg.ready();
@@ -33,7 +32,6 @@ if (tg) {
     }
 }
 
-// Загрузка данных с бэкенда (из users.json через API)
 async function fetchUserData() {
     try {
         const initData = tg?.initData || '';
@@ -50,7 +48,6 @@ async function fetchUserData() {
             userData.catalog = data.catalog || [];
             userData.equipped = data.equipped || [];
 
-            // Обновляем баланс на экране
             document.getElementById('user-balance').textContent = userData.currency;
             
             updatePetView();
@@ -64,7 +61,6 @@ async function fetchUserData() {
     }
 }
 
-// Переключение вкладок нижней навигации
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
@@ -84,7 +80,6 @@ function switchTab(tabName) {
     }
 }
 
-// Открытие и закрытие модального окна выбора питомца
 function openPetSelector() {
     const modal = document.getElementById('petSelectorModal');
     if (modal) {
@@ -100,7 +95,6 @@ function closePetSelector() {
     }
 }
 
-// Отрисовка списка питомцев в модальном окне
 function renderPetChoices() {
     const grid = document.getElementById('petChoicesGrid');
     if (!grid) return;
@@ -128,13 +122,11 @@ function renderPetChoices() {
     });
 }
 
-// Обновление питомца на главной (с учетом выбранного животного и надетых аксессуаров)
 function updatePetView() {
     const petDisplay = document.getElementById('petDisplay');
     const equippedPreview = document.getElementById('equippedPreview');
     const equippedItems = userData.inventory.filter(item => userData.equipped.includes(item.id));
 
-    // Находим активного питомца
     const activePet = AVAILABLE_PETS.find(p => p.id === currentPetId) || AVAILABLE_PETS[0];
     let petHtml = `<img src="${activePet.img}" alt="${activePet.name}" class="pet-avatar-img">`;
 
@@ -156,7 +148,6 @@ function updatePetView() {
         equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
     }
 
-    // Реакция на клик по питомцу на главной
     petDisplay.onclick = () => {
         const img = petDisplay.querySelector('.pet-avatar-img');
         if (img) {
@@ -171,7 +162,6 @@ function updatePetView() {
     };
 }
 
-// Отрисовка гардероба (фильтрация по частям тела)
 function renderWardrobe() {
     const grid = document.getElementById('itemsGrid');
     if (!grid) return;
@@ -225,7 +215,6 @@ function renderWardrobe() {
     });
 }
 
-// Отрисовка магазина (покупка за R$)
 function renderShop() {
     const grid = document.getElementById('shopItemsGrid');
     if (!grid) return;
@@ -306,9 +295,8 @@ function renderShop() {
     });
 }
 
-// Инициализация при загрузке документа
-document.addEventListener('DOMContentLoaded', () => {
-    // Вкладки фильтрации гардероба по частям тела
+// Автоматический перехват параметров URL для дуэли при запуске
+window.addEventListener('DOMContentLoaded', () => {
     const wardrobeTabsContainer = document.getElementById('wardrobeCategoryTabs');
     if (wardrobeTabsContainer) {
         wardrobeTabsContainer.addEventListener('click', event => {
@@ -323,7 +311,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Вкладки фильтрации магазина
     const shopTabsContainer = document.getElementById('shopCategoryTabs');
     if (shopTabsContainer) {
         shopTabsContainer.addEventListener('click', event => {
@@ -336,6 +323,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             renderShop();
         });
+    }
+
+    // Обработка параметров URL при старте (дуэль)
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode');
+    const challenger = urlParams.get('challenger');
+
+    if (mode === 'duo' && challenger) {
+        switchTab('play');
+        startTttGame('duo');
     }
 
     fetchUserData();
@@ -355,6 +352,7 @@ function openGameMenu(gameName) {
 
 function startTttGame(mode) {
     tttMode = mode; // 'solo' или 'duo'
+    document.getElementById('games-menu').style.display = 'none';
     document.getElementById('tictactoe-modes').style.display = 'none';
     document.getElementById('game-tictactoe').style.display = 'flex';
     document.getElementById('play-subtitle').textContent = mode === 'solo' ? 'Игра против бота 🤖' : 'Крестики-нолики на двоих 👥';
@@ -378,7 +376,7 @@ function closeGame() {
 let tttBoard = ['', '', '', '', '', '', '', '', ''];
 let tttCurrentPlayer = 'X';
 let tttIsActive = true;
-let tttMode = 'duo'; // 'duo' или 'solo'
+let tttMode = 'duo';
 
 const winningCombinations = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -389,7 +387,6 @@ const winningCombinations = [
 function makeMove(index) {
     if (!tttIsActive || tttBoard[index] !== '') return;
 
-    // В соло-режиме игрок ходит только за 'X', бот играет за 'O'
     if (tttMode === 'solo' && tttCurrentPlayer === 'O') return;
 
     tttBoard[index] = tttCurrentPlayer;
@@ -402,20 +399,17 @@ function makeMove(index) {
     
     if (checkTttWinOrDraw()) return;
 
-    // Меняем игрока
     tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
     updateTttStatus();
 
-    // Если режим соло и теперь ход бота ('O')
     if (tttMode === 'solo' && tttCurrentPlayer === 'O' && tttIsActive) {
-        setTimeout(botMove, 500); // небольшая задержка, чтобы бот «думал»
+        setTimeout(botMove, 500);
     }
 }
 
 function botMove() {
     if (!tttIsActive) return;
 
-    // Ищем свободные клетки
     let emptyCells = [];
     tttBoard.forEach((cell, idx) => {
         if (cell === '') emptyCells.push(idx);
@@ -423,7 +417,6 @@ function botMove() {
 
     if (emptyCells.length === 0) return;
 
-    // Простой ИИ: рандомный выбор свободной клетки
     let randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
     
     tttBoard[randomIndex] = 'O';
