@@ -254,3 +254,59 @@ body {
 
 .nav-icon { font-size: 18px; }
 .nav-item.active { color: #ec4899; }
+
+/* Анимация дыхания / покачивания для питомца */
+@keyframes petIdle {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-6px) scale(1.03);
+    }
+}
+
+/* Анимация мягкого свечения за питомцем */
+@keyframes petGlow {
+    0%, 100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.pet-card {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Эффект легкого свечения позади питомца */
+.pet-card::before {
+    content: '';
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
+    border-radius: 50%;
+    z-index: 1;
+    animation: petGlow 3s ease-in-out infinite;
+}
+
+.pet-display {
+    position: relative;
+    z-index: 2;
+    animation: petIdle 2.5s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 56px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+/* Эффект при клике на питомца (живое взаимодействие) */
+.pet-display:active {
+    transform: scale(0.9) rotate(-5deg);
+}

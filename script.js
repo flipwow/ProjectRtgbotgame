@@ -94,6 +94,17 @@ function updatePetView() {
         petDisplay.innerHTML = iconsHtml;
         equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
     }
+
+    // Добавляем мини-реакцию на клик по животному
+    petDisplay.onclick = () => {
+        petDisplay.style.transform = 'scale(1.2) rotate(10deg)';
+        setTimeout(() => {
+            petDisplay.style.transform = 'scale(1)';
+        }, 200);
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.impactOccurred('light'); // Легкая вибрация в Telegram, если поддерживается
+        }
+    };
 }
 
 // Отрисовка гардероба (фильтрация по частям тела: Все, Голова, Тело, Ноги, Руки)
