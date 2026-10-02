@@ -69,13 +69,14 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
 
-    document.getElementById(`tab-${tabName}`).classList.add('active');
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if (targetTab) targetTab.classList.add('active');
 
     const navButtons = document.querySelectorAll('.nav-item');
     if (tabName === 'home') navButtons[0].classList.add('active');
     if (tabName === 'wardrobe') navButtons[1].classList.add('active');
-    if (tabName === 'shop') navButtons[2].classList.add('active');
-    if (tabName === 'rules') navButtons[3].classList.add('active');
+    if (tabName === 'play') navButtons[2].classList.add('active');
+    if (tabName === 'shop') navButtons[3].classList.add('active');
     if (tabName === 'profile') navButtons[4].classList.add('active');
 
     if (tabName === 'home') {

@@ -73,7 +73,34 @@
                 <div class="items-grid" id="itemsGrid"></div>
             </section>
 
-            <!-- Вкладка 3: Магазин (дизайн гардероба, покупка за R$) -->
+            <!-- Вкладка 3: Play (Мини-игры) -->
+            <section id="tab-play" class="tab-content">
+                <div class="pet-section-header">
+                    <span class="vip-tag">RITUSHKA ARCADE</span>
+                    <h3>Мини-игры</h3>
+                    <p class="subtitle">Развлекись и заработай бонус 🎮</p>
+                </div>
+
+                <div class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="glass-card game-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">🎰 Колесо Фортуны</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Испытай удачу и выиграй R$</p>
+                        </div>
+                        <button class="category-tab active" onclick="alert('Скоро открытие мини-игры! 💅')">Играть</button>
+                    </div>
+
+                    <div class="glass-card game-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">🎯 Угадай образ</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Подбери правильный лук для Ритушки</p>
+                        </div>
+                        <button class="category-tab active" onclick="alert('Скоро открытие мини-игры! 💅')">Играть</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Вкладка 4: Магазин (дизайн гардероба, покупка за R$) -->
             <section id="tab-shop" class="tab-content">
                 <div class="section-heading">
                     <div>
@@ -91,33 +118,28 @@
                 <div class="items-grid" id="shopItemsGrid"></div>
             </section>
 
-            <!-- Вкладка 4: Правила игры -->
-            <section id="tab-rules" class="tab-content">
-                <div class="pet-section-header">
-                    <span class="vip-tag">ПРАВИЛА ИГРЫ</span>
-                    <h3>Свод законов Ритушки</h3>
-                    <p class="subtitle">Читай внимательно, плебей 💅</p>
+            <!-- Вкладка 5: Профиль (включая правила игры) -->
+            <section id="tab-profile" class="tab-content">
+                <h3 style="margin-bottom: 10px;">Информация</h3>
+                <div class="glass-card info-card" style="margin-bottom: 14px;">
+                    <p><strong>ID пользователя:</strong> <span id="profile-id">-</span></p>
+                    <p><strong>Статус:</strong> <span class="status-active">Активен</span></p>
                 </div>
 
-                <div class="glass-card info-card" style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="pet-section-header" style="text-align: left; margin-bottom: 8px;">
+                    <span class="vip-tag">ПРАВИЛА ИГРЫ</span>
+                    <h3 style="font-size: 16px;">Свод законов Ритушки</h3>
+                </div>
+                <div class="glass-card info-card" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
                     <p>👑 <strong>1. Уважение к хозяйке:</strong> Великая Ритушка всегда права. Споры караются обнулением RP.</p>
                     <p>💎 <strong>2. Фарм RP:</strong> Общайся в чате с ботом, чтобы повышать репутацию и копить кристаллы (R$).</p>
                     <p>👗 <strong>3. Шмотки:</strong> Покупай уникальные статусы и кастомизируй своего питомца в гардеробе.</p>
                     <p>🚫 <strong>4. Спам:</strong> Запрещено спамить сообщениями чаще чем раз в 3 секунды — влетит бан фарм-ресурса на 15 минут!</p>
                 </div>
             </section>
-
-            <!-- Вкладка 5: Профиль -->
-            <section id="tab-profile" class="tab-content">
-                <h3>Информация</h3>
-                <div class="glass-card info-card">
-                    <p><strong>ID пользователя:</strong> <span id="profile-id">-</span></p>
-                    <p><strong>Статус:</strong> <span class="status-active">Активен</span></p>
-                </div>
-            </section>
         </main>
 
-        <!-- Нижняя навигация (включает Магазин) -->
+        <!-- Нижняя навигация (5 кнопок: Питомец, Гардероб, Play, Магазин, Профиль) -->
         <nav class="bottom-nav glass-card">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
@@ -127,13 +149,13 @@
                 <span class="nav-icon">👗</span>
                 <span>Гардероб</span>
             </button>
+            <button class="nav-item" onclick="switchTab('play')">
+                <span class="nav-icon">🎮</span>
+                <span>Play</span>
+            </button>
             <button class="nav-item" onclick="switchTab('shop')">
                 <span class="nav-icon">🛍️</span>
                 <span>Магазин</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('rules')">
-                <span class="nav-icon">📜</span>
-                <span>Правила</span>
             </button>
             <button class="nav-item" onclick="switchTab('profile')">
                 <span class="nav-icon">👤</span>
@@ -151,11 +173,8 @@
                 <h3>Выбери питомца 🐾</h3>
                 <button class="close-modal-btn" onclick="closePetSelector()">✕</button>
             </div>
-            <div class="pet-choices-grid" id="petChoicesGrid">
-                <!-- Список питомцев генерируется динамически через JS -->
-            </div>
+            <div class="pet-choices-grid" id="petChoicesGrid"></div>
         </div>
     </div>
-
 </body>
 </html>
