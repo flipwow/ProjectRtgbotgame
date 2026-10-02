@@ -8,9 +8,10 @@ import time
 import hmac
 import hashlib
 
-# Правильный абсолютный путь к users.json внутри папки проекта
+# Правильные пути к файлам (все файлы лежат в корне проекта)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
+PUBLIC_DIR = BASE_DIR
 
 from urllib.parse import parse_qsl
 from aiohttp import web
@@ -101,25 +102,22 @@ def save_users(users_data):
 
 
 # ==========================================
-# TELEGRAM MINI APP API
+# TELEGRAM MINI APP API & WEB SERVER
 # ==========================================
 
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8080
 
-# Укажи здесь адрес, с которого открывается Mini App.
 WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
 
 def validate_telegram_init_data(init_data: str):
     """Проверка подлинности данных Telegram WebApp."""
-
     if not init_data or not BOT_TOKEN:
         return None
 
     try:
         parsed = dict(parse_qsl(init_data, keep_blank_values=True))
-
         received_hash = parsed.pop("hash", None)
 
         if not received_hash:
@@ -157,10 +155,7 @@ def validate_telegram_init_data(init_data: str):
 
 
 def get_webapp_user(request):
-    """Получение пользователя из проверенного Telegram initData."""
-
     init_data = request.headers.get("X-Telegram-Init-Data", "")
-
     telegram_user = validate_telegram_init_data(init_data)
 
     if not telegram_user:
@@ -175,8 +170,6 @@ def get_webapp_user(request):
 
 
 def get_inventory_details(user_info):
-    """Подготовка предметов для отображения в Mini App."""
-
     inventory = user_info.get("inventory", [])
     equipped = user_info.get("equipped", [])
 
@@ -215,7 +208,6 @@ async def api_profile(request):
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     user_info = get_or_create_user(username)
-
     role = user_info.get("role", "noob")
 
     return web.json_response(
@@ -246,18 +238,15 @@ async def api_toggle_item(request):
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     item_id = request.match_info["item_id"]
-
     users = load_users()
 
     if username not in users:
         return web.json_response({"error": "User not found"}, status=404)
 
     user_info = users[username]
-
     inventory = user_info.get("inventory", [])
     equipped = user_info.get("equipped", [])
 
-    # Нельзя надевать вещь, которой нет в инвентаре.
     if item_id not in inventory:
         return web.json_response({"error": "Item not owned"}, status=403)
 
@@ -269,7 +258,6 @@ async def api_toggle_item(request):
         action = "equipped"
 
     user_info["equipped"] = equipped
-
     users[username] = user_info
     save_users(users)
 
@@ -283,9 +271,16 @@ async def api_toggle_item(request):
     )
 
 
+async def index_handler(request):
+    """Отдает главную HTML-страницу мини-приложения из корневой папки."""
+    index_path = os.path.join(PUBLIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return web.FileResponse(index_path)
+    return web.Response(text="404: index.html not found", status=404)
+
+
 @web.middleware
 async def webapp_cors(request, handler):
-
     if request.method == "OPTIONS":
         response = web.Response(status=204)
     else:
@@ -305,23 +300,25 @@ async def webapp_cors(request, handler):
 
 
 async def start_webapp_api():
-
     app = web.Application(middlewares=[webapp_cors])
 
+    # API маршруты
     app.router.add_get("/api/me", api_profile)
-
     app.router.add_post("/api/equip/{item_id}", api_toggle_item)
 
+    # Главная страница
+    app.router.add_get("/", index_handler)
+
+    # Раздача статики (index.html, style.css, script.js) из корня проекта
+    if os.path.exists(PUBLIC_DIR):
+        app.router.add_static("/", PUBLIC_DIR, name="public")
+
     runner = web.AppRunner(app)
-
     await runner.setup()
-
     site = web.TCPSite(runner, WEBAPP_HOST, WEBAPP_PORT)
-
     await site.start()
 
-    print(f"Mini App API запущен на порту {WEBAPP_PORT}")
-
+    print(f"Mini App сервер запущен на порту {WEBAPP_PORT}")
     return runner
 
 
@@ -442,7 +439,6 @@ def get_main_hub_keyboard():
     )
 
 
-# Единый роутер для всех инлайн-кнопок
 @router.callback_query()
 async def unified_menu_router(callback: CallbackQuery):
     await callback.answer()
@@ -564,7 +560,7 @@ async def unified_menu_router(callback: CallbackQuery):
                 ]
             )
         buttons.append(
-            [InlineKeyboardButton(text="◀️ Назад в бутик", callback_data="menu_shop")]
+            [InlineKeyboardButton(text="◀️️ Назад в бутик", callback_data="menu_shop")]
         )
 
         await callback.message.edit_text(
@@ -575,14 +571,11 @@ async def unified_menu_router(callback: CallbackQuery):
 
     elif data.startswith("buy_"):
         parts = data.split("_")
-        category_type = parts[1]  # "sale" или "lux"
-        item_id = "_".join(
-            parts[2:]
-        )  # Корректно склеиваем ID товара (например, cap_pink)
+        category_type = parts[1]
+        item_id = "_".join(parts[2:])
 
         cat_key = "sale" if category_type == "sale" else "luxury"
 
-        # Гарантируем актуальный username
         username = (user.username or "").lower()
         if not username:
             username = f"id_{user.id}"
@@ -1099,7 +1092,6 @@ async def main():
     print(f"Бот @{BOT_USERNAME} запущен и полностью готов к работе! 👑")
 
     dp.include_router(router)
-
     api_runner = await start_webapp_api()
 
     try:
