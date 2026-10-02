@@ -1066,7 +1066,7 @@ async def handle_text(message: Message):
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}"
 
         chat_sessions[chat_id] = client.chats.create(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash-lite",
             config={"system_instruction": dynamic_system_prompt},
         )
 
