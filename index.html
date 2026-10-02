@@ -1,115 +1,124 @@
-const tg = window.Telegram?.WebApp;
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ritushka VIP</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Шапка профиля -->
+        <header class="profile-header glass-card">
+            <div class="profile-info">
+                <div class="avatar-wrapper">
+                    <img id="user-avatar" src="https://via.placeholder.com/60" alt="Avatar">
+                </div>
+                <div>
+                    <h2 id="username">Загрузка...</h2>
+                    <div class="balance-badge">
+                        <span class="coin-icon">💎</span>
+                        <span id="user-balance">0</span> R$
+                    </div>
+                </div>
+            </div>
+        </header>
 
-if (tg) {
-    tg.ready();
-    tg.expand();
-}
+        <!-- Основной контент (Вкладки) -->
+        <main class="content-area">
+            
+            <!-- Вкладка 1: Питомец (просмотр) -->
+            <section id="tab-home" class="tab-content active">
+                <div class="pet-section-header">
+                    <span class="vip-tag">RITUSHKA VIP</span>
+                    <h3>Твой питомец</h3>
+                    <p class="subtitle">Так выглядит твой персонаж сейчас ✨</p>
+                </div>
 
-// Демо-каталог предметов (в будущем подтянется из бэкенда)
-let userInventory = [
-    { id: 'cap_pink', name: 'Розовая кепка', icon: '🧢', category: 'head', equipped: true },
-    { id: 'glasses_pink', name: 'Розовые очки', icon: '🕶️', category: 'glasses', equipped: false },
-    { id: 'collar', name: 'Ошейник из страз', icon: '💎', category: 'accessory', equipped: false }
-];
+                <div class="pet-card glass-card">
+                    <div class="pet-display" id="petDisplay">
+                        <span class="pet-emoji">🐾</span>
+                    </div>
+                    <div class="equipped-list-preview" id="equippedPreview">
+                        Ничего не надето
+                    </div>
+                </div>
 
-let selectedCategory = 'all';
+                <button class="wardrobe-shortcut-btn" onclick="switchTab('wardrobe')">
+                    <span class="btn-icon">👗</span>
+                    <span>Перейти в гардероб</span>
+                    <span class="arrow">→</span>
+                </button>
+            </section>
 
-// Переключение вкладок
-function switchTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+            <!-- Вкладка 2: Гардероб (примерка) -->
+            <section id="tab-wardrobe" class="tab-content">
+                <div class="section-heading">
+                    <div>
+                        <span class="vip-tag">ПРИМЕРОЧНАЯ</span>
+                        <h3>Гардероб</h3>
+                    </div>
+                </div>
 
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-    
-    // Находим нужную кнопку навигации и подсвечиваем
-    const navButtons = document.querySelectorAll('.nav-item');
-    if (tabName === 'home') navButtons[0].classList.add('active');
-    if (tabName === 'wardrobe') navButtons[1].classList.add('active');
-    if (tabName === 'shop') navButtons[2].classList.add('active');
-    if (tabName === 'profile') navButtons[3].classList.add('active');
+                <div class="category-tabs" id="categoryTabs">
+                    <button class="category-tab active" data-category="all">Все</button>
+                    <button class="category-tab" data-category="head">Кепки</button>
+                    <button class="category-tab" data-category="glasses">Очки</button>
+                    <button class="category-tab" data-category="accessory">Аксессуары</button>
+                </div>
 
-    if (tabName === 'home') {
-        updatePetView();
-    }
-}
+                <div class="items-grid" id="itemsGrid"></div>
+            </section>
 
-// Обновление отображения питомца на главной
-function updatePetView() {
-    const petDisplay = document.getElementById('petDisplay');
-    const equippedPreview = document.getElementById('equippedPreview');
+            <!-- Вкладка 3: Магазин -->
+            <section id="tab-shop" class="tab-content">
+                <h3>Магазин стилей</h3>
+                <div id="shop-items" class="items-grid">
+                    <div class="item-card">
+                        <div class="item-art">🧥</div>
+                        <div class="item-name">Стильная куртка</div>
+                        <button class="action-btn" onclick="alert('Покупка в разработке!')">Купить (150 💎)</button>
+                    </div>
+                    <div class="item-card">
+                        <div class="item-art">🕶️</div>
+                        <div class="item-name">Крутые очки</div>
+                        <button class="action-btn" onclick="alert('Покупка в разработке!')">Купить (75 💎)</button>
+                    </div>
+                </div>
+            </section>
 
-    const equippedItems = userInventory.filter(item => item.equipped);
+            <!-- Вкладка 4: Профиль -->
+            <section id="tab-profile" class="tab-content">
+                <h3>Информация</h3>
+                <div class="glass-card info-card">
+                    <p><strong>ID пользователя:</strong> <span id="profile-id">-</span></p>
+                    <p><strong>Статус:</strong> <span class="status-active">Активен</span></p>
+                </div>
+            </section>
+        </main>
 
-    if (equippedItems.length === 0) {
-        petDisplay.innerHTML = `<span class="pet-emoji">🐾</span>`;
-        equippedPreview.textContent = 'Ничего не надето (голышом 🥶)';
-    } else {
-        // Показываем базовую лапку + иконки надетых вещей
-        let iconsHtml = `<span class="pet-emoji">🐾</span>`;
-        equippedItems.forEach(item => {
-            iconsHtml += `<span style="font-size: 40px; margin-left: -10px;">${item.icon}</span>`;
-        });
-        petDisplay.innerHTML = iconsHtml;
-        equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
-    }
-}
+        <!-- Нижняя навигация (4 кнопки) -->
+        <nav class="bottom-nav glass-card">
+            <button class="nav-item active" onclick="switchTab('home')">
+                <span class="nav-icon">🐾</span>
+                <span>Питомец</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('wardrobe')">
+                <span class="nav-icon">👗</span>
+                <span>Гардероб</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('shop')">
+                <span class="nav-icon">🛍️</span>
+                <span>Магазин</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('profile')">
+                <span class="nav-icon">👤</span>
+                <span>Профиль</span>
+            </button>
+        </nav>
+    </div>
 
-// Отрисовка гардероба (примерка)
-function renderWardrobe() {
-    const grid = document.getElementById('itemsGrid');
-    if (!grid) return;
-
-    grid.innerHTML = '';
-
-    const filtered = userInventory.filter(item => 
-        selectedCategory === 'all' || item.category === selectedCategory
-    );
-
-    if (filtered.length === 0) {
-        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px;">В этой категории пока нет вещей. Загляни в бутик! 🛍️</p>';
-        return;
-    }
-
-    filtered.forEach(item => {
-        const card = document.createElement('div');
-        card.className = `item-card ${item.equipped ? 'equipped' : ''}`;
-
-        card.innerHTML = `
-            <div class="item-art">${item.icon}</div>
-            <div class="item-name">${item.name}</div>
-            <div class="item-status-badge">${item.equipped ? 'Надето ✓' : 'Надеть'}</div>
-        `;
-
-        card.addEventListener('click', () => {
-            // Переключаем статус вещи
-            item.equipped = !item.equipped;
-            renderWardrobe();
-            updatePetView();
-        });
-
-        grid.appendChild(card);
-    });
-}
-
-// Обработка кликов по категориям в гардеробе
-document.addEventListener('DOMContentLoaded', () => {
-    const tabsContainer = document.getElementById('categoryTabs');
-    if (tabsContainer) {
-        tabsContainer.addEventListener('click', event => {
-            const tab = event.target.closest('[data-category]');
-            if (!tab) return;
-
-            selectedCategory = tab.dataset.category;
-
-            tabsContainer.querySelectorAll('.category-tab').forEach(btn => {
-                btn.classList.toggle('active', btn === tab);
-            });
-
-            renderWardrobe();
-        });
-    }
-
-    // Инициализация при старте
-    updatePetView();
-    renderWardrobe();
-});
+    <script src="script.js"></script>
+</body>
+</html>
