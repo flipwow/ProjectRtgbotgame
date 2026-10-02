@@ -77,26 +77,50 @@
             <section id="tab-play" class="tab-content">
                 <div class="pet-section-header">
                     <span class="vip-tag">RITUSHKA ARCADE</span>
-                    <h3>Крестики-нолики ❌⭕</h3>
-                    <p class="subtitle">Играйте вдвоем на одном экране 💅</p>
+                    <h3>Мини-игры</h3>
+                    <p class="subtitle" id="play-subtitle">Выбирай развлечение и играй 🎮</p>
                 </div>
 
-                <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-                    <div id="ttt-status" style="font-size: 13px; font-weight: 600; color: #c4b5fd;">Ходит: Х (Крестики)</div>
-                    
-                    <div class="ttt-board" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 260px;">
-                        <button class="ttt-cell" onclick="makeMove(0)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(1)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(2)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(3)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(4)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(5)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(6)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        <button class="ttt-cell" onclick="makeMove(8)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                <!-- Меню выбора игр (главный экран вкладки Play) -->
+                <div id="games-menu" class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="glass-card game-card" onclick="openGame('tictactoe')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <div>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Классика на двоих игроков</p>
+                        </div>
+                        <button class="category-tab active" style="pointer-events: none;">Играть</button>
                     </div>
 
-                    <button class="category-tab active" onclick="resetTtt()" style="margin-top: 4px; padding: 8px 16px;">Сбросить игру</button>
+                    <div class="glass-card game-card" onclick="openGame('fortune')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <div>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">🎰 Колесо Фортуны</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Испытай удачу и выиграй R$</p>
+                        </div>
+                        <button class="category-tab" style="pointer-events: none; opacity: 0.6;">Скоро</button>
+                    </div>
+                </div>
+
+                <!-- Сама игра "Крестики-нолики" (скрыта по умолчанию) -->
+                <div id="game-tictactoe" class="game-container" style="display: none; flex-direction: column; align-items: center; gap: 12px;">
+                    <button class="category-tab" onclick="closeGame()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">← Назад к играм</button>
+                    
+                    <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;">
+                        <div id="ttt-status" style="font-size: 13px; font-weight: 600; color: #c4b5fd;">Ходит: Х (Крестики)</div>
+                        
+                        <div class="ttt-board" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 260px;">
+                            <button class="ttt-cell" onclick="makeMove(0)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(1)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(2)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(3)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(4)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(5)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(6)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                            <button class="ttt-cell" onclick="makeMove(8)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        </div>
+
+                        <button class="category-tab active" onclick="resetTtt()" style="margin-top: 4px; padding: 8px 16px;">Заново</button>
+                    </div>
                 </div>
             </section>
 

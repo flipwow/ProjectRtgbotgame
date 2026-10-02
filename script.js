@@ -412,3 +412,22 @@ function resetTtt() {
     document.getElementById('ttt-status').textContent = 'Ходит: Х (Крестики)';
     renderTttBoard();
 }
+
+// Открытие конкретной мини-игры из меню Play
+function openGame(gameName) {
+    if (gameName === 'tictactoe') {
+        document.getElementById('games-menu').style.display = 'none';
+        document.getElementById('game-tictactoe').style.display = 'flex';
+        document.getElementById('play-subtitle').textContent = 'Крестики-нолики на двоих ❌⭕';
+        resetTtt();
+    } else if (gameName === 'fortune') {
+        alert('Скоро открытие Колеса Фортуны! 💅');
+    }
+}
+
+// Возврат к списку мини-игр
+function closeGame() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('games-menu').style.display = 'flex';
+    document.getElementById('play-subtitle').textContent = 'Выбирай развлечение и играй 🎮';
+}
