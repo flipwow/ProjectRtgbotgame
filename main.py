@@ -108,7 +108,7 @@ WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8080
 
 # Укажи здесь адрес, с которого открывается Mini App.
-WEBAPP_ORIGIN = " https://flipwow.github.io/ProjectRtgbotgame/"
+WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
 
 def validate_telegram_init_data(init_data: str):
@@ -435,9 +435,7 @@ def get_main_hub_keyboard():
             [
                 InlineKeyboardButton(
                     text="🎮 RituhaGame",
-                    web_app=WebAppInfo(
-                        url="https://flipwow.github.io/ProjectRtgbotgame/"
-                    ),
+                    web_app=WebAppInfo(url="https://projectrtgbotgame.onrender.com"),
                 )
             ],
         ]
