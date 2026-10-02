@@ -7,6 +7,7 @@ import random
 import time
 import hmac
 import hashlib
+import telebot
 
 # Правильные пути к файлам (все файлы лежат в корне проекта)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
