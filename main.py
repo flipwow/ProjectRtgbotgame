@@ -965,7 +965,7 @@ async def cmd_approve_role(message: Message):
 @router.message(Command("slay"))
 async def cmd_slay(message: Message):
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    photos_dir = os.path.join(base_dir, "Ritushka Photos")
+    photos_dir = os.path.join(base_dir, "RitushkaPhotos")
 
     if not os.path.exists(photos_dir):
         await message.reply(
