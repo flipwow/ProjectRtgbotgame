@@ -12,13 +12,19 @@ let selectedWardrobePart = 'all';
 let selectedShopCategory = 'all';
 
 const AVAILABLE_PETS = [
-    { id: 'cat', name: 'Милый котенок', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z2dXZvZnM2dnR6aXJ3ZXpxbWZ0NHJ1cTF4aTZ4ajN6bmR4YmdzaiZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/Geimx3k8w1V9C/giphy.gif' },
-    { id: 'bunny', name: 'Зайка', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1dzF3ZHFhY3M3dDF2Z3lscml0anZ6aWJneGhkeXJ4aTlhczFjYyZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/3NtY188QaxDjC/giphy.gif' },
-    { id: 'dog', name: 'Щенок', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNWx1ZWhud3NtdXF4djlhdTN5NXU0a3N0aWNubmJmbTFzMWprOXAzayZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/8vQSQ3cNXuDGo/giphy.gif' },
-    { id: 'panda', name: 'Пандочка', img: 'https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTB6a3Z5dGoxdTZhNjdyNGk4MG55dHRyZndrMGF5NDJmdXExbnM4NyZlcD12MV9pbninternalX9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyM/giphy.gif' }
+    { id: 'cat', name: 'Милый котенок', img: 'https://media.giphy.com/media/Geimx3k8w1V9C/giphy.gif' },
+    { id: 'bunny', name: 'Зайка', img: 'https://media.giphy.com/media/3NtY188QaxDjC/giphy.gif' },
+    { id: 'dog', name: 'Щенок', img: 'https://media.giphy.com/media/8vQSQ3cNXuDGo/giphy.gif' },
+    { id: 'panda', name: 'Пандочка', img: 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif' }
 ];
 
 let currentPetId = 'cat';
+
+// ===== Tic-Tac-Toe state =====
+let tttMode = 'solo';          // 'solo' | 'duo'
+let tttBoard = Array(9).fill(null);
+let tttCurrent = 'X';
+let tttGameOver = false;
 
 if (tg) {
     tg.ready();
@@ -75,11 +81,8 @@ function switchTab(tabName) {
     if (tabName === 'shop') navButtons[3].classList.add('active');
     if (tabName === 'chat') navButtons[4].classList.add('active');
 
-    if (tabName === 'home') {
-        updatePetView();
-    } else if (tabName === 'chat') {
-        fetchUserData(); // Обновляем реестр при переходе во вкладку
-    }
+    if (tabName === 'home') updatePetView();
+    if (tabName === 'chat') fetchUserData();
 }
 
 function renderChatRegistry() {
@@ -96,20 +99,17 @@ function renderChatRegistry() {
     userData.registry.forEach(member => {
         const card = document.createElement('div');
         card.className = 'glass-card';
-        card.style.cssText = 'padding: 12px; display: flex; align-items: center; justify-content: space-between;';
+        card.style.cssText = 'padding: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;';
 
         card.innerHTML = `
             <div>
                 <h4 style="font-size: 14px; margin-bottom: 2px;">@${member.username}</h4>
                 <p style="font-size: 11px; color: var(--text-secondary);">${member.role_name} • RP: ${member.rp}</p>
             </div>
-            <button class="category-tab active" style="padding: 6px 12px; font-size: 11px;">Профиль</button>
+            <button class="category-tab active" style="padding: 6px 12px; font-size: 11px; pointer-events: none;">Профиль</button>
         `;
 
-        card.onclick = () => {
-            showUserProfileModal(member);
-        };
-
+        card.onclick = () => showUserProfileModal(member);
         container.appendChild(card);
     });
 }
@@ -118,7 +118,6 @@ function showUserProfileModal(member) {
     const modal = document.getElementById('userProfileModal');
     const title = document.getElementById('modalUsername');
     const details = document.getElementById('modalUserDetails');
-
     if (!modal || !title || !details) return;
 
     title.textContent = `@${member.username}`;
@@ -128,7 +127,6 @@ function showUserProfileModal(member) {
         <p><strong>Валюта:</strong> ${member.currency} R$</p>
         <p><strong>Надето вещей:</strong> ${member.equipped_count || 0}</p>
     `;
-
     modal.style.display = 'flex';
 }
 
@@ -153,24 +151,21 @@ function closePetSelector() {
 function renderPetChoices() {
     const grid = document.getElementById('petChoicesGrid');
     if (!grid) return;
-
     grid.innerHTML = '';
+
     AVAILABLE_PETS.forEach(pet => {
         const card = document.createElement('div');
         card.className = `pet-choice-card ${currentPetId === pet.id ? 'active' : ''}`;
-        
         card.innerHTML = `
             <img src="${pet.img}" alt="${pet.name}" class="pet-choice-img">
             <div class="pet-choice-name">${pet.name}</div>
         `;
-
         card.onclick = () => {
             currentPetId = pet.id;
             updatePetView();
             closePetSelector();
             if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         };
-
         grid.appendChild(card);
     });
 }
@@ -187,11 +182,7 @@ function updatePetView() {
         petDisplay.innerHTML = petHtml;
         equippedPreview.textContent = 'Ничего не надето';
     } else {
-        let accessoriesHtml = '';
-        equippedItems.forEach(() => {
-            accessoriesHtml += `<span style="font-size: 24px; position: absolute; top: -5px; right: 25px;">✨</span>`;
-        });
-        petDisplay.innerHTML = `<div style="position: relative; display: inline-block;">${petHtml}${accessoriesHtml}</div>`;
+        petDisplay.innerHTML = `<div style="position: relative; display: inline-block;">${petHtml}<span style="font-size: 22px; position: absolute; top: -8px; right: 18px;">✨</span></div>`;
         equippedPreview.textContent = equippedItems.map(i => i.name).join(' + ');
     }
 }
@@ -215,13 +206,11 @@ function renderWardrobe() {
         const isEquipped = userData.equipped.includes(item.id);
         const card = document.createElement('div');
         card.className = `item-card ${isEquipped ? 'equipped' : ''}`;
-
         card.innerHTML = `
             <div class="item-art">✨</div>
             <div class="item-name">${item.name}</div>
             <div class="item-status-badge">${isEquipped ? 'Надето ✓' : 'Надеть'}</div>
         `;
-
         card.addEventListener('click', async () => {
             try {
                 const res = await fetch(`/api/equip/${item.id}`, {
@@ -233,12 +222,12 @@ function renderWardrobe() {
                     userData.equipped = data.equipped;
                     renderWardrobe();
                     updatePetView();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
                 }
             } catch (e) {
                 console.error('Ошибка при переодевании:', e);
             }
         });
-
         grid.appendChild(card);
     });
 }
@@ -282,16 +271,129 @@ function renderShop() {
                     document.getElementById('user-balance').textContent = userData.currency;
                     renderShop();
                     renderWardrobe();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 }
             } catch (e) {
                 console.error('Ошибка при покупке:', e);
             }
         });
-
         grid.appendChild(card);
     });
 }
 
+// ===== Tic-Tac-Toe =====
+function openGameMenu(name) {
+    if (name === 'tictactoe') {
+        document.getElementById('games-menu').style.display = 'none';
+        document.getElementById('tictactoe-modes').style.display = 'flex';
+    }
+}
+
+function startTttGame(mode) {
+    tttMode = mode;
+    document.getElementById('games-menu').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'none';
+    document.getElementById('game-tictactoe').style.display = 'flex';
+    resetTtt();
+}
+
+function closeGame() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'none';
+    document.getElementById('games-menu').style.display = 'flex';
+}
+
+function backTttModes() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'flex';
+}
+
+function openChallengeModal() {
+    document.getElementById('challenge-modal').style.display = 'flex';
+}
+
+function closeChallengeModal() {
+    document.getElementById('challenge-modal').style.display = 'none';
+}
+
+function shareChallengeLink() {
+    const userId = tg?.initDataUnsafe?.user?.id || '0';
+    if (tg?.switchInlineQuery) {
+        tg.switchInlineQuery(`challenge_ttt_${userId}`);
+    }
+    closeChallengeModal();
+}
+
+function resetTtt() {
+    tttBoard = Array(9).fill(null);
+    tttCurrent = 'X';
+    tttGameOver = false;
+    updateTttUI();
+    document.getElementById('ttt-status').textContent = 'Ходит: X (Крестики)';
+}
+
+function makeMove(index) {
+    if (tttGameOver || tttBoard[index] !== null) return;
+
+    tttBoard[index] = tttCurrent;
+    updateTttUI();
+
+    if (checkWinner()) {
+        tttGameOver = true;
+        document.getElementById('ttt-status').textContent = `Победа: ${tttCurrent}! 🎉`;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        return;
+    }
+
+    if (tttBoard.every(c => c !== null)) {
+        tttGameOver = true;
+        document.getElementById('ttt-status').textContent = 'Ничья! 🤝';
+        return;
+    }
+
+    tttCurrent = tttCurrent === 'X' ? 'O' : 'X';
+    document.getElementById('ttt-status').textContent = `Ходит: ${tttCurrent}`;
+
+    // Ход бота в solo-режиме
+    if (tttMode === 'solo' && tttCurrent === 'O' && !tttGameOver) {
+        setTimeout(botMove, 450);
+    }
+}
+
+function botMove() {
+    const empty = tttBoard.map((v, i) => v === null ? i : null).filter(v => v !== null);
+    if (empty.length === 0) return;
+
+    // Простой AI: сначала пытается выиграть, потом блокирует, иначе случайно
+    let move = findBestMove('O') ?? findBestMove('X') ?? empty[Math.floor(Math.random() * empty.length)];
+    makeMove(move);
+}
+
+function findBestMove(player) {
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for (const [a,b,c] of wins) {
+        const line = [tttBoard[a], tttBoard[b], tttBoard[c]];
+        if (line.filter(x => x === player).length === 2 && line.includes(null)) {
+            return [a,b,c].find(i => tttBoard[i] === null);
+        }
+    }
+    return null;
+}
+
+function checkWinner() {
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    return wins.some(([a,b,c]) => tttBoard[a] && tttBoard[a] === tttBoard[b] && tttBoard[a] === tttBoard[c]);
+}
+
+function updateTttUI() {
+    document.querySelectorAll('.ttt-cell').forEach((cell, i) => {
+        cell.textContent = tttBoard[i] || '';
+        cell.style.color = tttBoard[i] === 'X' ? '#ec4899' : '#8b5cf6';
+        cell.disabled = tttGameOver || tttBoard[i] !== null;
+    });
+}
+
+// ===== Init =====
 window.addEventListener('DOMContentLoaded', () => {
     const wardrobeTabs = document.getElementById('wardrobeCategoryTabs');
     if (wardrobeTabs) {
@@ -317,33 +419,3 @@ window.addEventListener('DOMContentLoaded', () => {
 
     fetchUserData();
 });
-
-// Мини-игры и дуэли
-function openGameMenu(name) {
-    if (name === 'tictactoe') {
-        document.getElementById('games-menu').style.display = 'none';
-        document.getElementById('tictactoe-modes').style.display = 'flex';
-    }
-}
-function startTttGame(mode) {
-    tttMode = mode;
-    document.getElementById('games-menu').style.display = 'none';
-    document.getElementById('tictactoe-modes').style.display = 'none';
-    document.getElementById('game-tictactoe').style.display = 'flex';
-}
-function closeGame() {
-    document.getElementById('game-tictactoe').style.display = 'none';
-    document.getElementById('tictactoe-modes').style.display = 'none';
-    document.getElementById('games-menu').style.display = 'flex';
-}
-function backTttModes() {
-    document.getElementById('game-tictactoe').style.display = 'none';
-    document.getElementById('tictactoe-modes').style.display = 'flex';
-}
-function openChallengeModal() { document.getElementById('challenge-modal').style.display = 'flex'; }
-function closeChallengeModal() { document.getElementById('challenge-modal').style.display = 'none'; }
-function shareChallengeLink() {
-    const userId = tg?.initDataUnsafe?.user?.id || '0';
-    if (tg?.switchInlineQuery) tg.switchInlineQuery(`challenge_ttt_${userId}`);
-    closeChallengeModal();
-}
