@@ -393,7 +393,29 @@ function updateTttUI() {
     });
 }
 
-// ===== Init =====
+// ===== Автозапуск дуэли из ссылки =====
+function checkDuelParams() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const challenger = params.get('challenger');
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+
+    if (mode === 'duo' || startParam.startsWith('duo')) {
+        switchTab('play');
+
+        setTimeout(() => {
+            startTttGame('duo');
+
+            if (challenger) {
+                const status = document.getElementById('ttt-status');
+                if (status) {
+                    status.textContent = `Дуэль! Ходит: X (Крестики)`;
+                }
+            }
+        }, 300);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     const wardrobeTabs = document.getElementById('wardrobeCategoryTabs');
     if (wardrobeTabs) {
@@ -418,4 +440,5 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     fetchUserData();
+    checkDuelParams();
 });
