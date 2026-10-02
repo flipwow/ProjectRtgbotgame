@@ -508,10 +508,14 @@ function closeChallengeModal() {
 function shareChallengeLink() {
     const gameSelect = document.getElementById('challenge-game-select');
     const gameType = gameSelect ? gameSelect.value : 'ttt';
-    const query = `challenge_${gameType}_${tg?.initDataUnsafe?.user?.id || 'user'}`;
+    
+    // Берем реальный ID пользователя из Telegram, а если его нет — заглушку
+    const userId = tg?.initDataUnsafe?.user?.id || '0';
+    const query = `challenge_${gameType}_${userId}`;
     
     if (tg?.switchInlineQuery) {
-        tg.switchInlineQuery(query, ['users', 'groups', 'channels']);
+        // Передаем параметры без ограничений по типу чатов
+        tg.switchInlineQuery(query);
     } else {
         alert('Функция доступна только внутри Telegram!');
     }
