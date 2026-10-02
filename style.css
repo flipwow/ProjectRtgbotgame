@@ -34,7 +34,8 @@ body {
     flex-direction: column;
     position: relative;
     padding: 16px;
-    padding-bottom: calc(var(--nav-height) + 20px);
+    /* Увеличиваем отступ снизу, чтобы навигация не перекрывала контент */
+    padding-bottom: calc(var(--nav-height) + 60px); 
 }
 
 .glass-card {
@@ -85,7 +86,7 @@ body {
     flex: 1;
     overflow-y: auto;
     position: relative;
-    padding-bottom: 10px;
+    padding-bottom: 30px; /* Добавим воздуха внизу */
 }
 
 .tab-content {
