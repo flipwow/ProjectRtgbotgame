@@ -4,30 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Гардероб Ритухи</title>
-    <!-- Telegram Web App Script -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключаем Telegram Web App скрипт -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Стили с защитой от кэша -->
-    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
-    <div class="app-container">
-        <header class="app-header">
-            <h1>👑 Гардероб Ритухи</h1>
-            <p class="subtitle">Твой личный стильный уголок</p>
-        </header>
-
-        <main class="content">
-            <div class="wardrobe-card">
-                <div class="icon-box">👗</div>
-                <div class="info-box">
-                    <h2>Твой гардероб</h2>
-                    <p class="hint">✨ Привет! Скоро здесь появятся твои купленные вещи.</p>
-                </div>
+    <div class="container">
+        <!-- Блок с карточкой гардероба -->
+        <div class="card">
+            <div class="card-icon">
+                <div class="dress-icon">👗</div>
             </div>
+            <div class="card-content">
+                <h2>Твой гардероб</h2>
+                <p>✨ Привет! Скоро здесь появятся твои купленные вещи.</p>
+            </div>
+        </div>
 
-            <!-- Кнопка закрытия / возврата -->
-            <button class="action-btn" id="closeBtn">Закрыть</button>
-        </main>
+        <!-- Кнопка закрытия -->
+        <button class="close-btn" id="closeBtn">Закрыть</button>
     </div>
 
     <script src="script.js"></script>
