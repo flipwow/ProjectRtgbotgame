@@ -110,9 +110,12 @@ def load_users():
         return {}
 
 
-def save_users(users_data):
+def save_user_to_json(user_id, user_data):
+    users = load_users()
+    # Превращаем user_id в строку, так как ключи в JSON всегда строки
+    users[str(user_id)] = user_data
     with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users_data, f, ensure_ascii=False, indent=4)
+        json.dump(users, f, ensure_ascii=False, indent=4)
 
 
 # ==========================================
@@ -933,6 +936,45 @@ async def cmd_slay(message: Message):
         "Мой аутфит сегодня просто разносит этот мир в щепки 👑🖤",
     ]
     await message.reply_photo(photo=photo, caption=random.choice(captions))
+
+
+@router.inline_query()
+async def inline_challenge_handler(inline_query: InlineQuery):
+    query_text = inline_query.query
+
+    if query_text.startswith("challenge_"):
+        parts = query_text.split("_")
+        game_type = parts[1] if len(parts) > 1 else "ttt"
+        challenger_id = parts[2] if len(parts) > 2 else "0"
+
+        # Ссылка, по которой второй игрок перейдет в Mini App для дуэли
+        webapp_url = f"{WEBAPP_ORIGIN}?mode=duo&game={game_type}&challenger={challenger_id}&chat_id={inline_query.from_user.id}"
+
+        result_id = f"duel_{game_type}_{inline_query.from_user.id}"
+
+        articles = [
+            InlineQueryResultArticle(
+                id=result_id,
+                title="⚔️ Вызвать на дуэль в крестики-нолики!",
+                description="Нажми, чтобы отправить вызов в этот чат 💅✨",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"👑 **@{inline_query.from_user.username or inline_query.from_user.first_name} вызывает на дуэль!**\n\nКто смелый? Жми кнопку ниже, чтобы принять вызов 💅✨",
+                    parse_mode="Markdown",
+                ),
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="⚔️ Принять вызов",
+                                web_app=WebAppInfo(url=webapp_url),
+                            )
+                        ]
+                    ]
+                ),
+            )
+        ]
+
+        await inline_query.answer(articles, cache_time=1, is_personal=True)
 
 
 @router.message(F.text)
