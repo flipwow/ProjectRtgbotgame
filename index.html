@@ -73,30 +73,30 @@
                 <div class="items-grid" id="itemsGrid"></div>
             </section>
 
-            <!-- Вкладка 3: Play (Мини-игры) -->
+           <!-- Вкладка 3: Play (Мини-игры) -->
             <section id="tab-play" class="tab-content">
                 <div class="pet-section-header">
                     <span class="vip-tag">RITUSHKA ARCADE</span>
-                    <h3>Мини-игры</h3>
-                    <p class="subtitle">Развлекись и заработай бонус 🎮</p>
+                    <h3>Крестики-нолики ❌⭕</h3>
+                    <p class="subtitle">Играйте вдвоем на одном экране 💅</p>
                 </div>
 
-                <div class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
-                    <div class="glass-card game-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">🎰 Колесо Фортуны</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">Испытай удачу и выиграй R$</p>
-                        </div>
-                        <button class="category-tab active" onclick="alert('Скоро открытие мини-игры! 💅')">Играть</button>
+                <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                    <div id="ttt-status" style="font-size: 13px; font-weight: 600; color: #c4b5fd;">Ходит: Х (Крестики)</div>
+                    
+                    <div class="ttt-board" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 260px;">
+                        <button class="ttt-cell" onclick="makeMove(0)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(1)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(2)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(3)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(4)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(5)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(6)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
+                        <button class="ttt-cell" onclick="makeMove(8)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
                     </div>
 
-                    <div class="glass-card game-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">🎯 Угадай образ</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">Подбери правильный лук для Ритушки</p>
-                        </div>
-                        <button class="category-tab active" onclick="alert('Скоро открытие мини-игры! 💅')">Играть</button>
-                    </div>
+                    <button class="category-tab active" onclick="resetTtt()" style="margin-top: 4px; padding: 8px 16px;">Сбросить игру</button>
                 </div>
             </section>
 

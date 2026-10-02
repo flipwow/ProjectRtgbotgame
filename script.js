@@ -340,3 +340,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchUserData();
 });
+
+// Логика крестиков-ноликов на двоих
+let tttBoard = ['', '', '', '', '', '', '', '', ''];
+let tttCurrentPlayer = 'X';
+let tttIsActive = true;
+
+const winningCombinations = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // линии
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // колонки
+    [0, 4, 8], [2, 4, 6]             // диагонали
+];
+
+function makeMove(index) {
+    if (!tttIsActive || tttBoard[index] !== '') return;
+
+    tttBoard[index] = tttCurrentPlayer;
+    
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
+    }
+
+    renderTttBoard();
+    checkTttWin();
+}
+
+function renderTttBoard() {
+    const cells = document.querySelectorAll('.ttt-cell');
+    cells.forEach((cell, index) => {
+        cell.textContent = tttBoard[index];
+        cell.style.color = tttBoard[index] === 'X' ? '#ec4899' : '#8b5cf6';
+    });
+}
+
+function checkTttWin() {
+    let roundWon = false;
+
+    for (let i = 0; i < winningCombinations.length; i++) {
+        const [a, b, c] = winningCombinations[i];
+        if (tttBoard[a] && tttBoard[a] === tttBoard[b] && tttBoard[a] === tttBoard[c]) {
+            roundWon = true;
+            break;
+        }
+    }
+
+    const statusText = document.getElementById('ttt-status');
+
+    if (roundWon) {
+        statusText.textContent = `Победил игрок ${tttCurrentPlayer} 🎉`;
+        tttIsActive = false;
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+        return;
+    }
+
+    if (!tttBoard.includes('')) {
+        statusText.textContent = `Ничья! 🤝`;
+        tttIsActive = false;
+        return;
+    }
+
+    tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
+    statusText.textContent = `Ходит: ${tttCurrentPlayer} (${tttCurrentPlayer === 'X' ? 'Крестики' : 'Нолики'})`;
+}
+
+function resetTtt() {
+    tttBoard = ['', '', '', '', '', '', '', '', ''];
+    tttCurrentPlayer = 'X';
+    tttIsActive = true;
+    document.getElementById('ttt-status').textContent = 'Ходит: Х (Крестики)';
+    renderTttBoard();
+}
