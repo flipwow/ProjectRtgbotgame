@@ -1,30 +1,57 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Гардероб Ритухи</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- Подключаем Telegram Web App скрипт -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ritushka — питомец</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-    <div class="container">
-        <!-- Блок с карточкой гардероба -->
-        <div class="card">
-            <div class="card-icon">
-                <div class="dress-icon">👗</div>
-            </div>
-            <div class="card-content">
-                <h2>Твой гардероб</h2>
-                <p>✨ Привет! Скоро здесь появятся твои купленные вещи.</p>
-            </div>
+  <main class="app-container">
+    <header class="app-header">
+      <div class="eyebrow">RITUSHKA VIP</div>
+      <h1>Твой питомец</h1>
+      <p class="subtitle">Собери ему свой неповторимый лук ✨</p>
+    </header>
+
+    <section class="pet-stage" aria-label="Питомец">
+      <div class="pet-frame" id="petFrame">
+        <div class="pet-sparkle sparkle-one">✦</div>
+        <div class="pet-placeholder" id="petPlaceholder">
+          <span class="pet-emoji">🐾</span>
+          <span>Твоё место для питомца</span>
+          <small>Скоро здесь появится персонаж</small>
         </div>
+      </div>
+      <div class="pet-caption"><span class="status-dot"></span> Питомец ожидает наряд</div>
+    </section>
 
-        <!-- Кнопка закрытия -->
-        <button class="close-btn" id="closeBtn">Закрыть</button>
-    </div>
+    <button class="wardrobe-open" id="openWardrobe"><span>👗</span> Гардероб <span class="button-arrow">→</span></button>
 
-    <script src="script.js"></script>
+    <section class="wardrobe-view hidden" id="wardrobeView" aria-label="Гардероб">
+      <div class="section-heading">
+        <div><p class="eyebrow">ТВОИ ВЕЩИ</p><h2>Гардероб</h2></div>
+        <button class="icon-button" id="backHome" aria-label="Назад">✕</button>
+      </div>
+      <div class="category-tabs" id="categoryTabs" role="tablist">
+        <button class="category-tab active" data-category="all">Все</button>
+        <button class="category-tab" data-category="head">Головные уборы</button>
+        <button class="category-tab" data-category="glasses">Очки</button>
+        <button class="category-tab" data-category="accessory">Аксессуары</button>
+      </div>
+      <div class="items-grid" id="itemsGrid"></div>
+      <div class="item-detail hidden" id="itemDetail">
+        <button class="detail-back" id="detailBack">← К вещам</button>
+        <div class="detail-art" id="detailArt">🧢</div>
+        <h3 id="detailName">Предмет</h3>
+        <p class="hint" id="detailDescription">Выбери вещь, чтобы посмотреть её.</p>
+        <div class="detail-price" id="detailPrice"></div>
+        <button class="action-btn" id="wearButton">Надеть</button>
+      </div>
+      <p class="footnote">Пока показан демонстрационный каталог. Подключим реальные покупки и надетые вещи из бота.</p>
+    </section>
+  </main>
+  <script src="script.js"></script>
 </body>
 </html>
