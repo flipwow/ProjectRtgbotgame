@@ -341,28 +341,103 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchUserData();
 });
 
-// Логика крестиков-ноликов на двоих
+// --- ЛОГИКА МИНИ-ИГР ВО ВКЛАДКЕ PLAY ---
+
+function openGameMenu(gameName) {
+    if (gameName === 'tictactoe') {
+        document.getElementById('games-menu').style.display = 'none';
+        document.getElementById('tictactoe-modes').style.display = 'flex';
+        document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️';
+    } else if (gameName === 'fortune') {
+        alert('Скоро открытие Колеса Фортуны! 💅');
+    }
+}
+
+function startTttGame(mode) {
+    tttMode = mode; // 'solo' или 'duo'
+    document.getElementById('tictactoe-modes').style.display = 'none';
+    document.getElementById('game-tictactoe').style.display = 'flex';
+    document.getElementById('play-subtitle').textContent = mode === 'solo' ? 'Игра против бота 🤖' : 'Крестики-нолики на двоих 👥';
+    resetTtt();
+}
+
+function backTttModes() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'flex';
+    document.getElementById('play-subtitle').textContent = 'Выберите режим игры ⚔️';
+}
+
+function closeGame() {
+    document.getElementById('game-tictactoe').style.display = 'none';
+    document.getElementById('tictactoe-modes').style.display = 'none';
+    document.getElementById('games-menu').style.display = 'flex';
+    document.getElementById('play-subtitle').textContent = 'Выбирай развлечение и играй 🎮';
+}
+
+// --- ЛОГИКА КРЕСТИКОВ-НОЛИКОВ ---
 let tttBoard = ['', '', '', '', '', '', '', '', ''];
 let tttCurrentPlayer = 'X';
 let tttIsActive = true;
+let tttMode = 'duo'; // 'duo' или 'solo'
 
 const winningCombinations = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // линии
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // колонки
-    [0, 4, 8], [2, 4, 6]             // диагонали
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
 ];
 
 function makeMove(index) {
     if (!tttIsActive || tttBoard[index] !== '') return;
 
+    // В соло-режиме игрок ходит только за 'X', бот играет за 'O'
+    if (tttMode === 'solo' && tttCurrentPlayer === 'O') return;
+
     tttBoard[index] = tttCurrentPlayer;
     
-    if (tg?.HapticFeedback) {
+    if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
 
     renderTttBoard();
-    checkTttWin();
+    
+    if (checkTttWinOrDraw()) return;
+
+    // Меняем игрока
+    tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
+    updateTttStatus();
+
+    // Если режим соло и теперь ход бота ('O')
+    if (tttMode === 'solo' && tttCurrentPlayer === 'O' && tttIsActive) {
+        setTimeout(botMove, 500); // небольшая задержка, чтобы бот «думал»
+    }
+}
+
+function botMove() {
+    if (!tttIsActive) return;
+
+    // Ищем свободные клетки
+    let emptyCells = [];
+    tttBoard.forEach((cell, idx) => {
+        if (cell === '') emptyCells.push(idx);
+    });
+
+    if (emptyCells.length === 0) return;
+
+    // Простой ИИ: рандомный выбор свободной клетки
+    let randomIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    
+    tttBoard[randomIndex] = 'O';
+
+    if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+    }
+
+    renderTttBoard();
+
+    if (checkTttWinOrDraw()) return;
+
+    tttCurrentPlayer = 'X';
+    updateTttStatus();
 }
 
 function renderTttBoard() {
@@ -373,7 +448,7 @@ function renderTttBoard() {
     });
 }
 
-function checkTttWin() {
+function checkTttWinOrDraw() {
     let roundWon = false;
 
     for (let i = 0; i < winningCombinations.length; i++) {
@@ -387,47 +462,42 @@ function checkTttWin() {
     const statusText = document.getElementById('ttt-status');
 
     if (roundWon) {
-        statusText.textContent = `Победил игрок ${tttCurrentPlayer} 🎉`;
+        if (tttMode === 'solo') {
+            statusText.textContent = tttCurrentPlayer === 'X' ? 'Вы победили! 🎉' : 'Бот победил! 🤖';
+        } else {
+            statusText.textContent = `Победил игрок ${tttCurrentPlayer} 🎉`;
+        }
         tttIsActive = false;
-        if (tg?.HapticFeedback) {
+        if (typeof tg !== 'undefined' && tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
-        return;
+        return true;
     }
 
     if (!tttBoard.includes('')) {
         statusText.textContent = `Ничья! 🤝`;
         tttIsActive = false;
-        return;
+        return true;
     }
 
-    tttCurrentPlayer = tttCurrentPlayer === 'X' ? 'O' : 'X';
-    statusText.textContent = `Ходит: ${tttCurrentPlayer} (${tttCurrentPlayer === 'X' ? 'Крестики' : 'Нолики'})`;
+    return false;
+}
+
+function updateTttStatus() {
+    const statusText = document.getElementById('ttt-status');
+    if (!statusText) return;
+
+    if (tttMode === 'solo') {
+        statusText.textContent = tttCurrentPlayer === 'X' ? 'Ваш ход (Х)' : 'Бот думает... (О)';
+    } else {
+        statusText.textContent = `Ходит: ${tttCurrentPlayer} (${tttCurrentPlayer === 'X' ? 'Крестики' : 'Нолики'})`;
+    }
 }
 
 function resetTtt() {
     tttBoard = ['', '', '', '', '', '', '', '', ''];
     tttCurrentPlayer = 'X';
     tttIsActive = true;
-    document.getElementById('ttt-status').textContent = 'Ходит: Х (Крестики)';
+    updateTttStatus();
     renderTttBoard();
-}
-
-// Открытие конкретной мини-игры из меню Play
-function openGame(gameName) {
-    if (gameName === 'tictactoe') {
-        document.getElementById('games-menu').style.display = 'none';
-        document.getElementById('game-tictactoe').style.display = 'flex';
-        document.getElementById('play-subtitle').textContent = 'Крестики-нолики на двоих ❌⭕';
-        resetTtt();
-    } else if (gameName === 'fortune') {
-        alert('Скоро открытие Колеса Фортуны! 💅');
-    }
-}
-
-// Возврат к списку мини-игр
-function closeGame() {
-    document.getElementById('game-tictactoe').style.display = 'none';
-    document.getElementById('games-menu').style.display = 'flex';
-    document.getElementById('play-subtitle').textContent = 'Выбирай развлечение и играй 🎮';
 }
