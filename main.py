@@ -974,26 +974,21 @@ async def handle_text(message: Message):
         else:
             role_instruction = f"[КОНТЕКСТ: Пишет новичок-NPC (@{username}), RP: {user_rp}, R$: {user_cash}, на питомце надето: {eq_str}. Презрение.]"
 
-        chat_id = message.chat.id
-        dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}"
+        dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}\n\n(Справочно для времени: в Москве {moscow_time})"
 
-        # ИСПРАВЛЕНИЕ: Использование актуального интерфейса SDK для чатов
-        if chat_id not in chat_sessions:
-            chat_sessions[chat_id] = client.chats.create(
-                model="gemini-3.5-flash-lite",
-                config={"system_instruction": dynamic_system_prompt},
-            )
+        # Прямой запрос к модели без сохранения зависающих сессий чата
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=text,
+            config={
+                "system_instruction": dynamic_system_prompt,
+            },
+        )
 
-        chat = chat_sessions[chat_id]
-        full_message = f"(Справочно для времени: в Москве {moscow_time})\n\nСообщение пользователя: {text}"
-
-        response = chat.send_message(full_message)
         await message.reply(response.text)
 
     except Exception as e:
         print(f"Ошибка в handle_text: {e}")
-        if message.chat.id in chat_sessions:
-            del chat_sessions[message.chat.id]
         await message.answer("Что-то пошло не так... даже у королевы бывают сбои 💅")
 
 
