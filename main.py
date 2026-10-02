@@ -575,12 +575,9 @@ def get_main_hub_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="👤 Профиль", callback_data="menu_profile"),
-                InlineKeyboardButton(
-                    text="👥 Реестр чата", callback_data="menu_registry"
-                ),
+                InlineKeyboardButton(text="🔄 Обмен RP", callback_data="menu_convert"),
             ],
             [
-                InlineKeyboardButton(text="🔄 Обмен RP", callback_data="menu_convert"),
                 InlineKeyboardButton(text="👑 Прайс ролей", callback_data="menu_roles"),
             ],
             [
@@ -851,7 +848,7 @@ async def cmd_lvlup(message: Message):
 @router.message(Command("duel"))
 async def cmd_duel(message: Message):
     user = message.from_user
-    username = (user.username or user.first_name).lower()
+    username = (user.username or user.first_name or "user").lower()
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
