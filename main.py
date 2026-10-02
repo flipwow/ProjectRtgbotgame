@@ -54,7 +54,7 @@ SHOP_ITEMS = {
             "part": "head",
         },
         "cool_glasses": {
-            "name": "🕶️️ Крутые пиксельные очки",
+            "name": "🕶 Крутые пиксельные очки",
             "price": 55,
             "part": "head",
         },
