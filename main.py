@@ -1041,7 +1041,7 @@ async def handle_text(message: Message):
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}\n\n(Справочно для времени: в Москве {moscow_time})"
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash-lite",
             contents=text,
             config={
                 "system_instruction": dynamic_system_prompt,
