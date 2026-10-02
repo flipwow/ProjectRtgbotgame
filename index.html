@@ -63,28 +63,26 @@
 
                 <div class="category-tabs" id="categoryTabs">
                     <button class="category-tab active" data-category="all">Все</button>
-                    <button class="category-tab" data-category="head">Кепки</button>
-                    <button class="category-tab" data-category="glasses">Очки</button>
-                    <button class="category-tab" data-category="accessory">Аксессуары</button>
+                    <button class="category-tab" data-category="sale">Sale</button>
+                    <button class="category-tab" data-category="luxury">Luxury</button>
                 </div>
 
                 <div class="items-grid" id="itemsGrid"></div>
             </section>
 
-            <!-- Вкладка 3: Магазин -->
-            <section id="tab-shop" class="tab-content">
-                <h3>Магазин стилей</h3>
-                <div id="shop-items" class="items-grid">
-                    <div class="item-card">
-                        <div class="item-art">🧥</div>
-                        <div class="item-name">Стильная куртка</div>
-                        <button class="action-btn" onclick="alert('Покупка в разработке!')">Купить (150 💎)</button>
-                    </div>
-                    <div class="item-card">
-                        <div class="item-art">🕶️</div>
-                        <div class="item-name">Крутые очки</div>
-                        <button class="action-btn" onclick="alert('Покупка в разработке!')">Купить (75 💎)</button>
-                    </div>
+            <!-- Вкладка 3: Правила игры -->
+            <section id="tab-rules" class="tab-content">
+                <div class="pet-section-header">
+                    <span class="vip-tag">ПРАВИЛА ИГРЫ</span>
+                    <h3>Свод законов Ритушки</h3>
+                    <p class="subtitle">Читай внимательно, плебей 💅</p>
+                </div>
+
+                <div class="glass-card info-card" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p>👑 <strong>1. Уважение к хозяйке:</strong> Великая Ритушка всегда права. Споры караются обнулением RP.</p>
+                    <p>💎 <strong>2. Фарм RP:</strong> Общайся в чате с ботом, чтобы повышать репутацию и копить кристаллы (R$).</p>
+                    <p>👗 <strong>3. Шмотки:</strong> Покупай уникальные статусы и кастомизируй своего питомца в гардеробе.</p>
+                    <p>🚫 <strong>4. Спам:</strong> Запрещено спамить сообщениями чаще чем раз в 3 секунды — влетит бан фарм-ресурса на 15 минут!</p>
                 </div>
             </section>
 
@@ -98,7 +96,7 @@
             </section>
         </main>
 
-        <!-- Нижняя навигация (4 кнопки) -->
+        <!-- Нижняя навигация -->
         <nav class="bottom-nav glass-card">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
@@ -108,9 +106,9 @@
                 <span class="nav-icon">👗</span>
                 <span>Гардероб</span>
             </button>
-            <button class="nav-item" onclick="switchTab('shop')">
-                <span class="nav-icon">🛍️</span>
-                <span>Магазин</span>
+            <button class="nav-item" onclick="switchTab('rules')">
+                <span class="nav-icon">📜</span>
+                <span>Правила</span>
             </button>
             <button class="nav-item" onclick="switchTab('profile')">
                 <span class="nav-icon">👤</span>

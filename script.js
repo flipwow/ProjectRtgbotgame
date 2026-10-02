@@ -59,7 +59,7 @@ function switchTab(tabName) {
     const navButtons = document.querySelectorAll('.nav-item');
     if (tabName === 'home') navButtons[0].classList.add('active');
     if (tabName === 'wardrobe') navButtons[1].classList.add('active');
-    if (tabName === 'shop') navButtons[2].classList.add('active');
+    if (tabName === 'rules') navButtons[2].classList.add('active');
     if (tabName === 'profile') navButtons[3].classList.add('active');
 
     if (tabName === 'home') {
@@ -79,7 +79,6 @@ function updatePetView() {
     } else {
         let iconsHtml = `<span class="pet-emoji">🐾</span>`;
         equippedItems.forEach(item => {
-            // Подбираем иконку под ID вещи
             let icon = '✨';
             if (item.id.includes('cap')) icon = '🧢';
             else if (item.id.includes('glasses')) icon = '🕶️';
@@ -106,7 +105,7 @@ function renderWardrobe() {
     });
 
     if (filtered.length === 0) {
-        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">Инвентарь пуст. Купи что-нибудь в бутик-разделе! 🛍️</p>';
+        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">Инвентарь пуст. Купи что-нибудь через бота! 🛍️</p>';
         return;
     }
 
@@ -117,7 +116,7 @@ function renderWardrobe() {
 
         let icon = '✨';
         if (item.id.includes('cap')) icon = '🧢';
-        else if (item.id.includes('glasses')) icon = '🕶️️';
+        else if (item.id.includes('glasses')) icon = '🕶';
         else if (item.id.includes('collar')) icon = '💎';
         else if (item.id.includes('crown')) icon = '👑';
 

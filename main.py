@@ -161,12 +161,41 @@ def get_webapp_user(request):
     if not telegram_user:
         return None, None
 
+    tg_id = str(telegram_user.get("id"))
     username = (telegram_user.get("username") or "").lower()
 
-    if not username:
-        username = f"id_{telegram_user['id']}"
+    users = load_users()
+    found_username = None
 
-    return username, telegram_user
+    # Ищем пользователя по telegram_id в базе, чтобы синхронизировать баланс
+    for uname, udata in users.items():
+        if str(udata.get("telegram_id")) == tg_id:
+            found_username = uname
+            break
+
+    if not found_username:
+        found_username = username if username else f"id_{tg_id}"
+        if found_username not in users:
+            users[found_username] = {
+                "telegram_id": tg_id,
+                "role": "noob",
+                "requested_role": None,
+                "status": "active",
+                "rp": 0,
+                "r_currency": 0,
+                "inventory": [],
+                "equipped": [],
+            }
+        else:
+            users[found_username]["telegram_id"] = tg_id
+        save_users(users)
+    else:
+        # Обновляем telegram_id на всякий случай
+        if "telegram_id" not in users[found_username]:
+            users[found_username]["telegram_id"] = tg_id
+            save_users(users)
+
+    return found_username, telegram_user
 
 
 def get_inventory_details(user_info):
@@ -467,7 +496,7 @@ async def unified_menu_router(callback: CallbackQuery):
         role_name = ROLES_HIERARCHY.get(user_role, {}).get("name", user_role)
         user_cash = user_info.get("r_currency", 0)
 
-        # Убрали текст про инвентарь и надетые вещи, теперь они в Mini App!
+        # Текст профиля без инвентаря и надетых вещей (они теперь в Mini App)
         text = (
             f"👑 **Королевское досье питомца @{username}** 👑\n\n"
             f"• **Статус:** {role_name}\n"
@@ -530,7 +559,7 @@ async def unified_menu_router(callback: CallbackQuery):
                 ]
             )
         buttons.append(
-            [InlineKeyboardButton(text="◀️️ Назад в бутик", callback_data="menu_shop")]
+            [InlineKeyboardButton(text="◀ Назад в бутик", callback_data="menu_shop")]
         )
 
         await callback.message.edit_text(
@@ -1036,7 +1065,7 @@ async def handle_text(message: Message):
         dynamic_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}"
 
         chat_sessions[chat_id] = client.chats.create(
-            model="gemini-3.5-flash-lite",
+            model="gemini-2.5-flash",
             config={"system_instruction": dynamic_system_prompt},
         )
 
