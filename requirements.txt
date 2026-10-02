@@ -1,4 +1,1 @@
-aiogram
-aiohttp
-google-genai
-python-dotenv
+pyTelegramBotAPI
