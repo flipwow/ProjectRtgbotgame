@@ -771,49 +771,17 @@ async def cmd_menu(message: Message):
 async def cmd_duel(message: Message):
     user = message.from_user
 
-    if not user:
-        return
-
-    username = (user.username or user.first_name or "user").lower()
-
     room_id = create_game_room(challenger_id=user.id)
 
-    # Параметры игры
-    start_parameter = f"duel_{room_id}"
+    duel_url = f"https://t.me/{BOT_USERNAME}?startapp=duel_{room_id}"
 
-    # Обычная ссылка на сайт — только для прямого доступа
-    duel_url = f"{WEBAPP_ORIGIN}?mode=online&room={room_id}"
-
-    if message.chat.type == "private":
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="⚔️ Принять вызов", web_app=WebAppInfo(url=duel_url)
-                    )
-                ]
-            ]
-        )
-
-    else:
-        # В группе отправляем ссылку на Telegram Mini App.
-        # BOT_USERNAME задаётся при запуске бота.
-        if not BOT_USERNAME:
-            await message.answer("❌ Не удалось определить имя бота.")
-            return
-
-        mini_app_url = f"https://t.me/{BOT_USERNAME}" f"?startapp={start_parameter}"
-
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="⚔️ Принять вызов", url=mini_app_url)]
-            ]
-        )
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="⚔️ Принять вызов", url=duel_url)]]
+    )
 
     await message.answer(
-        f"👑 **@{username} вызывает на дуэль!**\n\n"
-        f"Комната: `{room_id}`\n"
-        f"Жми кнопку, чтобы сразиться 💅✨",
+        f"⚔️ **{user.first_name} вызывает на дуэль!**\n\n"
+        f"Нажми кнопку ниже, чтобы открыть игру.",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
