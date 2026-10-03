@@ -644,7 +644,6 @@ def get_main_hub_keyboard():
                 InlineKeyboardButton(text="👤 Профиль", callback_data="menu_profile"),
                 InlineKeyboardButton(text="🔄 Обмен RP", callback_data="menu_convert"),
             ],
-            [InlineKeyboardButton(text="👑 Прайс ролей", callback_data="menu_roles")],
             [
                 InlineKeyboardButton(
                     text="🎮 RituhaGame", web_app=WebAppInfo(url=WEBAPP_ORIGIN)

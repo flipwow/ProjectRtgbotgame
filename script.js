@@ -240,10 +240,48 @@ function renderShop() {
     if (!grid) return;
     grid.innerHTML = '';
 
+    // === Вкладка "Роли" ===
+    if (selectedShopCategory === 'roles') {
+        grid.innerHTML = `
+            <div style="grid-column: span 2; padding: 16px;" class="glass-card">
+                <h3 style="margin-bottom: 12px; font-size: 16px;">👑 Прайс ролей</h3>
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5;">
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                        <strong>👑 boss</strong> — Легенда / Босс<br>
+                        <span style="color: #c4b5fd;">500 руб.</span> · Потолок RP: 1000
+                    </div>
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                        <strong>💎 dura</strong> — VIP-гость<br>
+                        <span style="color: #c4b5fd;">250 руб.</span> · Потолок RP: 700
+                    </div>
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                        <strong>💅 peshka</strong> — Модник<br>
+                        <span style="color: #c4b5fd;">100 руб.</span> · Потолок RP: 425
+                    </div>
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                        <strong>🧊 noob</strong> — Пешка (NPC)<br>
+                        <span style="color: #c4b5fd;">0 руб.</span> · Потолок RP: 200
+                    </div>
+                </div>
+                <p style="margin-top: 14px; font-size: 12px; color: var(--text-secondary);">
+                    После оплаты напиши в бота:<br>
+                    <code>/lvlup boss</code> или <code>/lvlup dura</code> и т.д.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    // === Обычные товары ===
     const filtered = userData.catalog.filter(item => {
         if (selectedShopCategory === 'all') return true;
         return item.category === selectedShopCategory;
     });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-secondary); padding: 20px; font-size: 13px;">В этой категории пусто</p>';
+        return;
+    }
 
     filtered.forEach(item => {
         const card = document.createElement('div');
@@ -280,6 +318,7 @@ function renderShop() {
                 console.error('Ошибка при покупке:', e);
             }
         });
+
         grid.appendChild(card);
     });
 }
@@ -339,6 +378,18 @@ function shareChallengeLink() {
 }
 
 function resetTtt() {
+    if (tttMode === 'online') {
+        // В онлайн-режиме просто выходим из игры
+        if (socket) {
+            socket.close();
+            socket = null;
+        }
+        document.getElementById('game-tictactoe').style.display = 'none';
+        document.getElementById('tictactoe-modes').style.display = 'flex';
+        return;
+    }
+
+    // Для solo и duo — обычный сброс
     tttBoard = Array(9).fill(null);
     tttCurrent = 'X';
     tttGameOver = false;
