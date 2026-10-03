@@ -775,6 +775,12 @@ async def cmd_duel(message: Message):
 
     duel_url = f"https://t.me/{BOT_USERNAME}?startapp=duel_{room_id}"
 
+    print("========== DUEL ==========")
+    print("BOT_USERNAME:", BOT_USERNAME)
+    print("ROOM_ID:", room_id)
+    print("DUEL_URL:", duel_url)
+    print("==========================")
+
     print("BOT_USERNAME =", BOT_USERNAME)
     print("DUEL URL =", duel_url)
 
