@@ -50,6 +50,13 @@
                     <span>Сменить питомца</span>
                     <span class="arrow">→</span>
                 </button>
+
+                <!-- Новая кнопка гардероба на главном экране -->
+<button class="wardrobe-shortcut-btn" onclick="switchTab('wardrobe')" style="margin-top: 8px;">
+    <span class="btn-icon">👗</span>
+    <span>Гардероб</span>
+    <span class="arrow">→</span>
+</button>
             </section>
 
             <!-- Вкладка 2: Гардероб -->
@@ -79,6 +86,28 @@
     <h3>Мини-игры</h3>
     <p class="subtitle" id="play-subtitle">Выбирай развлечение и играй 🎮</p>
 </div>
+
+<!-- Вкладка 4: Таблица лидеров -->
+<section id="tab-leaderboard" class="tab-content">
+    <div class="pet-section-header">
+        <span class="vip-tag">RITUSHKA HALL OF FAME</span>
+        <h3>Таблица лидеров 🏆</h3>
+        <p class="subtitle">Лучшие игроки нашего бота</p>
+    </div>
+
+    <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="font-size: 15px; margin: 0;">Выберите игру</h4>
+            <select id="leaderboard-game-select" onchange="loadLeaderboard(this.value)" style="background: var(--card-bg); border: 1px solid var(--card-border); color: white; padding: 6px 10px; border-radius: 8px; font-size: 12px; outline: none;">
+                <option value="tictactoe" style="background: #181925;">Крестики-нолики</option>
+                <option value="general" style="background: #181925;">Общий счет</option>
+            </select>
+        </div>
+        <ul id="leaderboard-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+            <li style="color: var(--text-secondary); text-align: center; padding: 8px;">Загрузка очков...</li>
+        </ul>
+    </div>
+</section>
 
 <!-- Главное меню игр -->
 <div id="games-menu" class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
@@ -195,44 +224,45 @@
                 <div class="items-grid" id="shopItemsGrid"></div>
             </section>
 
-            <!-- Вкладка 5: Реестр чата (Взаимодействие с людьми) -->
-            <section id="tab-chat" class="tab-content">
-                <div class="section-heading" style="margin-bottom: 12px;">
-                    <div>
-                        <span class="vip-tag">РЕЕСТР ЧАТА</span>
-                        <h3>Жители тусовки 👥</h3>
-                        <p class="subtitle">Взаимодействуй с другими участниками</p>
-                    </div>
-                </div>
-                <div id="chatUsersList" style="display: flex; flex-direction: column; gap: 8px;">
-                    <!-- Динамически заполнится из скрипта -->
-                </div>
-            </section>
+            <!-- Вкладка: Профиль и активные игроки -->
+<section id="tab-profile" class="tab-content">
+    <div class="section-heading" style="margin-bottom: 12px;">
+        <div>
+            <span class="vip-tag">МОЙ ПРОФИЛЬ И УЧАСТНИКИ</span>
+            <h3>Активные игроки бота 👤</h3>
+            <p class="subtitle">Пользователи, запустившие этого бота</p>
+        </div>
+    </div>
+    <div id="chatUsersList" style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Скрипт подгрузит список реальных пользователей из базы бота -->
+        <div style="color: var(--text-secondary); text-align: center; padding: 12px; font-size: 13px;">Загрузка списка пользователей...</div>
+    </div>
+</section>
         </main>
 
         <!-- Нижняя навигация -->
         <nav class="bottom-nav glass-card">
-            <button class="nav-item active" onclick="switchTab('home')">
-                <span class="nav-icon">🐾</span>
-                <span>Питомец</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('wardrobe')">
-                <span class="nav-icon">👗</span>
-                <span>Гардероб</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('play')">
-                <span class="nav-icon">🎮</span>
-                <span>Play</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('shop')">
-                <span class="nav-icon">🛍️</span>
-                <span>Магазин</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('chat')">
-                <span class="nav-icon">👥</span>
-                <span>Чат</span>
-            </button>
-        </nav>
+    <button class="nav-item active" onclick="switchTab('home')">
+        <span class="nav-icon">🐾</span>
+        <span>Питомец</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('leaderboard')">
+        <span class="nav-icon">🏆</span>
+        <span>Таблица лидеров</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('play')">
+        <span class="nav-icon">🎮</span>
+        <span>Play</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('shop')">
+        <span class="nav-icon">🛍️</span>
+        <span>Магазин</span>
+    </button>
+    <button class="nav-item" onclick="switchTab('profile')">
+        <span class="nav-icon">👤</span>
+        <span>Профиль</span>
+    </button>
+</nav>
     </div>
 
     <!-- Модальное окно смены питомца -->
