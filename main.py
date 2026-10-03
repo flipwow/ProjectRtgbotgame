@@ -63,8 +63,8 @@ SCORES_FILE = os.path.join(BASE_DIR, "scores.json")
 INVENTORY_FILE = os.path.join(BASE_DIR, "inventory.json")
 
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
-CSS_FILE = os.path.join(BASE_DIR, "style_2.css")
-JS_FILE = os.path.join(BASE_DIR, "script_2.js")
+CSS_FILE = os.path.join(BASE_DIR, "style.css")
+JS_FILE = os.path.join(BASE_DIR, "script.js")
 PET_IMAGE = os.path.join(BASE_DIR, "Barsichela.png")
 
 PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
@@ -1575,7 +1575,7 @@ async def css_handler(request):
 
     if not os.path.exists(CSS_FILE):
         return web.Response(
-            text="style_2.css не найден",
+            text="style.css не найден",
             status=404,
         )
 
@@ -1589,7 +1589,7 @@ async def js_handler(request):
 
     if not os.path.exists(JS_FILE):
         return web.Response(
-            text="script_2.js не найден",
+            text="script.js не найден",
             status=404,
         )
 
@@ -1853,12 +1853,12 @@ async def start_webapp_api():
     )
 
     app.router.add_get(
-        "/style_2.css",
+        "/style.css",
         css_handler,
     )
 
     app.router.add_get(
-        "/script_2.js",
+        "/script.js",
         js_handler,
     )
 
