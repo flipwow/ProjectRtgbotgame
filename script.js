@@ -242,44 +242,41 @@ function renderShop() {
 
     // === Вкладка "Роли" ===
     if (selectedShopCategory === 'roles') {
-        grid.innerHTML = `
-            <div style="grid-column: span 2; padding: 16px;" class="glass-card">
-                <h3 style="margin-bottom: 14px; font-size: 16px; text-align: center;">👑 Прайс ролей</h3>
-                
-                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.45;">
-                    <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
-                        <strong>👑 boss</strong> — Легенда / Босс<br>
-                        <span style="color: #c4b5fd;">500 руб.</span> · Потолок RP: 1000
-                    </div>
-                    
-                    <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
-                        <strong>💎 dura</strong> — VIP-гость<br>
-                        <span style="color: #c4b5fd;">250 руб.</span> · Потолок RP: 700
-                    </div>
-                    
-                    <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
-                        <strong>💅 peshka</strong> — Модник<br>
-                        <span style="color: #c4b5fd;">100 руб.</span> · Потолок RP: 425
-                    </div>
-                    
-                    <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
-                        <strong>🧊 noob</strong> — Пешка (NPC)<br>
-                        <span style="color: #c4b5fd;">0 руб.</span> · Потолок RP: 200
-                    </div>
+    grid.innerHTML = `
+        <div style="grid-column: span 2; padding: 16px;" class="glass-card">
+            <h3 style="margin-bottom: 14px; font-size: 16px; text-align: center;">👑 Прайс ролей</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.45;">
+                <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                    <strong>👑 boss</strong> — Легенда / Босс<br>
+                    <span style="color: #c4b5fd;">500 руб.</span> · Потолок RP: 1000
                 </div>
-
-                <div style="margin-top: 18px; padding: 12px; background: rgba(139, 92, 246, 0.15); border-radius: 12px; font-size: 13px;">
-                    <strong>Как получить роль:</strong><br>
-                    1. Оплати нужную сумму<br>
-                    2. Напиши боту команду:<br>
-                    <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 6px;">/lvlup boss</code><br>
-                    <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 6px;">/lvlup dura</code><br>
-                    <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 6px;">/lvlup peshka</code>
+                
+                <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                    <strong>💎 dura</strong> — VIP-гость<br>
+                    <span style="color: #c4b5fd;">250 руб.</span> · Потолок RP: 700
+                </div>
+                
+                <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                    <strong>💅 peshka</strong> — Модник<br>
+                    <span style="color: #c4b5fd;">100 руб.</span> · Потолок RP: 425
+                </div>
+                
+                <div style="padding: 12px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                    <strong>🧊 noob</strong> — Пешка (NPC)<br>
+                    <span style="color: #c4b5fd;">0 руб.</span> · Потолок RP: 200
                 </div>
             </div>
-        `;
-        return;
-    }
+
+            <div style="margin-top: 18px; padding: 12px; background: rgba(139, 92, 246, 0.15); border-radius: 12px; font-size: 13px;">
+                <strong>Как получить роль:</strong><br>
+                1. Оплати нужную сумму<br>
+                2. Напиши боту команду: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 6px;">/lvlup &lt;роль&gt;</code>
+            </div>
+        </div>
+    `;
+    return;
+}
 
     // === Обычные товары (Sale / Luxury / Все) ===
     const filtered = userData.catalog.filter(item => {
