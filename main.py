@@ -1,17 +1,16 @@
 import asyncio
 import datetime
-from dotenv import load_dotenv
+import hashlib
+import hmac
 import json
 import os
 import random
 import time
-import hmac
-import hashlib
 import uuid
 from urllib.parse import parse_qsl
 
 from aiohttp import web, WSMsgType
-from telebot import types
+from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
@@ -47,7 +46,6 @@ if not GEMINI_API_KEY:
 # ============================================================
 
 bot = Bot(token=BOT_TOKEN)
-
 dp = Dispatcher()
 router = Router()
 
@@ -60,12 +58,16 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-USERS_FILE = os.path.join(
-    BASE_DIR,
-    "users.json",
-)
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
+SCORES_FILE = os.path.join(BASE_DIR, "scores.json")
+INVENTORY_FILE = os.path.join(BASE_DIR, "inventory.json")
 
-PUBLIC_DIR = BASE_DIR
+INDEX_FILE = os.path.join(BASE_DIR, "index.html")
+CSS_FILE = os.path.join(BASE_DIR, "style_2.css")
+JS_FILE = os.path.join(BASE_DIR, "script_2.js")
+PET_IMAGE = os.path.join(BASE_DIR, "Barsichela.png")
+
+PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 
 
 # ============================================================
@@ -83,32 +85,62 @@ WEBAPP_PORT = 8080
 
 WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
-SCORES_FILE = "scores.json"
+
+# ============================================================
+# SCORES
+# ============================================================
 
 
 def load_scores():
     if not os.path.exists(SCORES_FILE):
-        default_data = {"tictactoe": {}, "general": {}}
+        default_data = {
+            "tictactoe": {},
+            "general": {},
+        }
         save_scores(default_data)
         return default_data
+
     try:
         with open(SCORES_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"tictactoe": {}, "general": {}}
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            raise ValueError("scores.json должен содержать объект.")
+
+        data.setdefault("tictactoe", {})
+        data.setdefault("general", {})
+
+        return data
+
+    except Exception as e:
+        print(f"Ошибка загрузки scores.json: {e}")
+        return {
+            "tictactoe": {},
+            "general": {},
+        }
 
 
 def save_scores(scores):
-    with open(SCORES_FILE, "w", encoding="utf-8") as f:
-        json.dump(scores, f, ensure_ascii=False, indent=4)
+    try:
+        with open(SCORES_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                scores,
+                f,
+                ensure_ascii=False,
+                indent=4,
+            )
+    except Exception as e:
+        print(f"Ошибка сохранения scores.json: {e}")
 
 
 def update_score(game_type, user_id, points):
     scores = load_scores()
+
     if game_type not in scores:
         scores[game_type] = {}
 
     user_id_str = str(user_id)
+
     current = scores[game_type].get(user_id_str, 0)
     scores[game_type][user_id_str] = current + points
 
@@ -170,7 +202,7 @@ SHOP_ITEMS = {
 
 
 # ============================================================
-# RP & ROLES
+# RP / ROLES
 # ============================================================
 
 RP_CEILINGS = {
@@ -180,6 +212,7 @@ RP_CEILINGS = {
     "dura": 700,
     "boss": 1000,
 }
+
 
 ROLES_HIERARCHY = {
     "boss": {
@@ -202,197 +235,110 @@ ROLES_HIERARCHY = {
 
 
 # ============================================================
-# GEMINI PROMPT
+# GEMINI
 # ============================================================
 
 BASE_SYSTEM_PROMPT = """
-Ты — Ритушка. Твой возраст: Маленькая девочка. Пол: Женский.
-ВАЖНО: Отвечай на вопросы пользователя по существу. Если спрашивают про время/погоду — укажи. Если нет — не упоминай время вообще.
-Стиль: Маленькая девочка с огромным ЧСВ, обожающая леопардовую одежду, ноготочки и слэй-вайб. Нарциссичная, эгоцентричная, дерзкая стерва. Играет в Roblox (Murder Mystery 2).
-Отношения: Ангелина Королева — мама (авторитет). Алинка Хуилка и Блонда — слуги/подружки. Остальные — NPC.
-Речь: Дерзкая, с подростковым и геймерским сленгом (слей, вайб, пешки). Эмодзи (💅✨👑🖤🔥). 3-5 предложений.
+Ты — персонаж Ритушка из игровой системы.
+
+Отвечай пользователю по существу.
+Если пользователь спрашивает про время или погоду — можешь упомянуть это.
+Если это не связано с вопросом — время не упоминай.
+
+Стиль:
+- дерзкий;
+- игровой;
+- немного пафосный;
+- подростковый сленг;
+- короткие ответы;
+- можно использовать 💅✨👑🖤🔥;
+- обычно 3-5 предложений.
+
+Не выдумывай факты о пользователе.
+Не утверждай, что у тебя есть доступ к данным, которых нет в контексте.
 """
 
 
-# Функция отправки меню выбора питомцев
-def send_pet_selection(message):
-    markup = types.InlineKeyboardMarkup(row_width=1)
-
-    # Кнопка выбора Барсичелы
-    btn_barsichela = types.InlineKeyboardButton(
-        "🐾 Выбрать Барсичелу", callback_data="select_pet_barsichela"
-    )
-    markup.add(btn_barsichela)
-
-    # Отправка фото питомца с описанием (используем изображение из источника)
-    caption = (
-        "<b>🐾 Знакомьтесь: Барсичела!</b>\n\n"
-        "<i>«Милый пушистик с секретом. Готов сопровождать вас в приключениях!»</i>\n\n"
-        "▫️ Редкость: Эпический\n"
-        "▫️ Бонус: +15% к защите профиля"
-    )
-
-    # Путь к изображению Барсичелы
-    with open("Barsichela.png", "rb") as photo:
-        message.bot.send_photo(
-            message.chat.id,
-            photo,
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=markup,
-        )
+# ============================================================
+# INVENTORY / PET DATA
+# ============================================================
 
 
-# Обработчик нажатия на кнопку выбора
-@bot.callback_query_handler(func=lambda call: call.data == "select_pet_barsichela")
-def set_pet_handler(call):
-    user_id = call.from_user.id
-    # Здесь логика сохранения выбора питомца в базу данных или JSON для конкретного пользователя
+def load_inventory_data():
+    if not os.path.exists(INVENTORY_FILE):
+        return {
+            "users_pets": {},
+            "food_items": {},
+        }
 
-    bot.answer_callback_query(
-        call.id, "🎉 Вы успешно выбрали Барсичелу своим питомцем!", show_alert=True
-    )
-    bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption="✅ <b>Барсичела теперь ваш официальный питомец!</b>",
-        parse_mode="HTML",
-    )
+    try:
+        with open(INVENTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
+        if not isinstance(data, dict):
+            return {
+                "users_pets": {},
+                "food_items": {},
+            }
 
-# Загрузка данных из JSON (в реальном проекте лучше обернуть в функции с сохранением)
-def load_data():
-    with open("inventory.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+        data.setdefault("users_pets", {})
+        data.setdefault("food_items", {})
 
+        return data
 
-# Команда вызова меню питомца (Статус + Кнопка «Покормить»)
-@bot.message_handler(commands=["pet", "barsichela"])
-def pet_status_command(message):
-    user_id = str(message.from_user.id)
-    data = load_data()
+    except Exception as e:
+        print(f"Ошибка загрузки inventory.json: {e}")
 
-    # Проверяем, есть ли у пользователя питомец
-    if user_id not in data["users_pets"]:
-        bot.reply_to(
-            message, "У вас пока нет питомца! Выберите Барсичелу командой /start_pet"
-        )
-        return
-
-    pet = data["users_pets"][user_id]
-
-    status_text = (
-        f"🐾 <b>Ваш питомец: {pet['pet_name']}</b>\n\n"
-        f"🍖 Сытость: {pet['hunger']}/100\n"
-        f"💖 Счастье: {pet['happiness']}/100\n\n"
-        f"<i>Нажмите кнопку ниже, чтобы открыть мисочку с едой!</i>"
-    )
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            "🥣 Покормить Барсичелу", callback_data="open_feed_menu"
-        )
-    )
-
-    # Путь к изображению Барсичелы
-    with open("Barsichela.png", "rb") as photo:
-        bot.send_photo(
-            message.chat.id,
-            photo,
-            caption=status_text,
-            parse_mode="HTML",
-            reply_markup=markup,
-        )
+        return {
+            "users_pets": {},
+            "food_items": {},
+        }
 
 
-# Открытие меню выбора еды из инвентаря
-@bot.callback_query_handler(func=lambda call: call.data == "open_feed_menu")
-def feed_menu_callback(call):
-    user_id = str(call.from_user.id)
-    data = load_data()
-    pet = data["users_pets"][user_id]
-
-    markup = types.InlineKeyboardMarkup(row_width=1)
-
-    # Формируем кнопки на основе того, что есть у игрока в инвентаре
-    inventory = pet["inventory"]
-    if not inventory:
-        bot.answer_callback_query(
-            call.id, "У вас пустой холодильник! Купите еды в магазине.", show_alert=True
-        )
-        return
-
-    for food_id, count in inventory.items():
-        food_info = data["food_items"][food_id]
-        btn_text = f"{food_info['name']} (x{count})"
-        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"eat_{food_id}"))
-
-    bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption="🥣 <b>Выберите, чем угостить Барсичелу:</b>",
-        parse_mode="HTML",
-        reply_markup=markup,
-    )
-
-
-# Обработка кормления выбранным блюдом
-@bot.callback_query_handler(func=lambda call: call.data.startswith("eat_"))
-def process_eating(call):
-    user_id = str(call.from_user.id)
-    food_id = call.data.split("_")[1]  # Получаем ID еды (например, fish)
-
-    data = load_data()
-    pet = data["users_pets"][user_id]
-    food_info = data["food_items"][food_id]
-
-    # Проверяем наличие в инвентаре
-    if pet["inventory"].get(food_id, 0) > 0:
-        # Уменьшаем количество еды
-        pet["inventory"][food_id] -= 1
-        if pet["inventory"][food_id] == 0:
-            del pet["inventory"][food_id]  # Удаляем предмет, если он кончился
-
-        # Повышаем характеристики (но не выше 100)
-        pet["hunger"] = min(100, pet["hunger"] + food_info["hunger_restore"])
-        pet["happiness"] = min(100, pet["happiness"] + food_info["happiness_restore"])
-
-        # Сохраняем изменения в файл (в реальном проекте: db.save())
-        with open("inventory.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-
-        bot.answer_callback_query(
-            call.id,
-            f"😋 Барсичела с аппетитом съел {food_info['name']}! Сытость и счастье выросли.",
-            show_alert=True,
-        )
-
-        # Возвращаем обновленный статус
-        status_text = (
-            f"🐾 <b>Ваш питомец: {pet['pet_name']}</b>\n\n"
-            f"🍖 Сытость: {pet['hunger']}/100\n"
-            f"💖 Счастье: {pet['happiness']}/100\n\n"
-            f"<i>Барсичела сыт и довольно жмурится! ✨</i>"
-        )
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton(
-                "🥣 Покормить ещё", callback_data="open_feed_menu"
+def save_inventory_data(data):
+    try:
+        with open(INVENTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                data,
+                f,
+                ensure_ascii=False,
+                indent=4,
             )
-        )
 
-        bot.edit_message_caption(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            caption=status_text,
-            parse_mode="HTML",
-            reply_markup=markup,
-        )
-    else:
-        bot.answer_callback_query(
-            call.id, "❌ У вас больше нет этого лакомства!", show_alert=True
-        )
+    except Exception as e:
+        print(f"Ошибка сохранения inventory.json: {e}")
+
+
+def get_pet_for_user(telegram_id):
+    data = load_inventory_data()
+
+    user_id = str(telegram_id)
+
+    pet = data.get("users_pets", {}).get(user_id)
+
+    if not pet:
+        return None
+
+    return pet
+
+
+def ensure_pet_for_user(telegram_id):
+    data = load_inventory_data()
+
+    user_id = str(telegram_id)
+
+    if user_id not in data["users_pets"]:
+        data["users_pets"][user_id] = {
+            "pet_name": "Барсичела",
+            "pet_type": "barsichela",
+            "hunger": 100,
+            "happiness": 100,
+            "inventory": {},
+        }
+
+        save_inventory_data(data)
+
+    return data["users_pets"][user_id]
 
 
 # ============================================================
@@ -403,73 +349,117 @@ def process_eating(call):
 def load_users():
     if not os.path.exists(USERS_FILE):
         return {}
+
     try:
         with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            return {}
+
+        return data
+
     except Exception as e:
         print(f"Ошибка загрузки users.json: {e}")
         return {}
 
 
 def save_users(users):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                users,
+                f,
+                ensure_ascii=False,
+                indent=4,
+            )
+
+    except Exception as e:
+        print(f"Ошибка сохранения users.json: {e}")
 
 
-def get_or_create_user(username):
+def create_default_user(telegram_id=None):
+    user = {
+        "role": "noob",
+        "requested_role": None,
+        "status": "active",
+        "rp": 0,
+        "r_currency": 0,
+        "inventory": [],
+        "equipped": [],
+    }
+
+    if telegram_id is not None:
+        user["telegram_id"] = str(telegram_id)
+
+    return user
+
+
+def get_or_create_user(username, telegram_id=None):
     users = load_users()
-    username = username.lower()
 
-    if username not in users:
-        users[username] = {
-            "role": "noob",
-            "requested_role": None,
-            "status": "active",
-            "rp": 0,
-            "r_currency": 0,
-            "inventory": [],
-            "equipped": [],
-        }
+    username = (username or "").lower().strip()
+
+    if not username and telegram_id is not None:
+        username = f"id_{telegram_id}"
+
+    if not username:
+        username = "unknown"
+
+    found_key = None
+
+    # Сначала ищем по Telegram ID.
+    if telegram_id is not None:
+        telegram_id_str = str(telegram_id)
+
+        for uname, data in users.items():
+            if str(data.get("telegram_id", "")) == telegram_id_str:
+                found_key = uname
+                break
+
+    # Если не нашли — используем username.
+    if found_key is None:
+        found_key = username
+
+    if found_key not in users:
+        users[found_key] = create_default_user(telegram_id)
+
+    user_data = users[found_key]
+
+    defaults = {
+        "role": "noob",
+        "requested_role": None,
+        "status": "active",
+        "rp": 0,
+        "r_currency": 0,
+        "inventory": [],
+        "equipped": [],
+    }
+
+    changed = False
+
+    for key, value in defaults.items():
+        if key not in user_data:
+            user_data[key] = value
+            changed = True
+
+    if telegram_id is not None:
+        tg_id = str(telegram_id)
+
+        if str(user_data.get("telegram_id", "")) != tg_id:
+            user_data["telegram_id"] = tg_id
+            changed = True
+
+    users[found_key] = user_data
+
+    if changed or found_key not in users:
         save_users(users)
     else:
-        user_data = users[username]
-        defaults = {
-            "role": "noob",
-            "requested_role": None,
-            "status": "active",
-            "rp": 0,
-            "r_currency": 0,
-            "inventory": [],
-            "equipped": [],
-        }
-        updated = False
-        for key, value in defaults.items():
-            if key not in user_data:
-                user_data[key] = value
-                updated = True
-        if updated:
-            save_users(users)
+        # Если пользователь только что был создан,
+        # сохраняем его.
+        save_users(users)
 
-    return users[username]
-
-
-# ============================================================
-# GAME ROOMS
-# ============================================================
-
-
-def create_game_room(challenger_id=None):
-    room_id = str(uuid.uuid4())[:8]
-    game_rooms[room_id] = {
-        "board": [None] * 9,
-        "current": "X",
-        "players": {},
-        "status": "waiting",
-        "winner": None,
-        "challenger_id": challenger_id,
-        "created_at": time.time(),
-    }
-    return room_id
+    return found_key, user_data
 
 
 # ============================================================
@@ -480,75 +470,82 @@ def create_game_room(challenger_id=None):
 def validate_telegram_init_data(init_data: str):
     if not init_data or not BOT_TOKEN:
         return None
+
     try:
-        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        parsed = dict(
+            parse_qsl(
+                init_data,
+                keep_blank_values=True,
+            )
+        )
+
         received_hash = parsed.pop("hash", None)
+
         if not received_hash:
             return None
 
         data_check_string = "\n".join(
             f"{key}={value}" for key, value in sorted(parsed.items())
         )
+
         secret_key = hmac.new(
-            b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256
+            b"WebAppData",
+            BOT_TOKEN.encode(),
+            hashlib.sha256,
         ).digest()
+
         calculated_hash = hmac.new(
-            secret_key, data_check_string.encode(), hashlib.sha256
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256,
         ).hexdigest()
 
-        if not hmac.compare_digest(calculated_hash, received_hash):
+        if not hmac.compare_digest(
+            calculated_hash,
+            received_hash,
+        ):
             return None
 
         user_data = json.loads(parsed.get("user", "{}"))
+
         if not user_data.get("id"):
             return None
 
         auth_date = int(parsed.get("auth_date", 0))
-        if abs(time.time() - auth_date) > 86400:
+
+        if auth_date <= 0:
+            return None
+
+        # Данные старше суток не принимаем.
+        if time.time() - auth_date > 86400:
             return None
 
         return user_data
+
     except Exception as e:
         print(f"Ошибка Telegram WebApp auth: {e}")
         return None
 
 
 def get_webapp_user(request):
-    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    init_data = request.headers.get(
+        "X-Telegram-Init-Data",
+        "",
+    )
+
     telegram_user = validate_telegram_init_data(init_data)
+
     if not telegram_user:
         return None, None
 
     tg_id = str(telegram_user.get("id"))
-    username = (telegram_user.get("username") or "").lower()
-    users = load_users()
-    found_username = None
 
-    for uname, udata in users.items():
-        if str(udata.get("telegram_id")) == tg_id:
-            found_username = uname
-            break
+    username = (telegram_user.get("username") or f"id_{tg_id}").lower()
 
-    if not found_username:
-        found_username = username if username else f"id_{tg_id}"
-        if found_username not in users:
-            users[found_username] = {
-                "telegram_id": tg_id,
-                "role": "noob",
-                "requested_role": None,
-                "status": "active",
-                "rp": 0,
-                "r_currency": 0,
-                "inventory": [],
-                "equipped": [],
-            }
-        else:
-            users[found_username]["telegram_id"] = tg_id
-        save_users(users)
-    else:
-        if "telegram_id" not in users[found_username]:
-            users[found_username]["telegram_id"] = tg_id
-            save_users(users)
+    found_username, _ = get_or_create_user(
+        username,
+        tg_id,
+    )
 
     return found_username, telegram_user
 
@@ -560,53 +557,107 @@ def get_webapp_user(request):
 
 def get_full_shop_catalog(user_info):
     catalog = []
-    inventory = user_info.get("inventory", [])
-    user_role = user_info.get("role", "noob")
 
-    for cat_name, items in SHOP_ITEMS.items():
+    inventory = user_info.get(
+        "inventory",
+        [],
+    )
+
+    user_role = user_info.get(
+        "role",
+        "noob",
+    )
+
+    for category_name, items in SHOP_ITEMS.items():
+
         for item_id, item_data in items.items():
-            min_roles = item_data.get("min_role", [])
-            is_allowed = not min_roles or user_role in min_roles
+
+            min_roles = item_data.get(
+                "min_role",
+                [],
+            )
+
+            allowed = not min_roles or user_role in min_roles
+
             catalog.append(
                 {
                     "id": item_id,
                     "name": item_data["name"],
                     "price": item_data["price"],
-                    "part": item_data.get("part", "body"),
-                    "category": cat_name,
+                    "part": item_data.get(
+                        "part",
+                        "body",
+                    ),
+                    "category": category_name,
                     "owned": item_id in inventory,
-                    "allowed": is_allowed,
+                    "allowed": allowed,
                     "min_role": min_roles,
                 }
             )
+
     return catalog
 
 
 def get_inventory_details(user_info):
     result = []
-    for item_id in user_info.get("inventory", []):
-        for cat_name, items in SHOP_ITEMS.items():
-            if item_id in items:
-                item = items[item_id]
-                result.append(
-                    {
-                        "id": item_id,
-                        "name": item["name"],
-                        "price": item["price"],
-                        "part": item.get("part", "body"),
-                        "category": cat_name,
-                        "equipped": item_id in user_info.get("equipped", []),
-                    }
-                )
-                break
+
+    inventory = user_info.get(
+        "inventory",
+        [],
+    )
+
+    equipped = user_info.get(
+        "equipped",
+        [],
+    )
+
+    for item_id in inventory:
+
+        for category_name, items in SHOP_ITEMS.items():
+
+            if item_id not in items:
+                continue
+
+            item = items[item_id]
+
+            result.append(
+                {
+                    "id": item_id,
+                    "name": item["name"],
+                    "price": item["price"],
+                    "part": item.get(
+                        "part",
+                        "body",
+                    ),
+                    "category": category_name,
+                    "equipped": item_id in equipped,
+                }
+            )
+
+            break
+
     return result
 
 
 def get_item_name(item_id):
-    for category in SHOP_ITEMS.values():
-        if item_id in category:
-            return category[item_id]["name"]
+    for items in SHOP_ITEMS.values():
+
+        if item_id in items:
+            return items[item_id]["name"]
+
     return item_id
+
+
+def get_item_part(item_id):
+    for items in SHOP_ITEMS.values():
+
+        if item_id in items:
+            return items[item_id].get(
+                "part",
+                "body",
+            )
+
+    return "body"
 
 
 # ============================================================
@@ -614,8 +665,12 @@ def get_item_name(item_id):
 # ============================================================
 
 
-def process_activity_and_spam(username, user_info):
+def process_activity_and_spam(
+    username,
+    user_info,
+):
     username = username.lower()
+
     current_time = time.time()
 
     if username not in user_activity_tracker:
@@ -626,6 +681,7 @@ def process_activity_and_spam(username, user_info):
         }
 
     tracker = user_activity_tracker[username]
+
     if current_time < tracker["blocked_until"]:
         return "blocked", 0
 
@@ -634,27 +690,57 @@ def process_activity_and_spam(username, user_info):
         tracker["spam_count"] = 0
 
     time_diff = current_time - tracker["last_msg"]
+
     tracker["last_msg"] = current_time
 
     if time_diff < 3.0:
+
         tracker["spam_count"] += 1
+
         if tracker["spam_count"] >= 5:
+
             tracker["blocked_until"] = current_time + 900
-            user_info["rp"] = max(0, user_info.get("rp", 0) - 100)
+
+            user_info["rp"] = max(
+                0,
+                user_info.get("rp", 0) - 100,
+            )
+
             users = load_users()
             users[username] = user_info
             save_users(users)
-            return "punished", 15
-        return "cooldown", 0
-    else:
-        tracker["spam_count"] = max(0, tracker["spam_count"] - 1)
 
-    role = user_info.get("role", "noob")
-    current_rp = user_info.get("rp", 0)
-    max_rp = RP_CEILINGS.get(role, 200)
+            return "punished", 15
+
+        return "cooldown", 0
+
+    tracker["spam_count"] = max(
+        0,
+        tracker["spam_count"] - 1,
+    )
+
+    role = user_info.get(
+        "role",
+        "noob",
+    )
+
+    current_rp = user_info.get(
+        "rp",
+        0,
+    )
+
+    max_rp = RP_CEILINGS.get(
+        role,
+        200,
+    )
 
     if current_rp < max_rp:
-        user_info["rp"] = min(current_rp + 5, max_rp)
+
+        user_info["rp"] = min(
+            current_rp + 5,
+            max_rp,
+        )
+
         users = load_users()
         users[username] = user_info
         save_users(users)
@@ -663,98 +749,680 @@ def process_activity_and_spam(username, user_info):
 
 
 # ============================================================
-# API ENDPOINTS
+# PET TELEGRAM HANDLERS
+# ============================================================
+
+
+async def send_pet_selection(message: Message):
+
+    if not os.path.exists(PET_IMAGE):
+        await message.answer("❌ Файл Barsichela.png не найден.")
+        return
+
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🐾 Выбрать Барсичелу",
+                    callback_data="select_pet_barsichela",
+                )
+            ]
+        ]
+    )
+
+    caption = (
+        "<b>🐾 Знакомьтесь: Барсичела!</b>\n\n"
+        "<i>Милый пушистик, готовый сопровождать "
+        "вас в приключениях!</i>\n\n"
+        "▫️ Редкость: Эпический\n"
+        "▫️ Бонус: +15% к защите профиля"
+    )
+
+    photo = FSInputFile(PET_IMAGE)
+
+    await message.answer_photo(
+        photo,
+        caption=caption,
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
+
+
+@router.message(Command("start_pet"))
+async def start_pet_command(message: Message):
+
+    await send_pet_selection(message)
+
+
+@router.callback_query(F.data == "select_pet_barsichela")
+async def set_pet_handler(
+    callback: CallbackQuery,
+):
+
+    user_id = callback.from_user.id
+
+    ensure_pet_for_user(user_id)
+
+    await callback.answer(
+        "🎉 Барсичела теперь ваш питомец!",
+        show_alert=True,
+    )
+
+    if callback.message:
+
+        await callback.message.edit_caption(
+            caption=("✅ <b>Барсичела теперь " "ваш официальный питомец!</b>"),
+            parse_mode="HTML",
+        )
+
+
+@router.message(Command("pet", "barsichela"))
+async def pet_status_command(
+    message: Message,
+):
+
+    user_id = message.from_user.id
+
+    pet = get_pet_for_user(user_id)
+
+    if not pet:
+        await message.answer(
+            "🐾 У вас пока нет питомца!\n\n" "Выберите Барсичелу через /start_pet"
+        )
+        return
+
+    status_text = (
+        f"🐾 <b>Ваш питомец: "
+        f"{pet.get('pet_name', 'Барсичела')}</b>\n\n"
+        f"🍖 Сытость: "
+        f"{pet.get('hunger', 0)}/100\n"
+        f"💖 Счастье: "
+        f"{pet.get('happiness', 0)}/100\n\n"
+        "Нажмите кнопку ниже, чтобы "
+        "открыть мисочку с едой!"
+    )
+
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🥣 Покормить Барсичелу",
+                    callback_data="open_feed_menu",
+                )
+            ]
+        ]
+    )
+
+    if not os.path.exists(PET_IMAGE):
+        await message.answer(
+            status_text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+        return
+
+    photo = FSInputFile(PET_IMAGE)
+
+    await message.answer_photo(
+        photo,
+        caption=status_text,
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
+
+
+@router.callback_query(F.data == "open_feed_menu")
+async def feed_menu_callback(
+    callback: CallbackQuery,
+):
+
+    user_id = str(callback.from_user.id)
+
+    data = load_inventory_data()
+
+    pet = data["users_pets"].get(user_id)
+
+    if not pet:
+        await callback.answer(
+            "Сначала выберите Барсичелу.",
+            show_alert=True,
+        )
+        return
+
+    inventory = pet.get(
+        "inventory",
+        {},
+    )
+
+    if not inventory:
+        await callback.answer(
+            "🥺 Холодильник пуст!",
+            show_alert=True,
+        )
+        return
+
+    buttons = []
+
+    for food_id, count in inventory.items():
+
+        food_info = data["food_items"].get(food_id)
+
+        if not food_info:
+            continue
+
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=(f"{food_info.get('name', food_id)} " f"(x{count})"),
+                    callback_data=f"eat_{food_id}",
+                )
+            ]
+        )
+
+    if not buttons:
+        await callback.answer(
+            "🥺 В инвентаре нет доступной еды.",
+            show_alert=True,
+        )
+        return
+
+    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    if callback.message:
+
+        await callback.message.edit_caption(
+            caption=("🥣 <b>Выберите, чем " "угостить Барсичелу:</b>"),
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("eat_"))
+async def process_eating(
+    callback: CallbackQuery,
+):
+
+    user_id = str(callback.from_user.id)
+
+    food_id = callback.data[4:]
+
+    data = load_inventory_data()
+
+    pet = data["users_pets"].get(user_id)
+
+    if not pet:
+        await callback.answer(
+            "Питомец не найден.",
+            show_alert=True,
+        )
+        return
+
+    food_info = data["food_items"].get(food_id)
+
+    if not food_info:
+        await callback.answer(
+            "Эта еда не найдена.",
+            show_alert=True,
+        )
+        return
+
+    inventory = pet.setdefault(
+        "inventory",
+        {},
+    )
+
+    count = inventory.get(
+        food_id,
+        0,
+    )
+
+    if count <= 0:
+        await callback.answer(
+            "❌ У вас больше нет этой еды.",
+            show_alert=True,
+        )
+        return
+
+    inventory[food_id] = count - 1
+
+    if inventory[food_id] <= 0:
+        del inventory[food_id]
+
+    pet["hunger"] = min(
+        100,
+        pet.get("hunger", 0)
+        + food_info.get(
+            "hunger_restore",
+            0,
+        ),
+    )
+
+    pet["happiness"] = min(
+        100,
+        pet.get("happiness", 0)
+        + food_info.get(
+            "happiness_restore",
+            0,
+        ),
+    )
+
+    data["users_pets"][user_id] = pet
+
+    save_inventory_data(data)
+
+    await callback.answer(
+        f"😋 Барсичела съел " f"{food_info.get('name', food_id)}!",
+        show_alert=True,
+    )
+
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🥣 Покормить ещё",
+                    callback_data="open_feed_menu",
+                )
+            ]
+        ]
+    )
+
+    if callback.message:
+
+        await callback.message.edit_caption(
+            caption=(
+                f"🐾 <b>Ваш питомец: "
+                f"{pet.get('pet_name', 'Барсичела')}</b>\n\n"
+                f"🍖 Сытость: {pet.get('hunger', 0)}/100\n"
+                f"💖 Счастье: {pet.get('happiness', 0)}/100\n\n"
+                "<i>Барсичела сыт и довольно жмурится! ✨</i>"
+            ),
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+
+
+# ============================================================
+# GAME ROOMS
+# ============================================================
+
+
+def create_game_room(
+    challenger_id=None,
+):
+    room_id = str(uuid.uuid4()).replace("-", "")[:8]
+
+    game_rooms[room_id] = {
+        "board": [None] * 9,
+        "current": "X",
+        "players": {},
+        "status": "waiting",
+        "winner": None,
+        "challenger_id": challenger_id,
+        "created_at": time.time(),
+    }
+
+    return room_id
+
+
+def check_winner(board):
+
+    wins = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
+    ]
+
+    for a, b, c in wins:
+
+        if board[a] and board[a] == board[b] == board[c]:
+            return board[a]
+
+    if all(cell is not None for cell in board):
+        return "draw"
+
+    return None
+
+
+# ============================================================
+# MINI APP API
 # ============================================================
 
 
 async def api_profile(request):
-    username, telegram_user = get_webapp_user(request)
-    if not username:
-        return web.json_response({"error": "Unauthorized"}, status=401)
 
-    user_info = get_or_create_user(username)
-    role = user_info.get("role", "noob")
+    username, telegram_user = get_webapp_user(request)
+
+    if not username:
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
+
+    _, user_info = get_or_create_user(
+        username,
+        telegram_user["id"],
+    )
+
+    role = user_info.get(
+        "role",
+        "noob",
+    )
+
+    pet = get_pet_for_user(telegram_user["id"])
+
     all_users = load_users()
+
     registry_list = []
 
     for uname, udata in all_users.items():
-        u_role = udata.get("role", "noob")
+
+        u_role = udata.get(
+            "role",
+            "noob",
+        )
+
         registry_list.append(
             {
                 "username": uname,
-                "role_name": ROLES_HIERARCHY.get(u_role, {}).get("name", u_role),
-                "rp": udata.get("rp", 0),
-                "currency": udata.get("r_currency", 0),
-                "equipped_count": len(udata.get("equipped", [])),
+                "role_name": ROLES_HIERARCHY.get(
+                    u_role,
+                    {},
+                ).get(
+                    "name",
+                    u_role,
+                ),
+                "rp": udata.get(
+                    "rp",
+                    0,
+                ),
+                "currency": udata.get(
+                    "r_currency",
+                    0,
+                ),
+                "equipped_count": len(
+                    udata.get(
+                        "equipped",
+                        [],
+                    )
+                ),
             }
         )
+
+    pet_data = {
+        "name": "Барсичела",
+        "type": "barsichela",
+        "hunger": 100,
+        "happiness": 100,
+    }
+
+    if pet:
+
+        pet_data = {
+            "name": pet.get(
+                "pet_name",
+                "Барсичела",
+            ),
+            "type": pet.get(
+                "pet_type",
+                "barsichela",
+            ),
+            "hunger": pet.get(
+                "hunger",
+                100,
+            ),
+            "happiness": pet.get(
+                "happiness",
+                100,
+            ),
+        }
 
     return web.json_response(
         {
             "user": {
                 "id": telegram_user["id"],
                 "username": username,
-                "first_name": telegram_user.get("first_name", ""),
-                "photo_url": telegram_user.get("photo_url", ""),
+                "first_name": telegram_user.get(
+                    "first_name",
+                    "",
+                ),
+                "last_name": telegram_user.get(
+                    "last_name",
+                    "",
+                ),
+                "photo_url": telegram_user.get(
+                    "photo_url",
+                    "",
+                ),
             },
-            "pet": {
-                "name": "Ритушкин питомец",
-                "role": role,
-                "role_name": ROLES_HIERARCHY.get(role, {}).get("name", role),
-            },
-            "rp": user_info.get("rp", 0),
-            "max_rp": RP_CEILINGS.get(role, 200),
-            "currency": user_info.get("r_currency", 0),
+            "pet": pet_data,
+            "rp": user_info.get(
+                "rp",
+                0,
+            ),
+            "max_rp": RP_CEILINGS.get(
+                role,
+                200,
+            ),
+            "currency": user_info.get(
+                "r_currency",
+                0,
+            ),
             "inventory": get_inventory_details(user_info),
             "catalog": get_full_shop_catalog(user_info),
-            "equipped": user_info.get("equipped", []),
+            "equipped": user_info.get(
+                "equipped",
+                [],
+            ),
             "registry": registry_list,
         }
     )
 
 
-async def api_toggle_item(request):
-    username, _ = get_webapp_user(request)
+async def api_pet(request):
+
+    username, telegram_user = get_webapp_user(request)
+
     if not username:
-        return web.json_response({"error": "Unauthorized"}, status=401)
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
+
+    pet = get_pet_for_user(telegram_user["id"])
+
+    if not pet:
+        return web.json_response(
+            {
+                "owned": False,
+                "pet": None,
+            }
+        )
+
+    return web.json_response(
+        {
+            "owned": True,
+            "pet": pet,
+        }
+    )
+
+
+async def api_pet_select(request):
+
+    username, telegram_user = get_webapp_user(request)
+
+    if not username:
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
+
+    pet = ensure_pet_for_user(telegram_user["id"])
+
+    return web.json_response(
+        {
+            "success": True,
+            "pet": pet,
+        }
+    )
+
+
+async def api_pet_feed(request):
+
+    username, telegram_user = get_webapp_user(request)
+
+    if not username:
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    food_id = body.get("food_id")
+
+    if not food_id:
+        return web.json_response(
+            {"error": "food_id is required"},
+            status=400,
+        )
+
+    user_id = str(telegram_user["id"])
+
+    data = load_inventory_data()
+
+    pet = data["users_pets"].get(user_id)
+
+    if not pet:
+        return web.json_response(
+            {"error": "Pet not found"},
+            status=404,
+        )
+
+    food_info = data["food_items"].get(food_id)
+
+    if not food_info:
+        return web.json_response(
+            {"error": "Food not found"},
+            status=404,
+        )
+
+    inventory = pet.setdefault(
+        "inventory",
+        {},
+    )
+
+    if (
+        inventory.get(
+            food_id,
+            0,
+        )
+        <= 0
+    ):
+        return web.json_response(
+            {"error": "Food not owned"},
+            status=400,
+        )
+
+    inventory[food_id] -= 1
+
+    if inventory[food_id] <= 0:
+        del inventory[food_id]
+
+    pet["hunger"] = min(
+        100,
+        pet.get("hunger", 0)
+        + food_info.get(
+            "hunger_restore",
+            0,
+        ),
+    )
+
+    pet["happiness"] = min(
+        100,
+        pet.get("happiness", 0)
+        + food_info.get(
+            "happiness_restore",
+            0,
+        ),
+    )
+
+    save_inventory_data(data)
+
+    return web.json_response(
+        {
+            "success": True,
+            "pet": pet,
+        }
+    )
+
+
+async def api_toggle_item(request):
+
+    username, _ = get_webapp_user(request)
+
+    if not username:
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
 
     item_id = request.match_info["item_id"]
+
     users = load_users()
+
     if username not in users:
-        return web.json_response({"error": "User not found"}, status=404)
+        return web.json_response(
+            {"error": "User not found"},
+            status=404,
+        )
 
     user_info = users[username]
-    inventory = user_info.get("inventory", [])
-    equipped = user_info.get("equipped", [])
+
+    inventory = user_info.setdefault(
+        "inventory",
+        [],
+    )
+
+    equipped = user_info.setdefault(
+        "equipped",
+        [],
+    )
 
     if item_id not in inventory:
-        return web.json_response({"error": "Item not owned"}, status=403)
+        return web.json_response(
+            {"error": "Item not owned"},
+            status=403,
+        )
 
-    target_part = "body"
-    for items in SHOP_ITEMS.values():
-        if item_id in items:
-            target_part = items[item_id].get("part", "body")
-            break
+    target_part = get_item_part(item_id)
 
     if item_id in equipped:
+
         equipped.remove(item_id)
         action = "unequipped"
+
     else:
-        new_equipped = []
-        for eq_id in equipped:
-            eq_part = "body"
-            for items in SHOP_ITEMS.values():
-                if eq_id in items:
-                    eq_part = items[eq_id].get("part", "body")
-                    break
-            if eq_part != target_part:
-                new_equipped.append(eq_id)
-        equipped = new_equipped
+
+        equipped = [eq_id for eq_id in equipped if get_item_part(eq_id) != target_part]
+
         equipped.append(item_id)
+
         action = "equipped"
 
     user_info["equipped"] = equipped
+
     users[username] = user_info
+
     save_users(users)
 
     return web.json_response(
@@ -768,43 +1436,87 @@ async def api_toggle_item(request):
 
 
 async def api_buy_item(request):
+
     username, _ = get_webapp_user(request)
+
     if not username:
-        return web.json_response({"error": "Unauthorized"}, status=401)
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
 
     item_id = request.match_info["item_id"]
+
     users = load_users()
+
     if username not in users:
-        get_or_create_user(username)
-        users = load_users()
+        return web.json_response(
+            {"error": "User not found"},
+            status=404,
+        )
 
     user_info = users[username]
-    item = None
-    cat_key = None
 
-    for c_name, items in SHOP_ITEMS.items():
+    item = None
+
+    for items in SHOP_ITEMS.values():
+
         if item_id in items:
             item = items[item_id]
-            cat_key = c_name
             break
 
     if not item:
-        return web.json_response({"error": "Item not found"}, status=404)
+        return web.json_response(
+            {"error": "Item not found"},
+            status=404,
+        )
 
-    if item_id in user_info.get("inventory", []):
-        return web.json_response({"error": "Already owned"}, status=400)
+    inventory = user_info.setdefault(
+        "inventory",
+        [],
+    )
 
-    if cat_key == "luxury" and user_info.get("role", "noob") not in item.get(
-        "min_role", []
+    if item_id in inventory:
+        return web.json_response(
+            {"error": "Already owned"},
+            status=400,
+        )
+
+    min_roles = item.get(
+        "min_role",
+        [],
+    )
+
+    if (
+        min_roles
+        and user_info.get(
+            "role",
+            "noob",
+        )
+        not in min_roles
     ):
-        return web.json_response({"error": "Role not allowed"}, status=403)
+        return web.json_response(
+            {"error": "Role not allowed"},
+            status=403,
+        )
 
-    if user_info.get("r_currency", 0) < item["price"]:
-        return web.json_response({"error": "Not enough currency"}, status=400)
+    currency = user_info.get(
+        "r_currency",
+        0,
+    )
 
-    user_info["r_currency"] -= item["price"]
-    user_info.setdefault("inventory", []).append(item_id)
+    if currency < item["price"]:
+        return web.json_response(
+            {"error": "Not enough currency"},
+            status=400,
+        )
+
+    user_info["r_currency"] = currency - item["price"]
+
+    inventory.append(item_id)
+
     users[username] = user_info
+
     save_users(users)
 
     return web.json_response(
@@ -817,35 +1529,133 @@ async def api_buy_item(request):
     )
 
 
-async def index_handler(request):
-    index_path = os.path.join(PUBLIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        return web.FileResponse(index_path)
-    return web.Response(text="404: index.html not found", status=404)
+async def api_create_game(request):
+
+    username, telegram_user = get_webapp_user(request)
+
+    if not username:
+        return web.json_response(
+            {"error": "Unauthorized"},
+            status=401,
+        )
+
+    room_id = create_game_room(challenger_id=telegram_user["id"])
+
+    duel_url = get_duel_url(room_id)
+
+    return web.json_response(
+        {
+            "success": True,
+            "room_id": room_id,
+            "url": duel_url,
+            "ws_url": (
+                f"wss://" f"projectrtgbotgame.onrender.com" f"/ws/game/{room_id}"
+            ),
+        }
+    )
 
 
 # ============================================================
-# WEBSOCKET GAME
+# STATIC FILES
+# ============================================================
+
+
+async def index_handler(request):
+
+    if not os.path.exists(INDEX_FILE):
+        return web.Response(
+            text="index.html не найден",
+            status=404,
+        )
+
+    return web.FileResponse(INDEX_FILE)
+
+
+async def css_handler(request):
+
+    if not os.path.exists(CSS_FILE):
+        return web.Response(
+            text="style_2.css не найден",
+            status=404,
+        )
+
+    return web.FileResponse(
+        CSS_FILE,
+        headers={"Content-Type": "text/css"},
+    )
+
+
+async def js_handler(request):
+
+    if not os.path.exists(JS_FILE):
+        return web.Response(
+            text="script_2.js не найден",
+            status=404,
+        )
+
+    return web.FileResponse(
+        JS_FILE,
+        headers={"Content-Type": "application/javascript"},
+    )
+
+
+async def pet_image_handler(request):
+
+    if not os.path.exists(PET_IMAGE):
+        return web.Response(
+            text="Barsichela.png не найден",
+            status=404,
+        )
+
+    return web.FileResponse(PET_IMAGE)
+
+
+# ============================================================
+# WEBSOCKET TIC-TAC-TOE
 # ============================================================
 
 
 async def websocket_game_handler(request):
+
     room_id = request.match_info["room_id"]
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
 
     if room_id not in game_rooms:
-        await ws.send_json({"type": "error", "message": "Комната не найдена"})
+
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+
+        await ws.send_json(
+            {
+                "type": "error",
+                "message": "Комната не найдена",
+            }
+        )
+
         await ws.close()
+
         return ws
 
+    ws = web.WebSocketResponse()
+
+    await ws.prepare(request)
+
     room = game_rooms[room_id]
+
     if len(room["players"]) >= 2:
-        await ws.send_json({"type": "error", "message": "Комната уже полная"})
+
+        await ws.send_json(
+            {
+                "type": "error",
+                "message": "Комната уже полная",
+            }
+        )
+
         await ws.close()
+
         return ws
 
     symbol = "X" if len(room["players"]) == 0 else "O"
+
     room["players"][ws] = {"symbol": symbol}
 
     if len(room["players"]) == 2:
@@ -862,8 +1672,11 @@ async def websocket_game_handler(request):
     )
 
     if room["status"] == "playing":
+
         for player_ws in list(room["players"].keys()):
+
             try:
+
                 await player_ws.send_json(
                     {
                         "type": "start",
@@ -871,22 +1684,39 @@ async def websocket_game_handler(request):
                         "current": room["current"],
                     }
                 )
+
             except Exception:
                 pass
 
     try:
+
         async for msg in ws:
+
             if msg.type == WSMsgType.TEXT:
+
                 try:
                     data = json.loads(msg.data)
-                except (json.JSONDecodeError, TypeError):
+
+                except (
+                    json.JSONDecodeError,
+                    TypeError,
+                ):
                     continue
 
                 if data.get("type") != "move":
                     continue
+
                 index = data.get("index")
-                if not isinstance(index, int) or not 0 <= index <= 8:
+
+                if (
+                    not isinstance(
+                        index,
+                        int,
+                    )
+                    or not 0 <= index <= 8
+                ):
                     continue
+
                 if (
                     room["status"] != "playing"
                     or room["board"][index] is not None
@@ -895,33 +1725,41 @@ async def websocket_game_handler(request):
                     continue
 
                 room["board"][index] = symbol
-                wins = [
-                    [0, 1, 2],
-                    [3, 4, 5],
-                    [6, 7, 8],
-                    [0, 3, 6],
-                    [1, 4, 7],
-                    [2, 5, 8],
-                    [0, 4, 8],
-                    [2, 4, 6],
-                ]
-                winner = None
 
-                for a, b, c in wins:
-                    if (
-                        room["board"][a]
-                        and room["board"][a] == room["board"][b] == room["board"][c]
-                    ):
-                        winner = room["board"][a]
-                        break
+                winner = check_winner(room["board"])
 
                 if winner:
+
                     room["status"] = "finished"
                     room["winner"] = winner
-                elif all(cell is not None for cell in room["board"]):
-                    room["status"] = "finished"
-                    room["winner"] = "draw"
+
+                    if winner in (
+                        "X",
+                        "O",
+                    ):
+
+                        for player_ws, player_data in list(room["players"].items()):
+
+                            player_symbol = player_data["symbol"]
+
+                            if player_symbol == winner:
+
+                                user_data = room.get(
+                                    "player_telegram_ids",
+                                    {},
+                                )
+
+                                tg_id = user_data.get(player_ws)
+
+                                if tg_id:
+                                    update_score(
+                                        "tictactoe",
+                                        tg_id,
+                                        10,
+                                    )
+
                 else:
+
                     room["current"] = "O" if room["current"] == "X" else "X"
 
                 update_payload = {
@@ -933,75 +1771,202 @@ async def websocket_game_handler(request):
                 }
 
                 for player_ws in list(room["players"].keys()):
+
                     try:
+
                         await player_ws.send_json(update_payload)
+
                     except Exception:
                         pass
+
             elif msg.type == WSMsgType.ERROR:
+
                 break
+
     finally:
+
         if ws in room["players"]:
             del room["players"][ws]
+
+        # Удаляем пустую завершённую/заброшенную комнату.
+        if not room["players"] and room["status"] in (
+            "finished",
+            "waiting",
+        ):
+            game_rooms.pop(
+                room_id,
+                None,
+            )
 
     return ws
 
 
+# ============================================================
+# CORS
+# ============================================================
+
+
 @web.middleware
-async def webapp_cors(request, handler):
+async def webapp_cors(
+    request,
+    handler,
+):
+
     if request.method == "OPTIONS":
+
         response = web.Response(status=204)
+
     else:
+
         response = await handler(request)
 
     origin = request.headers.get("Origin")
+
     if origin == WEBAPP_ORIGIN:
+
         response.headers["Access-Control-Allow-Origin"] = origin
+
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, X-Telegram-Init-Data"
+            "Content-Type, " "X-Telegram-Init-Data"
         )
+
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
         response.headers["Vary"] = "Origin"
+
     return response
 
 
-async def start_webapp_api():
-    app = web.Application(middlewares=[webapp_cors])
-    app.router.add_get("/api/me", api_profile)
-    app.router.add_post("/api/equip/{item_id}", api_toggle_item)
-    app.router.add_post("/api/buy/{item_id}", api_buy_item)
-    app.router.add_get("/ws/game/{room_id}", websocket_game_handler)
-    app.router.add_get("/", index_handler)
+# ============================================================
+# MINI APP SERVER
+# ============================================================
 
-    if os.path.exists(PUBLIC_DIR):
-        app.router.add_static("/", PUBLIC_DIR, name="public")
+
+async def start_webapp_api():
+
+    app = web.Application(middlewares=[webapp_cors])
+
+    # Mini App
+    app.router.add_get(
+        "/",
+        index_handler,
+    )
+
+    app.router.add_get(
+        "/style_2.css",
+        css_handler,
+    )
+
+    app.router.add_get(
+        "/script_2.js",
+        js_handler,
+    )
+
+    app.router.add_get(
+        "/Barsichela.png",
+        pet_image_handler,
+    )
+
+    # API
+    app.router.add_get(
+        "/api/me",
+        api_profile,
+    )
+
+    app.router.add_get(
+        "/api/pet",
+        api_pet,
+    )
+
+    app.router.add_post(
+        "/api/pet/select",
+        api_pet_select,
+    )
+
+    app.router.add_post(
+        "/api/pet/feed",
+        api_pet_feed,
+    )
+
+    app.router.add_post(
+        "/api/equip/{item_id}",
+        api_toggle_item,
+    )
+
+    app.router.add_post(
+        "/api/buy/{item_id}",
+        api_buy_item,
+    )
+
+    app.router.add_post(
+        "/api/game/create",
+        api_create_game,
+    )
+
+    # WebSocket
+    app.router.add_get(
+        "/ws/game/{room_id}",
+        websocket_game_handler,
+    )
 
     runner = web.AppRunner(app)
+
     await runner.setup()
-    site = web.TCPSite(runner, WEBAPP_HOST, WEBAPP_PORT)
+
+    site = web.TCPSite(
+        runner,
+        WEBAPP_HOST,
+        WEBAPP_PORT,
+    )
+
     await site.start()
-    print(f"Mini App сервер запущен на порту {WEBAPP_PORT}")
+
+    print(f"Mini App сервер запущен " f"на порту {WEBAPP_PORT}")
+
     return runner
 
 
-def get_main_app_url(start_param="game"):
+# ============================================================
+# TELEGRAM URLS
+# ============================================================
+
+
+def get_main_app_url(
+    start_param="game",
+):
+
     if not BOT_USERNAME:
         return WEBAPP_ORIGIN
-    return f"https://t.me/{BOT_USERNAME}?startapp={start_param}"
+
+    return f"https://t.me/" f"{BOT_USERNAME}" f"?startapp={start_param}"
 
 
 def get_duel_url(room_id):
+
     if not BOT_USERNAME:
         return None
-    return f"https://t.me/{BOT_USERNAME}?startapp=duel_{room_id}"
+
+    return f"https://t.me/" f"{BOT_USERNAME}" f"?startapp=duel_{room_id}"
 
 
-def get_main_hub_keyboard(chat_type="private"):
+# ============================================================
+# KEYBOARDS
+# ============================================================
+
+
+def get_main_hub_keyboard(
+    chat_type="private",
+):
+
     if chat_type == "private":
+
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             web_app=WebAppInfo(url=WEBAPP_ORIGIN),
         )
+
     else:
+
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             url=get_main_app_url("game"),
@@ -1010,8 +1975,14 @@ def get_main_hub_keyboard(chat_type="private"):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="👤 Профиль", callback_data="menu_profile"),
-                InlineKeyboardButton(text="🔄 Обмен RP", callback_data="menu_convert"),
+                InlineKeyboardButton(
+                    text="👤 Профиль",
+                    callback_data="menu_profile",
+                ),
+                InlineKeyboardButton(
+                    text="🔄 Обмен RP",
+                    callback_data="menu_convert",
+                ),
             ],
             [game_button],
         ]
@@ -1019,351 +1990,753 @@ def get_main_hub_keyboard(chat_type="private"):
 
 
 # ============================================================
-# TELEGRAM BOT ROUTERS & HANDLERS
+# MENU CALLBACKS
 # ============================================================
 
 
-@router.callback_query()
-async def unified_menu_router(callback: CallbackQuery):
-    data = callback.data
-    user = callback.from_user
-    username = (user.username or f"id_{user.id}").lower()
-    user_info = get_or_create_user(username)
-    user_role = user_info.get("role", "noob")
+@router.callback_query(F.data == "menu_hub")
+async def menu_hub(
+    callback: CallbackQuery,
+):
 
-    if data == "menu_hub":
-        if not callback.message:
-            await callback.answer()
-            return
-        chat_type = callback.message.chat.type
-        await callback.message.edit_text(
-            "✨ **Главное меню Ритушки** ✨\n\nВыбирай нужный раздел 💅",
-            reply_markup=get_main_hub_keyboard(chat_type),
-            parse_mode="Markdown",
-        )
+    if not callback.message:
         await callback.answer()
         return
 
-    if data == "menu_profile":
-        if not callback.message:
-            await callback.answer()
-            return
-        rp = user_info.get("rp", 0)
-        max_rp = RP_CEILINGS.get(user_role, 200)
-        role_name = ROLES_HIERARCHY.get(user_role, {}).get("name", user_role)
-        text = (
-            f"👑 **Королевское досье @{username}** 👑\n\n"
-            f"• **Статус:** {role_name}\n"
-            f"• **RP:** `{rp} / {max_rp}`\n"
-            f"• **R$:** `{user_info.get('r_currency', 0)}`"
-        )
-        chat_type = callback.message.chat.type
-        game_button = InlineKeyboardButton(
-            text="🎮 Открыть игру",
-            web_app=WebAppInfo(url=WEBAPP_ORIGIN) if chat_type == "private" else None,
-            url=None if chat_type == "private" else get_main_app_url("game"),
-        )
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [game_button],
-                [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_hub")],
-            ]
-        )
-        await callback.message.edit_text(
-            text, reply_markup=keyboard, parse_mode="Markdown"
-        )
-        await callback.answer()
-        return
-
-    if data == "menu_convert":
-        if not callback.message:
-            await callback.answer()
-            return
-        rp = user_info.get("rp", 0)
-        cash = user_info.get("r_currency", 0)
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="🔄 50 RP", callback_data="do_convert_50"
-                    ),
-                    InlineKeyboardButton(
-                        text="🔄 100 RP", callback_data="do_convert_100"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="🔄 250 RP", callback_data="do_convert_250"
-                    ),
-                    InlineKeyboardButton(text="◀️ Назад", callback_data="menu_hub"),
-                ],
-            ]
-        )
-        await callback.message.edit_text(
-            f"🔄 **Конвертация RP → R$**\n\nRP: `{rp}` | R$: `{cash}`",
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-        await callback.answer()
-        return
-
-    if data.startswith("do_convert_"):
-        if not callback.message:
-            await callback.answer()
-            return
-        try:
-            amount = int(data.split("_")[2])
-        except (ValueError, IndexError):
-            await callback.answer("Некорректная сумма.", show_alert=True)
-            return
-
-        if user_info.get("rp", 0) < amount:
-            await callback.answer(
-                f"Недостаточно RP! У тебя {user_info.get('rp', 0)}", show_alert=True
-            )
-            return
-
-        user_info["rp"] -= amount
-        user_info["r_currency"] = user_info.get("r_currency", 0) + amount
-        users = load_users()
-        users[username] = user_info
-        save_users(users)
-
-        await callback.message.edit_text(
-            f"✅ **Обмен успешен!**\nRP: `{user_info['rp']}` | R$: `{user_info['r_currency']}`",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_hub")]
-                ]
-            ),
-            parse_mode="Markdown",
-        )
-        await callback.answer()
-        return
+    await callback.message.edit_text(
+        "✨ **Главное меню Ритушки** ✨\n\n" "Выбирай нужный раздел 💅",
+        reply_markup=get_main_hub_keyboard(callback.message.chat.type),
+        parse_mode="Markdown",
+    )
 
     await callback.answer()
 
 
+@router.callback_query(F.data == "menu_profile")
+async def menu_profile(
+    callback: CallbackQuery,
+):
+
+    if not callback.message:
+        await callback.answer()
+        return
+
+    user = callback.from_user
+
+    username = (user.username or f"id_{user.id}").lower()
+
+    _, user_info = get_or_create_user(
+        username,
+        user.id,
+    )
+
+    role = user_info.get(
+        "role",
+        "noob",
+    )
+
+    rp = user_info.get(
+        "rp",
+        0,
+    )
+
+    max_rp = RP_CEILINGS.get(
+        role,
+        200,
+    )
+
+    role_name = ROLES_HIERARCHY.get(
+        role,
+        {},
+    ).get(
+        "name",
+        role,
+    )
+
+    text = (
+        f"👑 **Королевское досье "
+        f"@{username}** 👑\n\n"
+        f"• **Статус:** {role_name}\n"
+        f"• **RP:** `{rp} / {max_rp}`\n"
+        f"• **R$:** "
+        f"`{user_info.get('r_currency', 0)}`"
+    )
+
+    if callback.message.chat.type == "private":
+
+        game_button = InlineKeyboardButton(
+            text="🎮 Открыть игру",
+            web_app=WebAppInfo(url=WEBAPP_ORIGIN),
+        )
+
+    else:
+
+        game_button = InlineKeyboardButton(
+            text="🎮 Открыть игру",
+            url=get_main_app_url("game"),
+        )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [game_button],
+            [
+                InlineKeyboardButton(
+                    text="◀️ Назад",
+                    callback_data="menu_hub",
+                )
+            ],
+        ]
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu_convert")
+async def menu_convert(
+    callback: CallbackQuery,
+):
+
+    if not callback.message:
+        await callback.answer()
+        return
+
+    user = callback.from_user
+
+    username = (user.username or f"id_{user.id}").lower()
+
+    _, user_info = get_or_create_user(
+        username,
+        user.id,
+    )
+
+    rp = user_info.get(
+        "rp",
+        0,
+    )
+
+    cash = user_info.get(
+        "r_currency",
+        0,
+    )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 50 RP",
+                    callback_data="do_convert_50",
+                ),
+                InlineKeyboardButton(
+                    text="🔄 100 RP",
+                    callback_data="do_convert_100",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔄 250 RP",
+                    callback_data="do_convert_250",
+                ),
+                InlineKeyboardButton(
+                    text="◀️ Назад",
+                    callback_data="menu_hub",
+                ),
+            ],
+        ]
+    )
+
+    await callback.message.edit_text(
+        f"🔄 **Конвертация RP → R$**\n\n" f"RP: `{rp}` | R$: `{cash}`",
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("do_convert_"))
+async def do_convert(
+    callback: CallbackQuery,
+):
+
+    if not callback.message:
+        await callback.answer()
+        return
+
+    try:
+
+        amount = int(callback.data.split("_")[2])
+
+    except (
+        ValueError,
+        IndexError,
+    ):
+
+        await callback.answer(
+            "Некорректная сумма.",
+            show_alert=True,
+        )
+
+        return
+
+    user = callback.from_user
+
+    username = (user.username or f"id_{user.id}").lower()
+
+    _, user_info = get_or_create_user(
+        username,
+        user.id,
+    )
+
+    rp = user_info.get(
+        "rp",
+        0,
+    )
+
+    if rp < amount:
+
+        await callback.answer(
+            f"Недостаточно RP! " f"У тебя {rp}",
+            show_alert=True,
+        )
+
+        return
+
+    user_info["rp"] = rp - amount
+
+    user_info["r_currency"] = (
+        user_info.get(
+            "r_currency",
+            0,
+        )
+        + amount
+    )
+
+    users = load_users()
+
+    users[username] = user_info
+
+    save_users(users)
+
+    await callback.message.edit_text(
+        f"✅ **Обмен успешен!**\n\n"
+        f"RP: `{user_info['rp']}`\n"
+        f"R$: `{user_info['r_currency']}`",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="◀️ Назад",
+                        callback_data="menu_hub",
+                    )
+                ]
+            ]
+        ),
+        parse_mode="Markdown",
+    )
+
+    await callback.answer()
+
+
+# ============================================================
+# BOT COMMANDS
+# ============================================================
+
+
 @router.message(Command("menu", "start"))
-async def cmd_menu(message: Message):
+async def cmd_menu(
+    message: Message,
+):
+
     await message.answer(
-        "✨ **Привет... Это я, RitushkaVIPai 👑**\n\nВыбирай раздел:",
+        "✨ **Привет... Это я, " "RitushkaVIPai 👑**\n\n" "Выбирай раздел:",
         reply_markup=get_main_hub_keyboard(message.chat.type),
         parse_mode="Markdown",
     )
 
 
 @router.message(Command("duel"))
-async def cmd_duel(message: Message):
+async def cmd_duel(
+    message: Message,
+):
+
     user = message.from_user
+
     room_id = create_game_room(challenger_id=user.id)
+
     duel_url = get_duel_url(room_id)
 
     if not duel_url:
+
         await message.answer("❌ Не удалось создать ссылку на дуэль.")
+
         return
 
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⚔️ Принять вызов", url=duel_url)]]
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⚔️ Принять вызов",
+                    url=duel_url,
+                )
+            ]
+        ]
     )
+
     await message.answer(
-        f"⚔️ **{user.first_name} вызывает на дуэль!**\n\nНажми кнопку ниже, чтобы открыть игру.",
+        f"⚔️ **{user.first_name} "
+        f"вызывает на дуэль!**\n\n"
+        "Нажми кнопку ниже, чтобы открыть игру.",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
 
 
 @router.message(Command("lvlup"))
-async def cmd_lvlup(message: Message):
-    args = message.text.split()
+async def cmd_lvlup(
+    message: Message,
+):
+
+    args = (message.text or "").split()
+
     if len(args) < 2:
+
         roles = "\n".join(
-            [
-                f"• `{k}` — {v['name']} ({v['price']} руб.)"
-                for k, v in ROLES_HIERARCHY.items()
-            ]
+            f"• `{key}` — " f"{value['name']} " f"({value['price']} руб.)"
+            for key, value in ROLES_HIERARCHY.items()
         )
+
         await message.reply(
-            f"Использование: `/lvlup <роль>`\n\n{roles}", parse_mode="Markdown"
+            "Использование: " "`/lvlup <роль>`\n\n" f"{roles}",
+            parse_mode="Markdown",
         )
+
         return
 
     target_role = args[1].lower()
+
     if target_role not in ROLES_HIERARCHY:
+
         await message.reply("❌ Такой роли нет!")
+
         return
 
     user = message.from_user
-    if not user.username:
-        await message.reply("❌ Установи юзернейм в Telegram!")
-        return
+
+    username = (user.username or f"id_{user.id}").lower()
 
     users = load_users()
-    uname = user.username.lower()
-    if uname not in users:
-        get_or_create_user(uname)
+
+    if username not in users:
+        get_or_create_user(
+            username,
+            user.id,
+        )
         users = load_users()
 
-    users[uname]["requested_role"] = target_role
+    users[username]["requested_role"] = target_role
+
+    users[username]["telegram_id"] = str(user.id)
+
     save_users(users)
+
     role_info = ROLES_HIERARCHY[target_role]
 
     await message.reply(
-        f"⏳ Запрос на **{role_info['name']}** отправлен!\n💳 Сумма: **{role_info['price']} руб.**",
+        f"⏳ Запрос на "
+        f"**{role_info['name']}** отправлен!\n"
+        f"💳 Сумма: "
+        f"**{role_info['price']} руб.**",
         parse_mode="Markdown",
     )
 
 
 @router.message(Command("approve"))
-async def cmd_approve_role(message: Message):
-    ADMIN_ID = 8990488378
-    ADMIN_USERNAME = "FLL1P"
+async def cmd_approve_role(
+    message: Message,
+):
 
-    if (
-        message.from_user.id != ADMIN_ID
-        and (message.from_user.username or "").lower() != ADMIN_USERNAME.lower()
-    ):
+    # Здесь лучше хранить ID администратора
+    # в .env, а не непосредственно в коде.
+    admin_id_raw = os.getenv("ADMIN_ID")
+
+    admin_username = os.getenv(
+        "ADMIN_USERNAME",
+        "",
+    ).lower()
+
+    is_admin = False
+
+    if admin_id_raw:
+
+        try:
+
+            is_admin = message.from_user.id == int(admin_id_raw)
+
+        except ValueError:
+            pass
+
+    if admin_username and (message.from_user.username or "").lower() == admin_username:
+        is_admin = True
+
+    if not is_admin:
+
         await message.reply("Только хозяйка может это делать 💅")
+
         return
 
-    args = message.text.split()
+    args = (message.text or "").split()
+
     if len(args) < 2:
-        await message.reply("Использование: `/approve <username>`")
+
+        await message.reply(
+            "Использование: " "`/approve <username>`",
+            parse_mode="Markdown",
+        )
+
         return
 
     target = args[1].lower().replace("@", "")
+
     users = load_users()
+
     if target not in users:
-        await message.reply("Пользователь не найден")
+
+        await message.reply("Пользователь не найден.")
+
         return
 
-    req = users[target].get("requested_role")
-    if not req:
-        await message.reply("Нет активных запросов")
+    requested_role = users[target].get("requested_role")
+
+    if not requested_role:
+
+        await message.reply("Нет активных запросов.")
+
         return
 
-    users[target]["role"] = req
+    users[target]["role"] = requested_role
+
     users[target]["requested_role"] = None
+
     save_users(users)
 
+    role_name = ROLES_HIERARCHY.get(
+        requested_role,
+        {},
+    ).get(
+        "name",
+        requested_role,
+    )
+
     await message.reply(
-        f"✅ @{target} получил роль **{ROLES_HIERARCHY[req]['name']}** 👑"
+        f"✅ @{target} получил роль " f"**{role_name}** 👑",
+        parse_mode="Markdown",
     )
 
 
 @router.message(Command("slay"))
-async def cmd_slay(message: Message):
-    photos_dir = os.path.join(BASE_DIR, "RitushkaPhotos")
-    if not os.path.exists(photos_dir):
+async def cmd_slay(
+    message: Message,
+):
+
+    if not os.path.exists(PHOTOS_DIR):
+
         await message.reply("Папка с фото не найдена 💅")
+
         return
 
     photos = [
-        f
-        for f in os.listdir(photos_dir)
-        if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+        filename
+        for filename in os.listdir(PHOTOS_DIR)
+        if filename.lower().endswith(
+            (
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".webp",
+            )
+        )
     ]
+
     if not photos:
+
         await message.reply("Альбом пуст 👑")
+
         return
 
-    photo = FSInputFile(os.path.join(photos_dir, random.choice(photos)))
+    filename = random.choice(photos)
+
+    photo = FSInputFile(
+        os.path.join(
+            PHOTOS_DIR,
+            filename,
+        )
+    )
+
     await message.reply_photo(
         photo,
         caption=random.choice(
             [
-                "Смотри и учись, как выглядит настоящий слэй 💅✨",
-                "Мой аутфит сегодня просто разносит этот мир 👑🖤",
+                "Смотри и учись 💅✨",
+                "Мой аутфит сегодня просто разносит 👑🖤",
             ]
         ),
     )
 
 
-@router.message(F.text.in_({"/reset", "/clear"}))
-async def cmd_reset(message: Message):
+@router.message(
+    F.text.in_(
+        {
+            "/reset",
+            "/clear",
+        }
+    )
+)
+async def cmd_reset(
+    message: Message,
+):
+
     if message.chat.id in chat_sessions:
+
         del chat_sessions[message.chat.id]
+
     await message.reply("Память стёрта 💅✨")
 
 
+# ============================================================
+# TEXT / GEMINI
+# ============================================================
+
+
 @router.message(F.text)
-async def handle_text(message: Message):
+async def handle_text(
+    message: Message,
+):
+
+    global BOT_USERNAME
+
     should_reply = False
+
     if message.chat.type == "private":
+
         should_reply = True
+
     elif message.text and BOT_USERNAME and (f"@{BOT_USERNAME}" in message.text):
+
         should_reply = True
+
     elif (
         message.reply_to_message
         and message.reply_to_message.from_user
-        and message.reply_to_message.from_user.id == (await bot.me()).id
+        and BOT_USERNAME
+        and message.reply_to_message.from_user.username
+        and message.reply_to_message.from_user.username.lower() == BOT_USERNAME.lower()
     ):
+
         should_reply = True
 
     if not should_reply:
         return
 
     try:
-        text = message.text
+
+        text = message.text or ""
+
         if BOT_USERNAME:
-            text = (
-                text.replace(f"@{BOT_USERNAME}", "")
-                .replace(f"@{BOT_USERNAME.capitalize()}", "")
-                .strip()
-            )
+
+            text = text.replace(
+                f"@{BOT_USERNAME}",
+                "",
+            ).strip()
 
         user = message.from_user
-        username = (user.username or f"id_{user.id}").lower()
-        user_info = get_or_create_user(username)
 
-        status, _ = process_activity_and_spam(username, user_info)
+        username = (user.username or f"id_{user.id}").lower()
+
+        _, user_info = get_or_create_user(
+            username,
+            user.id,
+        )
+
+        status, _ = process_activity_and_spam(
+            username,
+            user_info,
+        )
+
         if status == "blocked":
             return
+
         if status == "punished":
-            await message.reply("⚠ Ты доспамился. −100 RP и блок на 15 минут! 🤬")
+
+            await message.reply("⚠ Ты доспамился. " "−100 RP и блок на 15 минут! 🤬")
+
             return
 
-        role = user_info.get("role", "noob")
-        equipped = user_info.get("equipped", [])
-        eq_str = (
-            ", ".join(get_item_name(e) for e in equipped) if equipped else "без одежды"
+        role = user_info.get(
+            "role",
+            "noob",
         )
+
+        equipped = user_info.get(
+            "equipped",
+            [],
+        )
+
+        if equipped:
+
+            equipped_text = ", ".join(get_item_name(item_id) for item_id in equipped)
+
+        else:
+
+            equipped_text = "без одежды"
+
         moscow_time = datetime.datetime.now(
             datetime.timezone(datetime.timedelta(hours=3))
         ).strftime("%H:%M")
 
-        role_instruction = f"[КОНТЕКСТ: Пользователь @{username}, роль: {role}, RP:{user_info.get('rp', 0)}, надето: {eq_str}. Тон: пафосный/дерзкий.]"
-        dynamic_prompt = f"{BASE_SYSTEM_PROMPT}\n\n{role_instruction}\n\n(Сейчас в Москве {moscow_time})"
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=text,
-            config={"system_instruction": dynamic_prompt},
+        role_instruction = (
+            f"[КОНТЕКСТ: "
+            f"Пользователь @{username}, "
+            f"роль: {role}, "
+            f"RP: {user_info.get('rp', 0)}, "
+            f"надето: {equipped_text}. "
+            f"Тон: игровой и дерзкий.]"
         )
-        await message.reply(response.text)
+
+        dynamic_prompt = (
+            f"{BASE_SYSTEM_PROMPT}\n\n"
+            f"{role_instruction}\n\n"
+            f"(Сейчас в Москве "
+            f"{moscow_time})"
+        )
+
+        # Важно:
+        # Gemini-вызов синхронный, поэтому
+        # переносим его в отдельный поток,
+        # чтобы не блокировать aiogram.
+
+        def generate():
+
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=text,
+                config={"system_instruction": dynamic_prompt},
+            )
+
+        response = await asyncio.to_thread(generate)
+
+        answer = getattr(
+            response,
+            "text",
+            None,
+        )
+
+        if not answer:
+
+            answer = "Я пока не смогла придумать ответ 💅"
+
+        await message.reply(answer)
+
     except Exception as e:
+
         print(f"Ошибка handle_text: {e}")
+
         await message.answer("Что-то пошло не так... 💅")
 
 
+# ============================================================
+# CLEANUP OLD GAME ROOMS
+# ============================================================
+
+
+async def game_room_cleanup_loop():
+
+    while True:
+
+        await asyncio.sleep(300)
+
+        now = time.time()
+
+        expired_rooms = []
+
+        for room_id, room in list(game_rooms.items()):
+
+            created_at = room.get(
+                "created_at",
+                now,
+            )
+
+            # Комната живёт максимум час.
+            if now - created_at > 3600:
+
+                expired_rooms.append(room_id)
+
+        for room_id in expired_rooms:
+
+            game_rooms.pop(
+                room_id,
+                None,
+            )
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+
 async def main():
+
     global BOT_USERNAME
+
     me = await bot.me()
-    BOT_USERNAME = me.username
+
+    BOT_USERNAME = me.username or ""
+
     print(f"Бот @{BOT_USERNAME} запущен! 👑")
 
     dp.include_router(router)
+
     api_runner = await start_webapp_api()
 
+    cleanup_task = asyncio.create_task(game_room_cleanup_loop())
+
     try:
+
         await dp.start_polling(bot)
+
     finally:
+
+        cleanup_task.cancel()
+
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+
         await api_runner.cleanup()
+
         await bot.session.close()
 
 
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
 if __name__ == "__main__":
+
     try:
+
         asyncio.run(main())
+
+    except KeyboardInterrupt:
+
+        print("Бот остановлен.")
+
     except Exception as e:
-        print(f"\n[!] ОШИБКА:\n{e}")
+
+        print("\n[!] ОШИБКА:\n" f"{e}")

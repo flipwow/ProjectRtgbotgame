@@ -30,11 +30,12 @@ body {
     width: 100%;
     max-width: 480px;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     position: relative;
     padding: 16px;
-    padding-bottom: calc(var(--nav-height) + 60px); 
+    padding-bottom: calc(var(--nav-height) + 60px);
 }
 
 .glass-card {
@@ -86,6 +87,11 @@ body {
     overflow-y: auto;
     position: relative;
     padding-bottom: 30px;
+    scrollbar-width: none;
+}
+
+.content-area::-webkit-scrollbar {
+    display: none;
 }
 
 .tab-content {
@@ -98,14 +104,38 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.pet-section-header { text-align: center; margin-bottom: 12px; }
-.vip-tag { font-size: 10px; letter-spacing: 2px; color: #ec4899; font-weight: 700; }
-.pet-section-header h3 { font-size: 20px; margin: 4px 0; }
-.subtitle { font-size: 12px; color: var(--text-secondary); }
+.pet-section-header {
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.vip-tag {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #ec4899;
+    font-weight: 700;
+}
+
+.pet-section-header h3 {
+    font-size: 20px;
+    margin: 4px 0;
+}
+
+.subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
 
 .pet-card {
     padding: 20px 16px;
@@ -116,7 +146,13 @@ body {
     text-align: center;
     min-height: 200px;
     margin-bottom: 14px;
-    background: radial-gradient(circle at 50% 35%, rgba(236, 72, 153, 0.12), transparent 70%), var(--card-bg);
+    background:
+        radial-gradient(
+            circle at 50% 35%,
+            rgba(236, 72, 153, 0.12),
+            transparent 70%
+        ),
+        var(--card-bg);
     position: relative;
     overflow: hidden;
 }
@@ -126,15 +162,25 @@ body {
     position: absolute;
     width: 120px;
     height: 120px;
-    background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
+    background:
+        radial-gradient(
+            circle,
+            rgba(236, 72, 153, 0.4) 0%,
+            transparent 70%
+        );
     border-radius: 50%;
     z-index: 1;
     animation: petGlow 3s ease-in-out infinite;
 }
 
 @keyframes petGlow {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.8; }
+    0%, 100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
 }
 
 .pet-display {
@@ -156,8 +202,13 @@ body {
 }
 
 @keyframes petIdle {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-6px) scale(1.03); }
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-6px) scale(1.03);
+    }
 }
 
 .equipped-list-preview {
@@ -187,7 +238,9 @@ body {
     box-shadow: 0 4px 15px rgba(236, 72, 153, 0.25);
 }
 
-.section-heading { margin-bottom: 12px; }
+.section-heading {
+    margin-bottom: 12px;
+}
 
 .category-tabs {
     display: flex;
@@ -195,6 +248,11 @@ body {
     overflow-x: auto;
     margin-bottom: 12px;
     padding-bottom: 4px;
+    scrollbar-width: none;
+}
+
+.category-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .category-tab {
@@ -234,15 +292,25 @@ body {
     transition: transform 0.1s;
 }
 
-.item-card:active { transform: scale(0.97); }
+.item-card:active {
+    transform: scale(0.97);
+}
 
 .item-card.equipped {
     border-color: #ec4899;
     background: rgba(236, 72, 153, 0.08);
 }
 
-.item-art { font-size: 36px; margin-bottom: 6px; }
-.item-name { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.item-art {
+    font-size: 36px;
+    margin-bottom: 6px;
+}
+
+.item-name {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
 
 .item-status-badge {
     font-size: 10px;
@@ -258,8 +326,16 @@ body {
     color: white;
 }
 
-.info-card { padding: 14px; line-height: 1.5; font-size: 13px; }
-.status-active { color: #4ade80; font-weight: 600; }
+.info-card {
+    padding: 14px;
+    line-height: 1.5;
+    font-size: 13px;
+}
+
+.status-active {
+    color: #4ade80;
+    font-weight: 600;
+}
 
 .bottom-nav {
     position: absolute;
@@ -287,12 +363,20 @@ body {
     flex: 1;
 }
 
-.nav-icon { font-size: 18px; }
-.nav-item.active { color: #ec4899; }
+.nav-icon {
+    font-size: 18px;
+}
+
+.nav-item.active {
+    color: #ec4899;
+}
 
 .pet-modal-overlay {
     position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(15, 16, 22, 0.8);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -330,13 +414,17 @@ body {
     background: rgba(255, 255, 255, 0.1);
     border: none;
     color: var(--text-secondary);
-    width: 30px; height: 30px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     cursor: pointer;
     font-size: 14px;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background 0.2s;
 }
+
 .close-modal-btn:hover {
     background: rgba(236, 72, 153, 0.2);
     color: #ec4899;
@@ -384,4 +472,19 @@ body {
 .pet-choice-name {
     font-size: 12px;
     font-weight: 600;
+}
+
+.ttt-cell {
+    aspect-ratio: 1;
+    font-size: 32px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--card-border);
+    color: white;
+    min-width: 0;
+}
+
+.ttt-cell:disabled {
+    cursor: default;
+    opacity: 0.9;
 }
