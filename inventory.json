@@ -1,0 +1,33 @@
+{
+  "food_items": {
+    "fish": {
+      "name": "🐟 Свежая рыбкка",
+      "hunger_restore": 35,
+      "happiness_restore": 20,
+      "price": 50
+    },
+    "meat": {
+      "name": "🥩 Сочный стейк",
+      "hunger_restore": 60,
+      "happiness_restore": 40,
+      "price": 100
+    },
+    "milk": {
+      "name": "🥛 Мисочка молока",
+      "hunger_restore": 15,
+      "happiness_restore": 25,
+      "price": 25
+    }
+  },
+  "users_pets": {
+    "123456789": {
+      "pet_name": "Барсичела",
+      "hunger": 50,
+      "happiness": 60,
+      "inventory": {
+        "fish": 2,
+        "milk": 1
+      }
+    }
+  }
+}
