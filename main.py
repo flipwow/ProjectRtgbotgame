@@ -775,6 +775,9 @@ async def cmd_duel(message: Message):
 
     duel_url = f"https://t.me/{BOT_USERNAME}?startapp=duel_{room_id}"
 
+    print("BOT_USERNAME =", BOT_USERNAME)
+    print("DUEL URL =", duel_url)
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="⚔️ Принять вызов", url=duel_url)]]
     )
