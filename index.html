@@ -2,258 +2,200 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ritushka VIP</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ritushka Game</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style_2.css">
 </head>
 <body>
     <div class="app-container">
         <!-- Шапка профиля -->
-        <header class="profile-header glass-card">
+        <div class="glass-card profile-header">
             <div class="profile-info">
                 <div class="avatar-wrapper">
-                    <img id="user-avatar" src="https://via.placeholder.com/60" alt="Avatar">
+                    <img id="user-avatar" src="https://via.placeholder.com/50" alt="Avatar">
                 </div>
                 <div>
                     <h2 id="username">Загрузка...</h2>
                     <div class="balance-badge">
-                        <span class="coin-icon">💎</span>
-                        <span id="user-balance">0</span> R$
+                        <span>💎</span> <span id="user-balance">0</span> R$
                     </div>
                 </div>
             </div>
-        </header>
+        </div>
 
-        <!-- Основной контент (Вкладки) -->
-        <main class="content-area">
-            
-            <!-- Вкладка 1: Питомец -->
-            <section id="tab-home" class="tab-content active">
+        <!-- Основной контент -->
+        <div class="content-area">
+            <!-- Вкладка: Главная / Питомец -->
+            <div id="tab-home" class="tab-content active">
                 <div class="pet-section-header">
-                    <span class="vip-tag">RITUSHKA VIP</span>
-                    <h3>Твой питомец</h3>
-                    <p class="subtitle">Так выглядит твой персонаж сейчас ✨</p>
+                    <div class="vip-tag">RITUSHKA PET</div>
+                    <h3>Барсичела</h3>
+                    <div class="subtitle">Твой любимый дерзкий пушистик 💅</div>
                 </div>
 
-                <div class="pet-card glass-card">
-                    <div class="pet-display" id="petDisplay">
-                        <span class="pet-emoji">🐾</span>
+                <div class="glass-card pet-card">
+                    <div class="pet-display" id="petDisplay" onclick="openPetSelector()">
+                        🐾
                     </div>
-                    <div class="equipped-list-preview" id="equippedPreview">
-                        Ничего не надето
-                    </div>
+                    <div class="equipped-list-preview" id="equippedPreview">Питомец сыт и доволен ✨</div>
                 </div>
 
-                <button class="wardrobe-shortcut-btn" onclick="openPetSelector()">
-                    <span class="btn-icon">🔄</span>
-                    <span>Сменить питомца</span>
-                    <span class="arrow">→</span>
+                <!-- Кнопка «Покормить» вместо гардероба -->
+                <button class="wardrobe-shortcut-btn" onclick="openFeedMenuModal()">
+                    <span>🥣 Покормить питомца</span>
+                    <span>→</span>
                 </button>
+            </div>
 
-                <button class="wardrobe-shortcut-btn" onclick="switchTab('wardrobe')" style="margin-top: 8px;">
-                    <span class="btn-icon">👗</span>
-                    <span>Гардероб</span>
-                    <span class="arrow">→</span>
-                </button>
-            </section>
-
-            <!-- Вкладка 2: Гардероб -->
-            <section id="tab-wardrobe" class="tab-content">
+            <!-- Вкладка: Реестр чата -->
+            <div id="tab-leaderboard" class="tab-content">
                 <div class="section-heading">
-                    <div>
-                        <span class="vip-tag">ПРИМЕРОЧНАЯ</span>
-                        <h3>Гардероб</h3>
-                    </div>
+                    <h3>👑 Реестр чата</h3>
+                    <div class="subtitle">Список всех участников и их статусы</div>
                 </div>
-
-                <div class="category-tabs" id="wardrobeCategoryTabs">
-                    <button class="category-tab active" data-part="all">Все</button>
-                    <button class="category-tab" data-part="head">Голова</button>
-                    <button class="category-tab" data-part="body">Тело</button>
-                    <button class="category-tab" data-part="legs">Ноги</button>
-                    <button class="category-tab" data-part="arms">Руки</button>
+                <div id="chatUsersList" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Динамически заполнится из JS -->
                 </div>
+            </div>
 
-                <div class="items-grid" id="itemsGrid"></div>
-            </section>
-
-            <!-- Вкладка 3: Таблица лидеров (Gooners) -->
-            <section id="tab-leaderboard" class="tab-content">
-                <div class="pet-section-header">
-                    <span class="vip-tag">RITUSHKA HALL OF FAME</span>
-                    <h3>Таблица лидеров 🏆</h3>
-                    <p class="subtitle">Лучшие игроки нашего бота</p>
+            <!-- Вкладка: Игры -->
+            <div id="tab-play" class="tab-content">
+                <div class="section-heading">
+                    <h3>🎮 Мини-игры</h3>
+                    <div class="subtitle">Сразись с другими пешками</div>
                 </div>
-
-                <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h4 style="font-size: 15px; margin: 0;">Выберите игру</h4>
-                        <select id="leaderboard-game-select" style="background: var(--card-bg); border: 1px solid var(--card-border); color: white; padding: 6px 10px; border-radius: 8px; font-size: 12px; outline: none;">
-                            <option value="tictactoe" style="background: #181925;">Крестики-нолики</option>
-                            <option value="general" style="background: #181925;">Общий счет</option>
-                        </select>
-                    </div>
-                    <ul id="leaderboard-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
-                        <li style="color: var(--text-secondary); text-align: center; padding: 8px;">Скоро обновление таблицы...</li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- Вкладка 4: Play (Мини-игры) -->
-            <section id="tab-play" class="tab-content">
-                <div class="pet-section-header">
-                    <span class="vip-tag">RITUSHKA ARCADE</span>
-                    <h3>Мини-игры</h3>
-                    <p class="subtitle" id="play-subtitle">Выбирай развлечение и играй 🎮</p>
-                </div>
-
-                <!-- Главное меню игр -->
-                <div id="games-menu" class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
-                    <div class="glass-card game-card" onclick="openGameMenu('tictactoe')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                
+                <div id="games-menu" style="display: flex; flex-direction: column; gap: 10px;">
+                    <div class="glass-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="openGameMenu('tictactoe')">
                         <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">С ботом или дуэль с другом</p>
+                            <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕️</h4>
+                            <p style="font-size: 12px; color: var(--text-secondary);">Классическая дуэль</p>
                         </div>
-                        <button class="category-tab active" style="pointer-events: none;">Играть</button>
+                        <span style="font-size: 18px; color: #ec4899;">→</span>
                     </div>
                 </div>
 
-                <!-- Подменю выбора режима для Крестиков-ноликов -->
+                <!-- Меню режимов крестиков-ноликов -->
                 <div id="tictactoe-modes" style="display: none; flex-direction: column; gap: 10px;">
-                    <button class="category-tab" onclick="closeGame()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">
-                        ← Назад к играм
-                    </button>
-
-                    <div style="padding: 12px 14px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; font-size: 13px; line-height: 1.4;">
-                        <strong>⚔️ Хочешь сразиться с другом?</strong><br>
-                        Напиши в чат команду <code style="background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 6px;">/duel</code>
-                    </div>
-
-                    <div class="glass-card game-card" onclick="startTttGame('solo')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-                        <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">🤖 Против Бота</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">Сыграй в одиночку</p>
-                        </div>
-                        <button class="category-tab active" style="pointer-events: none;">Выбрать</button>
-                    </div>
-
-                    <div class="glass-card game-card" onclick="startTttGame('duo')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-                        <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">👥 С другом (на одном экране)</h4>
-                            <p style="font-size: 12px; color: var(--text-secondary);">Передавайте телефон друг другу</p>
-                        </div>
-                        <button class="category-tab active" style="pointer-events: none;">Выбрать</button>
-                    </div>
+                    <button class="wardrobe-shortcut-btn" onclick="startTttGame('solo')">🤖 Играть с ботом</button>
+                    <button class="wardrobe-shortcut-btn" onclick="startTttGame('online')" style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);">🌐 Играть с другом (Онлайн)</button>
+                    <button class="category-tab" style="padding: 12px; text-align: center; margin-top: 4px;" onclick="closeGame()">◀️ Назад к играм</button>
                 </div>
 
-                <!-- Игровое поле Крестиков-ноликов -->
-                <div id="game-tictactoe" style="display: none; flex-direction: column; gap: 10px;">
-                    <button class="category-tab" onclick="backTttModes()" style="align-self: flex-start; margin-bottom: 4px; padding: 6px 12px; font-size: 12px;">
-                        ← К выбору режима
-                    </button>
-                    
-                    <div class="glass-card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;">
-                        <div id="ttt-status" style="font-size: 13px; font-weight: 600; color: #c4b5fd;">Ходит: X (Крестики)</div>
-                        
-                        <div class="ttt-board" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 260px;">
-                            <button class="ttt-cell" onclick="makeMove(0)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(1)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(2)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(3)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(4)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(5)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(6)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(7)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                            <button class="ttt-cell" onclick="makeMove(8)" style="height: 75px; font-size: 32px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; color: white;"></button>
-                        </div>
-
-                        <button class="category-tab active" onclick="resetTtt()" style="margin-top: 4px; padding: 8px 16px;">Заново</button>
+                <!-- Сама игра Крестики-нолики -->
+                <div id="game-tictactoe" style="display: none; flex-direction: column; align-items: center; gap: 14px;">
+                    <div id="ttt-status" style="font-weight: 600; font-size: 14px; color: #c4b5fd;">Ходит: X</div>
+                    <div class="glass-card" style="padding: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px;">
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(0)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(1)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(2)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(3)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(4)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(5)></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(6)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(7)"></button>
+                        <button class="glass-card ttt-cell" style="aspect-ratio: 1; font-size: 32px; font-weight: 700; cursor: pointer; border: 1px solid var(--card-border);" onclick="makeMove(8)"></button>
                     </div>
+                    <button class="category-tab" style="padding: 10px 20px;" onclick="backTttModes()">Сдаться / Назад</button>
                 </div>
-            </section>
+            </div>
 
-            <!-- Вкладка 5: Магазин -->
-            <section id="tab-shop" class="tab-content">
+            <!-- Вкладка: Магазин -->
+            <div id="tab-shop" class="tab-content">
                 <div class="section-heading">
-                    <div>
-                        <span class="vip-tag">БУТИК РИТУШКИ</span>
-                        <h3>Магазин</h3>
-                    </div>
+                    <h3>🛍️ Королевский магазин</h3>
+                    <div class="subtitle">Покупай роли и редкие вещицы</div>
                 </div>
 
                 <div class="category-tabs" id="shopCategoryTabs">
-                    <button class="category-tab active" data-shopcat="all">Все</button>
-                    <button class="category-tab" data-shopcat="sale">Sale</button>
-                    <button class="category-tab" data-shopcat="luxury">Luxury</button>
+                    <button class="category-tab active" data-shopcat="all">Всё</button>
+                    <button class="category-tab" data-shopcat="sale">Распродажа</button>
+                    <button class="category-tab" data-shopcat="luxury">Люкс</button>
                     <button class="category-tab" data-shopcat="roles">Роли</button>
                 </div>
 
-                <div class="items-grid" id="shopItemsGrid"></div>
-            </section>
+                <div class="items-grid" id="shopItemsGrid">
+                    <!-- Заполняется из JS -->
+                </div>
+            </div>
 
-            <!-- Вкладка 6: Участники (Профиль) -->
-            <section id="tab-profile" class="tab-content">
-                <div class="section-heading" style="margin-bottom: 12px;">
-                    <div>
-                        <span class="vip-tag">МОЙ ПРОФИЛЬ И УЧАСТНИКИ</span>
-                        <h3>Активные игроки бота 👤</h3>
-                        <p class="subtitle">Пользователи, запустившие этого бота</p>
-                    </div>
+            <!-- Вкладка: Профиль / Настройки -->
+            <div id="tab-profile" class="tab-content">
+                <div class="section-heading">
+                    <h3>⚙️ Меню питомца</h3>
+                    <div class="subtitle">Управление Барсичелой</div>
                 </div>
-                <div id="chatUsersList" style="display: flex; flex-direction: column; gap: 8px;">
-                    <div style="color: var(--text-secondary); text-align: center; padding: 12px; font-size: 13px;">Загрузка списка пользователей...</div>
+                <div class="glass-card info-card" style="margin-bottom: 12px;">
+                    <p><strong>Статус:</strong> <span class="status-active">Активен 💅</span></p>
+                    <p style="margin-top: 6px; color: var(--text-secondary); font-size: 12px;">Твой питомец всегда готов слэйнить вместе с тобой в Telegram-чатах.</p>
                 </div>
-            </section>
-        </main>
+                <button class="wardrobe-shortcut-btn" onclick="openPetSelector()">🐾 Сменить питомца</button>
+            </div>
+        </div>
 
         <!-- Нижняя навигация -->
-        <nav class="bottom-nav glass-card">
+        <div class="glass-card bottom-nav">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
-                <span>Pet</span>
+                <span>Питомец</span>
             </button>
             <button class="nav-item" onclick="switchTab('leaderboard')">
-                <span class="nav-icon">🏆</span>
-                <span>Gooners</span>
+                <span class="nav-icon">👑</span>
+                <span>Реестр</span>
             </button>
             <button class="nav-item" onclick="switchTab('play')">
                 <span class="nav-icon">🎮</span>
-                <span>Play</span>
+                <span>Игры</span>
             </button>
             <button class="nav-item" onclick="switchTab('shop')">
                 <span class="nav-icon">🛍️</span>
-                <span>Shop</span>
+                <span>Магазин</span>
             </button>
             <button class="nav-item" onclick="switchTab('profile')">
-                <span class="nav-icon">👤</span>
-                <span>мшк фрд</span>
+                <span class="nav-icon">⚙️</span>
+                <span>Профиль</span>
             </button>
-        </nav>
+        </div>
     </div>
 
-    <!-- Модальные окна -->
+    <!-- Модальное окно выбора питомца -->
     <div id="petSelectorModal" class="pet-modal-overlay" style="display: none;">
-        <div class="pet-modal-content glass-card">
+        <div class="pet-modal-content">
             <div class="pet-modal-header">
-                <h3>Выбери питомца 🐾</h3>
+                <h3>Выбор питомца</h3>
                 <button class="close-modal-btn" onclick="closePetSelector()">✕</button>
             </div>
             <div class="pet-choices-grid" id="petChoicesGrid"></div>
         </div>
     </div>
 
+    <!-- Модальное окно профиля участника реестра -->
     <div id="userProfileModal" class="pet-modal-overlay" style="display: none;">
-        <div class="pet-modal-content glass-card">
+        <div class="pet-modal-content">
             <div class="pet-modal-header">
                 <h3 id="modalUsername">Профиль</h3>
                 <button class="close-modal-btn" onclick="closeUserProfileModal()">✕</button>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; margin-bottom: 16px;" id="modalUserDetails"></div>
-            <button class="wardrobe-shortcut-btn" onclick="closeUserProfileModal()" style="width: 100%; padding: 10px; font-size: 13px;">Закрыть</button>
+            <div id="modalUserDetails" style="font-size: 13px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
+            <button class="wardrobe-shortcut-btn" onclick="closeUserProfileModal()" style="justify-content: center;">Закрыть</button>
         </div>
     </div>
 
-    <script src="script.js?v=1.5"></script>
+    <!-- Модальное окно кормления питомца -->
+    <div id="feedMenuModal" class="pet-modal-overlay" style="display: none;">
+        <div class="pet-modal-content">
+            <div class="pet-modal-header">
+                <h3>🥣 Покормить Барсичелу</h3>
+                <button class="close-modal-btn" onclick="closeFeedMenuModal()">✕</button>
+            </div>
+            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Выбери лакомство из инвентаря:</div>
+            <div id="feedItemsGrid" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
+                <p style="text-align: center; color: var(--text-secondary); padding: 15px;">Холодильник пока пуст 🛍</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script_2.js"></script>
 </body>
 </html>

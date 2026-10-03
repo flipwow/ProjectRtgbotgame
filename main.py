@@ -11,6 +11,7 @@ import uuid
 from urllib.parse import parse_qsl
 
 from aiohttp import web, WSMsgType
+from telebot import types
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
@@ -211,6 +212,187 @@ BASE_SYSTEM_PROMPT = """
 Отношения: Ангелина Королева — мама (авторитет). Алинка Хуилка и Блонда — слуги/подружки. Остальные — NPC.
 Речь: Дерзкая, с подростковым и геймерским сленгом (слей, вайб, пешки). Эмодзи (💅✨👑🖤🔥). 3-5 предложений.
 """
+
+
+# Функция отправки меню выбора питомцев
+def send_pet_selection(message):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    # Кнопка выбора Барсичелы
+    btn_barsichela = types.InlineKeyboardButton(
+        "🐾 Выбрать Барсичелу", callback_data="select_pet_barsichela"
+    )
+    markup.add(btn_barsichela)
+
+    # Отправка фото питомца с описанием (используем изображение из источника)
+    caption = (
+        "<b>🐾 Знакомьтесь: Барсичела!</b>\n\n"
+        "<i>«Милый пушистик с секретом. Готов сопровождать вас в приключениях!»</i>\n\n"
+        "▫️ Редкость: Эпический\n"
+        "▫️ Бонус: +15% к защите профиля"
+    )
+
+    # Путь к изображению Барсичелы
+    with open("Barsichela.png", "rb") as photo:
+        message.bot.send_photo(
+            message.chat.id,
+            photo,
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+
+
+# Обработчик нажатия на кнопку выбора
+@bot.callback_query_handler(func=lambda call: call.data == "select_pet_barsichela")
+def set_pet_handler(call):
+    user_id = call.from_user.id
+    # Здесь логика сохранения выбора питомца в базу данных или JSON для конкретного пользователя
+
+    bot.answer_callback_query(
+        call.id, "🎉 Вы успешно выбрали Барсичелу своим питомцем!", show_alert=True
+    )
+    bot.edit_message_caption(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        caption="✅ <b>Барсичела теперь ваш официальный питомец!</b>",
+        parse_mode="HTML",
+    )
+
+
+# Загрузка данных из JSON (в реальном проекте лучше обернуть в функции с сохранением)
+def load_data():
+    with open("inventory.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# Команда вызова меню питомца (Статус + Кнопка «Покормить»)
+@bot.message_handler(commands=["pet", "barsichela"])
+def pet_status_command(message):
+    user_id = str(message.from_user.id)
+    data = load_data()
+
+    # Проверяем, есть ли у пользователя питомец
+    if user_id not in data["users_pets"]:
+        bot.reply_to(
+            message, "У вас пока нет питомца! Выберите Барсичелу командой /start_pet"
+        )
+        return
+
+    pet = data["users_pets"][user_id]
+
+    status_text = (
+        f"🐾 <b>Ваш питомец: {pet['pet_name']}</b>\n\n"
+        f"🍖 Сытость: {pet['hunger']}/100\n"
+        f"💖 Счастье: {pet['happiness']}/100\n\n"
+        f"<i>Нажмите кнопку ниже, чтобы открыть мисочку с едой!</i>"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            "🥣 Покормить Барсичелу", callback_data="open_feed_menu"
+        )
+    )
+
+    # Путь к изображению Барсичелы
+    with open("Barsichela.png", "rb") as photo:
+        bot.send_photo(
+            message.chat.id,
+            photo,
+            caption=status_text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+
+
+# Открытие меню выбора еды из инвентаря
+@bot.callback_query_handler(func=lambda call: call.data == "open_feed_menu")
+def feed_menu_callback(call):
+    user_id = str(call.from_user.id)
+    data = load_data()
+    pet = data["users_pets"][user_id]
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+
+    # Формируем кнопки на основе того, что есть у игрока в инвентаре
+    inventory = pet["inventory"]
+    if not inventory:
+        bot.answer_callback_query(
+            call.id, "У вас пустой холодильник! Купите еды в магазине.", show_alert=True
+        )
+        return
+
+    for food_id, count in inventory.items():
+        food_info = data["food_items"][food_id]
+        btn_text = f"{food_info['name']} (x{count})"
+        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f"eat_{food_id}"))
+
+    bot.edit_message_caption(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        caption="🥣 <b>Выберите, чем угостить Барсичелу:</b>",
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
+
+
+# Обработка кормления выбранным блюдом
+@bot.callback_query_handler(func=lambda call: call.data.startswith("eat_"))
+def process_eating(call):
+    user_id = str(call.from_user.id)
+    food_id = call.data.split("_")[1]  # Получаем ID еды (например, fish)
+
+    data = load_data()
+    pet = data["users_pets"][user_id]
+    food_info = data["food_items"][food_id]
+
+    # Проверяем наличие в инвентаре
+    if pet["inventory"].get(food_id, 0) > 0:
+        # Уменьшаем количество еды
+        pet["inventory"][food_id] -= 1
+        if pet["inventory"][food_id] == 0:
+            del pet["inventory"][food_id]  # Удаляем предмет, если он кончился
+
+        # Повышаем характеристики (но не выше 100)
+        pet["hunger"] = min(100, pet["hunger"] + food_info["hunger_restore"])
+        pet["happiness"] = min(100, pet["happiness"] + food_info["happiness_restore"])
+
+        # Сохраняем изменения в файл (в реальном проекте: db.save())
+        with open("inventory.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
+        bot.answer_callback_query(
+            call.id,
+            f"😋 Барсичела с аппетитом съел {food_info['name']}! Сытость и счастье выросли.",
+            show_alert=True,
+        )
+
+        # Возвращаем обновленный статус
+        status_text = (
+            f"🐾 <b>Ваш питомец: {pet['pet_name']}</b>\n\n"
+            f"🍖 Сытость: {pet['hunger']}/100\n"
+            f"💖 Счастье: {pet['happiness']}/100\n\n"
+            f"<i>Барсичела сыт и довольно жмурится! ✨</i>"
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton(
+                "🥣 Покормить ещё", callback_data="open_feed_menu"
+            )
+        )
+
+        bot.edit_message_caption(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            caption=status_text,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+    else:
+        bot.answer_callback_query(
+            call.id, "❌ У вас больше нет этого лакомства!", show_alert=True
+        )
 
 
 # ============================================================
