@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "food_items": {
     "fish": {
       "name": "🐟 Свежая рыбка",
@@ -39,9 +40,15 @@
   },
   "users_pets": {
     "123456789": {
+      "pet_id": "barsichela",
       "pet_name": "Барсичела",
+      "pet_type": "barsichela",
+      "level": 1,
+      "experience": 0,
+      "health": 100,
       "hunger": 50,
       "happiness": 60,
+      "energy": 100,
       "inventory": {
         "fish": 2,
         "milk": 1

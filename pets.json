@@ -1,15 +1,19 @@
 {
   "barsichela": {
+    "id": "barsichela",
     "name": "Барсичела",
     "type": "Снежный барсик",
+    "level": 1,
+    "max_level": 10,
     "description": "Милый, но очень дерзкий пиздюк с клыком наружу и невероятно сильным стремлениям захерачить Ритушку.",
     "rarity": "Редкий",
     "stats": {
+      "health": 100,
       "hunger": 100,
       "happiness": 100,
       "energy": 100
     },
     "bonus": "",
-    "image": "barsichela.png"
+    "image": "/Barsichela.png"
   }
 }

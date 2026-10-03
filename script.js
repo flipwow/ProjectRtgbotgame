@@ -8,36 +8,19 @@ let userData = {
     registry: [],
     leaderboard: [],
     foodCatalog: [],
+    petCatalog: [],
     pet: null,
     user: null,
+    chat: null,
+    chatProfile: null,
+    selectedRecipient: null,
     rp: 0,
+    convertibleRp: 0,
     maxRp: 0
 };
 
-const AVAILABLE_PETS = [
-    {
-        id: 'cat',
-        name: 'Милый котенок',
-        img: 'https://media.giphy.com/media/Geimx3k8w1V9C/giphy.gif'
-    },
-    {
-        id: 'bunny',
-        name: 'Зайка',
-        img: 'https://media.giphy.com/media/3NtY188QaxDjC/giphy.gif'
-    },
-    {
-        id: 'dog',
-        name: 'Щенок',
-        img: 'https://media.giphy.com/media/8vQSQ3cNXuDGo/giphy.gif'
-    },
-    {
-        id: 'panda',
-        name: 'Пандочка',
-        img: 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif'
-    }
-];
-
-let currentPetId = 'cat';
+let currentPetId = 'barsichela';
+let chatContext = { chatId: null, userId: null };
 
 let tttMode = 'solo';
 let tttBoard = Array(9).fill(null);
@@ -50,12 +33,14 @@ let currentRoomId = null;
 
 function initTelegramUser() {
     if (!tg) {
+        chatContext = resolveChatContext();
         console.warn('Telegram WebApp не обнаружен');
         return;
     }
 
     tg.ready();
     tg.expand();
+    chatContext = resolveChatContext();
 
     const user = tg.initDataUnsafe?.user;
 
@@ -66,6 +51,7 @@ function initTelegramUser() {
 
     const usernameElement = document.getElementById('username');
     const avatarElement = document.getElementById('user-avatar');
+    const avatarFallback = document.getElementById('avatar-fallback');
 
     if (usernameElement) {
         usernameElement.textContent =
@@ -74,73 +60,77 @@ function initTelegramUser() {
 
     if (avatarElement && user.photo_url) {
         avatarElement.src = user.photo_url;
+        avatarElement.classList.add('is-visible');
+        if (avatarFallback) avatarFallback.hidden = true;
 
         avatarElement.onerror = () => {
             console.warn('Не удалось загрузить аватарку');
+            avatarElement.classList.remove('is-visible');
+            if (avatarFallback) {
+                avatarFallback.hidden = false;
+                avatarFallback.textContent = user.first_name?.slice(0, 1) || '🐾';
+            }
         };
+    } else if (avatarFallback && user.first_name) {
+        avatarFallback.textContent = user.first_name.slice(0, 1);
     }
+}
+
+
+function resolveChatContext() {
+    const params = new URLSearchParams(window.location.search);
+    let chatId = params.get('chat_id');
+    let launchUserId = params.get('user_id');
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+    const match = startParam.match(/^profile_(-?\d+)_(-?\d+)$/);
+
+    if (match) {
+        chatId ||= match[1];
+        launchUserId ||= match[2];
+    }
+
+    const telegramUserId = tg?.initDataUnsafe?.user?.id;
+    return {
+        chatId,
+        userId: telegramUserId ? String(telegramUserId) : launchUserId
+    };
 }
 
 
 async function fetchUserData() {
     try {
-        const initData = tg?.initData || '';
-
-        const response = await fetch('/api/me', {
-            headers: {
-                'X-Telegram-Init-Data': initData
-            }
-        });
-
-        if (!response.ok) {
-            console.error(
-                'Ошибка API:',
-                response.status,
-                response.statusText
-            );
+        if (!chatContext.chatId || !chatContext.userId) {
+            showProfileFeedback('Открой профиль через кнопку бота в нужном чате.', 'error');
+            renderChatRegistry();
             return;
         }
 
-        const data = await response.json();
+        const headers = {
+            'X-Telegram-Init-Data': tg?.initData || ''
+        };
+        const response = await fetch(
+            `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+            { headers }
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
 
-        userData.currency = data.currency || 0;
+        applyChatProfile(data);
         userData.inventory = data.inventory || [];
         userData.catalog = data.catalog || [];
         userData.equipped = data.equipped || [];
-        userData.registry = data.registry || [];
         userData.leaderboard = data.leaderboard || [];
         userData.foodCatalog = data.food_catalog || [];
-        userData.pet = data.pet || null;
-        userData.user = data.user || null;
-        userData.rp = data.rp || 0;
-        userData.maxRp = data.max_rp || 0;
-
-        const balanceEl =
-            document.getElementById('user-balance');
-
-        if (balanceEl) {
-            balanceEl.textContent = userData.currency;
-        }
-
-        const profileUsername =
-            document.getElementById('profile-username');
-        const profileRp =
-            document.getElementById('profile-rp');
-        const profileMaxRp =
-            document.getElementById('profile-max-rp');
-        const profileCurrency =
-            document.getElementById('profile-currency');
-
-        if (profileUsername) {
-            profileUsername.textContent =
-                userData.user?.username || 'Пользователь';
-        }
-        if (profileRp) profileRp.textContent = userData.rp;
-        if (profileMaxRp) profileMaxRp.textContent = userData.maxRp;
-        if (profileCurrency) profileCurrency.textContent = userData.currency;
+        userData.petCatalog = data.pet_catalog || [];
+        userData.pet = normalizePetData(data.pet || data.profile?.pet);
+        currentPetId = userData.pet?.id || 'barsichela';
+        renderProfile();
 
         updatePetView();
         renderShop();
+        renderInventory();
         renderChatRegistry();
         renderLeaderboard();
 
@@ -149,7 +139,224 @@ async function fetchUserData() {
             'Не удалось загрузить данные профиля:',
             error
         );
+        showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
+        renderChatRegistry();
     }
+}
+
+
+function applyChatProfile(data) {
+    const profile = data.profile || data;
+    userData.chatProfile = profile;
+    userData.chat = data.chat || null;
+    userData.user = data.user || profile.user || null;
+    userData.registry = data.members || data.participants || [];
+    userData.currency = Number(profile.balance_r ?? data.balance_r ?? 0);
+    userData.rp = Number(profile.relationship_rp ?? data.relationship_rp ?? 0);
+    userData.convertibleRp = Number(profile.convertible_rp ?? data.convertible_rp ?? 0);
+}
+
+
+function renderProfile() {
+    const currentUser = userData.user || {};
+    const profile = userData.chatProfile || {};
+    const name = currentUser.display_name || currentUser.first_name || currentUser.username || 'Пользователь';
+    const headerName = document.getElementById('username');
+    const profileName = document.getElementById('profile-username');
+    const chatTitle = document.getElementById('profile-chat-title');
+    const status = document.getElementById('profile-status');
+    const balance = document.getElementById('user-balance');
+
+    if (headerName) headerName.textContent = name;
+    if (profileName) profileName.textContent = name;
+    if (chatTitle) chatTitle.textContent = userData.chat?.title || 'Участники и экономика чата';
+    if (status) {
+        status.textContent = profile.status || 'активен';
+        status.classList.toggle('is-offended', profile.status === 'обижен');
+    }
+    if (balance) balance.textContent = userData.currency;
+
+    const currency = document.getElementById('profile-currency');
+    const relationshipRp = document.getElementById('profile-rp');
+    const convertibleRp = document.getElementById('profile-convertible-rp');
+    if (currency) currency.textContent = userData.currency;
+    if (relationshipRp) relationshipRp.textContent = userData.rp;
+    if (convertibleRp) convertibleRp.textContent = userData.convertibleRp;
+
+    renderProfilePet(userData.pet);
+    updateConvertPreview();
+}
+
+
+function renderProfilePet(pet) {
+    if (!pet) return;
+
+    const petName = document.getElementById('profile-pet-name');
+    const petLevel = document.getElementById('profile-pet-level');
+    const petImage = document.getElementById('profile-pet-image');
+    if (petName) petName.textContent = pet.name || pet.pet_name || 'Питомец';
+    if (petLevel) petLevel.textContent = pet.level ?? 1;
+
+    if (petImage && pet.image) {
+        const image = document.createElement('img');
+        image.src = pet.image;
+        image.alt = '';
+        image.onerror = () => {
+            petImage.textContent = '🐾';
+        };
+        petImage.replaceChildren(image);
+    }
+
+    const stats = [
+        ['health', 'Здоровье'],
+        ['hunger', 'Сытость'],
+        ['happiness', 'Счастье'],
+        ['energy', 'Энергия']
+    ];
+    stats.forEach(([key]) => {
+        const value = Math.max(0, Math.min(100, Number(pet[key] ?? 100)));
+        const valueEl = document.getElementById(`profile-pet-${key}-value`);
+        const bar = document.getElementById(`profile-pet-${key}-bar`);
+        if (valueEl) valueEl.textContent = `${value} / 100`;
+        if (bar) {
+            bar.style.width = `${value}%`;
+            bar.parentElement.setAttribute('aria-valuenow', String(value));
+        }
+    });
+}
+
+
+function showProfileFeedback(message, kind = '') {
+    const feedback = document.getElementById('profile-feedback');
+    if (!feedback) return;
+    feedback.textContent = message;
+    feedback.classList.toggle('is-error', kind === 'error');
+    feedback.classList.toggle('is-success', kind === 'success');
+}
+
+
+function updateConvertPreview() {
+    const input = document.getElementById('convert-rp-amount');
+    const preview = document.getElementById('convert-preview');
+    const button = document.getElementById('convert-rp-button');
+    if (!input || !preview || !button) return;
+
+    const amount = Number(input.value);
+    const valid = Number.isInteger(amount) && amount >= 100 && amount % 100 === 0 && amount <= userData.convertibleRp;
+    preview.textContent = Number.isInteger(amount) && amount > 0
+        ? `Будет начислено ${Math.floor(amount / 100) * 10} R$`
+        : 'Укажи сумму от 100 RP';
+    button.disabled = !valid;
+}
+
+
+async function postChatAction(path, payload) {
+    const response = await fetch(path, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': tg?.initData || ''
+        },
+        body: JSON.stringify({ ...payload, chat_id: chatContext.chatId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+}
+
+
+async function convertRp() {
+    const amount = Number(document.getElementById('convert-rp-amount')?.value);
+    if (!Number.isInteger(amount) || amount < 100 || amount % 100 !== 0 || amount > userData.convertibleRp) {
+        showProfileFeedback('Проверь сумму RP для обмена.', 'error');
+        return;
+    }
+
+    const button = document.getElementById('convert-rp-button');
+    if (button) button.disabled = true;
+    try {
+        await postChatAction('/api/chat/convert', { rp_amount: amount });
+        await fetchUserData();
+        showProfileFeedback(`Обмен завершён: ${amount} RP → ${amount / 10} R$.`, 'success');
+        tg?.HapticFeedback?.notificationOccurred('success');
+    } catch (error) {
+        showProfileFeedback(error.message || 'Не удалось выполнить обмен.', 'error');
+    } finally {
+        updateConvertPreview();
+    }
+}
+
+
+function openGiftModal(member) {
+    if (!member || member.user_id == null) return;
+    userData.selectedRecipient = member;
+
+    const title = document.getElementById('gift-recipient-name');
+    const note = document.getElementById('gift-balance-note');
+    const amount = document.getElementById('gift-amount');
+    const feedback = document.getElementById('gift-feedback');
+    const modal = document.getElementById('giftModal');
+    if (!title || !note || !amount || !modal) return;
+
+    title.textContent = member.display_name || member.username || 'Участник';
+    note.textContent = `Доступно: ${userData.currency} R$`;
+    amount.max = String(userData.currency);
+    amount.value = '';
+    if (feedback) feedback.textContent = '';
+    modal.style.display = 'flex';
+    amount.focus();
+}
+
+
+function closeGiftModal() {
+    const modal = document.getElementById('giftModal');
+    if (modal) modal.style.display = 'none';
+    userData.selectedRecipient = null;
+}
+
+
+async function sendGift() {
+    const recipient = userData.selectedRecipient;
+    const amount = Number(document.getElementById('gift-amount')?.value);
+    const feedback = document.getElementById('gift-feedback');
+    const button = document.getElementById('gift-submit');
+    if (!recipient || !Number.isInteger(amount) || amount <= 0 || amount > userData.currency) {
+        if (feedback) feedback.textContent = 'Укажи целую сумму в пределах баланса.';
+        return;
+    }
+
+    if (button) button.disabled = true;
+    try {
+        await postChatAction('/api/chat/gift', {
+            recipient_user_id: recipient.user_id,
+            amount
+        });
+        closeGiftModal();
+        await fetchUserData();
+        showProfileFeedback(`Подарок отправлен: ${amount} R$.`, 'success');
+        tg?.HapticFeedback?.notificationOccurred('success');
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Не удалось отправить подарок.';
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+
+function normalizePetData(pet) {
+    if (!pet) return null;
+
+    const id = pet.id || pet.pet_id || 'barsichela';
+    const definition = userData.petCatalog.find(item => item.id === id) || {};
+    return {
+        ...definition,
+        ...pet,
+        id,
+        name: pet.name || pet.pet_name || definition.name || 'Питомец',
+        image: pet.image || definition.image || '/Barsichela.png',
+        level: pet.level ?? 1,
+        max_level: pet.max_level || 10
+    };
 }
 
 
@@ -201,45 +408,40 @@ function switchTab(tabName) {
 
 
 function renderChatRegistry() {
-    const containers = [document.getElementById('profileUsersList')].filter(Boolean);
+    const container = document.getElementById('profileUsersList');
+    const count = document.getElementById('members-count');
+    if (!container) return;
 
-    if (containers.length === 0) return;
+    const members = (userData.registry || []).filter(member =>
+        String(member.user_id ?? member.id) !== String(chatContext.userId)
+    );
+    if (count) count.textContent = members.length;
 
-    containers.forEach(container => {
-        container.innerHTML = '';
+    if (members.length === 0) {
+        container.innerHTML = '<p class="list-state">Другие участники пока не активировали бота в этом чате.</p>';
+        return;
+    }
 
-        if (!userData.registry || userData.registry.length === 0) {
-            container.innerHTML = `
-            <p
-                style="
-                    text-align: center;
-                    color: var(--text-secondary);
-                    padding: 20px;
-                    font-size: 13px;
-                "
-            >
-                Пока никто не запустил бота через /start
-            </p>
+    container.replaceChildren();
+    members.forEach(member => {
+        const userId = member.user_id ?? member.id;
+        const name = member.display_name || member.username || `Игрок ${userId}`;
+        const balance = Number(member.balance_r ?? member.currency ?? 0);
+        const rp = Number(member.relationship_rp ?? member.rp ?? 0);
+        const button = document.createElement('button');
+        button.className = 'profile-member-row';
+        button.type = 'button';
+        button.disabled = userId == null;
+        button.innerHTML = `
+            <span class="member-avatar" aria-hidden="true">${escapeHtml(name.slice(0, 1).toUpperCase())}</span>
+            <span class="member-details">
+                <strong>${escapeHtml(name)}</strong>
+                <small>${rp} RP <span aria-hidden="true">·</span> ${balance} R$</small>
+            </span>
+            <span class="member-gift-icon" aria-hidden="true">＋</span>
         `;
-
-            return;
-        }
-
-        userData.registry.forEach(member => {
-            const card = document.createElement('div');
-            card.className = 'glass-card registry-user-card';
-            card.innerHTML = `
-                <div>
-                    <h4>@${escapeHtml(member.username)}</h4>
-                    <p>${escapeHtml(member.role_name)} · RP: ${member.rp}</p>
-                    <p>Счёт: ${member.currency} R$</p>
-                </div>
-                <span class="registry-user-arrow">→</span>
-            `;
-
-            card.onclick = () => showUserProfileModal(member);
-            container.appendChild(card);
-        });
+        button.addEventListener('click', () => openGiftModal(member));
+        container.appendChild(button);
     });
 }
 
@@ -290,56 +492,6 @@ function escapeHtml(value) {
 }
 
 
-function showUserProfileModal(member) {
-    const modal =
-        document.getElementById('userProfileModal');
-
-    const title =
-        document.getElementById('modalUsername');
-
-    const details =
-        document.getElementById('modalUserDetails');
-
-    if (!modal || !title || !details) return;
-
-    title.textContent = `@${member.username}`;
-
-    details.innerHTML = `
-        <p>
-            <strong>Статус:</strong>
-            ${escapeHtml(member.role_name)}
-        </p>
-
-        <p>
-            <strong>Репутация (RP):</strong>
-            ${member.rp}
-        </p>
-
-        <p>
-            <strong>Валюта:</strong>
-            ${member.currency} R$
-        </p>
-
-        <p>
-            <strong>Надето вещей:</strong>
-            ${member.equipped_count || 0}
-        </p>
-    `;
-
-    modal.style.display = 'flex';
-}
-
-
-function closeUserProfileModal() {
-    const modal =
-        document.getElementById('userProfileModal');
-
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-
 function openPetSelector() {
     const modal =
         document.getElementById('petSelectorModal');
@@ -370,7 +522,7 @@ function renderPetChoices() {
 
     grid.innerHTML = '';
 
-    AVAILABLE_PETS.forEach(pet => {
+    userData.petCatalog.forEach(pet => {
         const card =
             document.createElement('div');
 
@@ -383,7 +535,7 @@ function renderPetChoices() {
 
         card.innerHTML = `
             <img
-                src="${pet.img}"
+                src="${escapeHtml(pet.image)}"
                 alt="${escapeHtml(pet.name)}"
                 class="pet-choice-img"
             >
@@ -393,16 +545,32 @@ function renderPetChoices() {
             </div>
         `;
 
-        card.onclick = () => {
-            currentPetId = pet.id;
+        card.onclick = async () => {
+            try {
+                const response = await fetch('/api/me', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tg?.initData || ''
+                    },
+                    body: JSON.stringify({ pet_id: pet.id })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Pet selection failed');
+                }
 
-            updatePetView();
-            closePetSelector();
+                userData.pet = normalizePetData(data.pet);
+                currentPetId = userData.pet.id;
+                updatePetView();
+                closePetSelector();
 
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.notificationOccurred(
-                    'success'
-                );
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (error) {
+                console.error('Не удалось сохранить питомца:', error);
+                tg?.showAlert?.('Не удалось выбрать питомца. Попробуй ещё раз.');
             }
         };
 
@@ -428,22 +596,35 @@ function updatePetView() {
         );
 
     const activePet =
-        AVAILABLE_PETS.find(
+        userData.petCatalog.find(
             pet => pet.id === currentPetId
-        ) || AVAILABLE_PETS[0];
+        ) || userData.petCatalog[0] || userData.pet || {
+            name: 'Питомец',
+            image: '/Barsichela.png'
+        };
+    const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
     const level = Math.max(1, Number(userData.pet?.level || 1));
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
+    const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
+    const energy = Math.max(0, Math.min(100, Number(userData.pet?.energy ?? 100)));
+
+    const petName = document.getElementById('pet-name');
+    if (petName) petName.textContent = userData.pet?.name || activePet.name;
 
     const statValues = {
-        'pet-level-value': `${level} / 10`,
+        'pet-level-value': `${level} / ${maxLevel}`,
         'pet-health-value': `${health} / 100`,
-        'pet-hunger-value': `${hunger} / 100`
+        'pet-hunger-value': `${hunger} / 100`,
+        'pet-happiness-value': `${happiness} / 100`,
+        'pet-energy-value': `${energy} / 100`
     };
     const statProgress = {
-        'pet-level-bar': { value: level, max: 10, width: Math.min(level * 10, 100) },
+        'pet-level-bar': { value: level, max: maxLevel, width: Math.min(level / maxLevel * 100, 100) },
         'pet-health-bar': { value: health, max: 100, width: health },
-        'pet-hunger-bar': { value: hunger, max: 100, width: hunger }
+        'pet-hunger-bar': { value: hunger, max: 100, width: hunger },
+        'pet-happiness-bar': { value: happiness, max: 100, width: happiness },
+        'pet-energy-bar': { value: energy, max: 100, width: energy }
     };
 
     Object.entries(statValues).forEach(([id, value]) => {
@@ -463,8 +644,9 @@ function updatePetView() {
 
     const petHtml = `
         <img
-            src="${activePet.img}"
-            alt="${escapeHtml(activePet.name)}"
+            src="${escapeHtml(userData.pet?.image || activePet.image)}"
+            alt="${escapeHtml(userData.pet?.name || activePet.name)}"
+            class="active-pet-image"
             style="
                 width: 100px;
                 height: 100px;
@@ -504,6 +686,10 @@ function updatePetView() {
                 .map(item => item.name)
                 .join(' + ');
     }
+
+    petDisplay.querySelectorAll('img').forEach(image => {
+        image.onerror = () => image.replaceWith(document.createTextNode('🐾'));
+    });
 }
 
 
@@ -567,11 +753,13 @@ function renderShop() {
 
                 userData.currency = data.currency;
                 userData.foodCatalog = data.food_catalog;
-                userData.pet = data.pet;
-                document.getElementById('user-balance').textContent = userData.currency;
+                userData.pet = normalizePetData(data.pet);
+                const balance = document.getElementById('user-balance');
+                if (balance) balance.textContent = userData.currency;
                 const profileCurrency = document.getElementById('profile-currency');
                 if (profileCurrency) profileCurrency.textContent = userData.currency;
                 renderShop();
+                renderInventory();
                 updatePetView();
             } catch (error) {
                 console.error('Ошибка при покупке еды:', error);
@@ -580,6 +768,41 @@ function renderShop() {
 
         grid.appendChild(card);
     });
+}
+
+
+function renderInventory() {
+    const grid = document.getElementById('inventoryGrid');
+    if (!grid) return;
+
+    const ownedFood = userData.foodCatalog
+        .filter(food => food.count > 0)
+        .map(food => ({
+            icon: food.name.split(' ')[0],
+            name: food.name.replace(/^\S+\s*/, ''),
+            status: `×${food.count}`,
+            equipped: false
+        }));
+    const ownedItems = userData.inventory.map(item => ({
+        icon: item.name.split(' ')[0],
+        name: item.name.replace(/^\S+\s*/, ''),
+        status: item.equipped ? 'Надето' : 'В коллекции',
+        equipped: item.equipped
+    }));
+    const inventoryItems = [...ownedItems, ...ownedFood];
+
+    if (inventoryItems.length === 0) {
+        grid.innerHTML = '<p class="inventory-empty">Пока нет предметов</p>';
+        return;
+    }
+
+    grid.innerHTML = inventoryItems.map(item => `
+        <article class="inventory-item">
+            <span class="inventory-item-icon">${escapeHtml(item.icon)}</span>
+            <span class="inventory-item-name">${escapeHtml(item.name)}</span>
+            <strong class="inventory-item-count ${item.equipped ? 'is-equipped' : ''}">${escapeHtml(item.status)}</strong>
+        </article>
+    `).join('');
 }
 
 
@@ -1181,13 +1404,14 @@ async function feedPet(foodId) {
             return;
         }
 
-        userData.pet = data.pet;
+        userData.pet = normalizePetData(data.pet);
         userData.foodCatalog = userData.foodCatalog.map(food => ({
             ...food,
             count: data.pet.inventory?.[food.id] || 0
         }));
         renderFeedItems();
         renderShop();
+        renderInventory();
         updatePetView();
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
@@ -1204,6 +1428,9 @@ document.addEventListener(
 
         initTelegramUser();
 
+        document.getElementById('convert-rp-amount')
+            ?.addEventListener('input', updateConvertPreview);
+        updateConvertPreview();
         fetchUserData();
         checkDuelParams();
     }

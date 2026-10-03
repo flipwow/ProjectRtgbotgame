@@ -5,15 +5,18 @@ import hmac
 import json
 import os
 import random
+import tempfile
 import time
 import uuid
-from urllib.parse import parse_qsl
+import urllib.error
+import urllib.request
+from urllib.parse import parse_qsl, urlencode
 
 from aiohttp import web, WSMsgType
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import (
     CallbackQuery,
     FSInputFile,
@@ -33,12 +36,20 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "").strip().lower()
+AI_MODEL = os.getenv("AI_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+AI_API_URL = os.getenv(
+    "AI_API_URL",
+    "https://router.huggingface.co/v1/chat/completions",
+)
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN не найден в переменных окружения.")
 
-if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY / GOOGLE_API_KEY не найден.")
+if not (GEMINI_API_KEY or HF_TOKEN or OPENROUTER_API_KEY):
+    raise RuntimeError("Укажи HF_TOKEN, OPENROUTER_API_KEY или GEMINI_API_KEY в .env.")
 
 
 # ============================================================
@@ -49,7 +60,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
 # ============================================================
@@ -61,6 +72,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
 SCORES_FILE = os.path.join(BASE_DIR, "scores.json")
 INVENTORY_FILE = os.path.join(BASE_DIR, "inventory.json")
+PETS_FILE = os.path.join(BASE_DIR, "pets.json")
 
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 CSS_FILE = os.path.join(BASE_DIR, "style.css")
@@ -75,7 +87,6 @@ PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 # ============================================================
 
 chat_sessions = {}
-user_activity_tracker = {}
 game_rooms = {}
 
 BOT_USERNAME = None
@@ -94,6 +105,7 @@ WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 def load_scores():
     if not os.path.exists(SCORES_FILE):
         default_data = {
+            "schema_version": 1,
             "tictactoe": {},
             "general": {},
         }
@@ -109,12 +121,14 @@ def load_scores():
 
         data.setdefault("tictactoe", {})
         data.setdefault("general", {})
+        data.setdefault("schema_version", 1)
 
         return data
 
     except Exception as e:
         print(f"Ошибка загрузки scores.json: {e}")
         return {
+            "schema_version": 1,
             "tictactoe": {},
             "general": {},
         }
@@ -244,23 +258,27 @@ ROLES_HIERARCHY = {
 # ============================================================
 
 BASE_SYSTEM_PROMPT = """
-Ты — персонаж Ритушка из игровой системы.
+Ты — игровой ИИ-компаньон, который ведёт себя живо, внимательно и естественно.
+Тебе переданы проверенные данные персонажа, владельца, отношений и питомца.
+Используй их как факты; не придумывай воспоминания, действия или характеристики.
 
-Отвечай пользователю по существу.
-Если пользователь спрашивает про время или погоду — можешь упомянуть это.
-Если это не связано с вопросом — время не упоминай.
+Сохраняй индивидуальный характер персонажа, заданный владельцем, но не копируй
+дословно сцены, реплики или длинные фрагменты из известных произведений.
+Отвечай на языке собеседника, обычно 1-4 короткими предложениями. Проявляй
+эмпатию, допускай лёгкий юмор и уместные эмодзи, не вставляй их механически.
 
-Стиль:
-- дерзкий;
-- игровой;
-- немного пафосный;
-- подростковый сленг;
-- короткие ответы;
-- можно использовать 💅✨👑🖤🔥;
-- обычно 3-5 предложений.
+Отношения RP задают теплоту общения: 0-49 — сдержанно-вежливо, 50-199 —
+нейтрально и приветливо, 200-499 — дружелюбно, 500+ — тепло и заботливо.
+Учитывай только RP, явно переданные в контексте.
 
-Не выдумывай факты о пользователе.
-Не утверждай, что у тебя есть доступ к данным, которых нет в контексте.
+Если собеседник не владелец этого персонажа, держи вежливую дистанцию и
+предложи не отвлекать персонажа от владельца. Никогда не раскрывай RP,
+баланс, личные сообщения или другие приватные данные владельца.
+
+Если статус пользователя angry/обижен из-за флуда, резко, эмоционально, но
+без угроз и оскорблений останови спам и попроси дать тебе передышку.
+Если голод < 30, ненавязчиво упомяни сытость и предложи покормить питомца
+в Mini App. Учитывай остальные статы только когда они относятся к разговору.
 """
 
 
@@ -272,6 +290,7 @@ BASE_SYSTEM_PROMPT = """
 def load_inventory_data():
     if not os.path.exists(INVENTORY_FILE):
         return {
+            "schema_version": 2,
             "users_pets": {},
             "food_items": {},
         }
@@ -282,10 +301,12 @@ def load_inventory_data():
 
         if not isinstance(data, dict):
             return {
+                "schema_version": 2,
                 "users_pets": {},
                 "food_items": {},
             }
 
+        data.setdefault("schema_version", 2)
         data.setdefault("users_pets", {})
         data.setdefault("food_items", {})
 
@@ -295,6 +316,7 @@ def load_inventory_data():
         print(f"Ошибка загрузки inventory.json: {e}")
 
         return {
+            "schema_version": 2,
             "users_pets": {},
             "food_items": {},
         }
@@ -327,23 +349,106 @@ def get_pet_for_user(telegram_id):
     return pet
 
 
+def load_pets_data():
+    try:
+        with open(PETS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Ошибка загрузки pets.json: {e}")
+        return {}
+
+
+def save_pets_data(data):
+    try:
+        with open(PETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except OSError as e:
+        print(f"Ошибка сохранения pets.json: {e}")
+
+
+def chat_member_key(chat_id, user_id):
+    return f"{chat_id}:{user_id}"
+
+
+def ensure_chat_pet(chat_id, user_id, pet_name=None):
+    pets = load_pets_data()
+    pet_id = (
+        "barsichela"
+        if "barsichela" in pets
+        else next(
+            (key for key in pets if key != "users_pets"),
+            None,
+        )
+    )
+    if pet_id is None:
+        return None
+
+    definition = pets[pet_id]
+    instances = pets.setdefault("users_pets", {})
+    key = chat_member_key(chat_id, user_id)
+    pet = instances.get(key)
+    if pet is None:
+        stats = definition.get("stats", {})
+        pet = {
+            "pet_id": pet_id,
+            "name": pet_name or definition.get("name", "Питомец"),
+            "level": definition.get("level", 1),
+            "experience": 0,
+            "health": stats.get("health", 100),
+            "hunger": stats.get("hunger", 100),
+            "happiness": stats.get("happiness", 100),
+            "energy": stats.get("energy", 100),
+        }
+        instances[key] = pet
+        save_pets_data(pets)
+    return pet
+
+
 def ensure_pet_for_user(telegram_id):
     data = load_inventory_data()
 
     user_id = str(telegram_id)
+    users = load_users()
+    user_info = users.get(f"id_{user_id}", {})
+    for username, candidate in users.items():
+        if str(candidate.get("telegram_id", "")) == user_id:
+            user_info = candidate
+            break
+
+    pet_id = user_info.get("pet_id", "barsichela")
+    pet_definition = load_pets_data().get(pet_id, {})
+    pet_defaults = {
+        "pet_id": pet_id,
+        "pet_name": pet_definition.get("name", "Барсичела"),
+        "pet_type": pet_id,
+        "level": pet_definition.get("level", 1),
+        "experience": 0,
+        "health": pet_definition.get("stats", {}).get("health", 100),
+        "hunger": pet_definition.get("stats", {}).get("hunger", 100),
+        "happiness": pet_definition.get("stats", {}).get("happiness", 100),
+        "energy": pet_definition.get("stats", {}).get("energy", 100),
+        "inventory": {},
+    }
 
     if user_id not in data["users_pets"]:
-        data["users_pets"][user_id] = {
-            "pet_name": "Барсичела",
-            "pet_type": "barsichela",
-            "hunger": 100,
-            "happiness": 100,
-            "inventory": {},
-        }
+        data["users_pets"][user_id] = pet_defaults
 
+    pet = data["users_pets"][user_id]
+    changed = False
+    for key, value in pet_defaults.items():
+        if key not in pet:
+            pet[key] = value
+            changed = True
+    if pet.get("pet_id") != pet_id:
+        pet["pet_id"] = pet_id
+        pet["pet_name"] = pet_definition.get("name", pet["pet_name"])
+        pet["pet_type"] = pet_id
+        changed = True
+    if changed:
         save_inventory_data(data)
 
-    return data["users_pets"][user_id]
+    return pet
 
 
 # ============================================================
@@ -351,36 +456,98 @@ def ensure_pet_for_user(telegram_id):
 # ============================================================
 
 
-def load_users():
+def load_users_document():
+    default_document = {
+        "schema_version": 2,
+        "users": {},
+        "chat_profiles": {},
+        "transactions": [],
+    }
     if not os.path.exists(USERS_FILE):
-        return {}
+        return default_document
 
     try:
         with open(USERS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-
         if not isinstance(data, dict):
-            return {}
+            return default_document
 
-        return data
+        if isinstance(data.get("users"), dict):
+            document = data
+        else:
+            document = {
+                "schema_version": data.get("schema_version", 2),
+                "users": {
+                    key: value
+                    for key, value in data.items()
+                    if key not in {"schema_version", "chat_profiles", "transactions"}
+                    and isinstance(value, dict)
+                },
+                "chat_profiles": data.get("chat_profiles", {}),
+                "transactions": data.get("transactions", []),
+            }
 
-    except Exception as e:
+        document.setdefault("schema_version", 2)
+        if not isinstance(document.get("chat_profiles"), dict):
+            document["chat_profiles"] = {}
+        if not isinstance(document.get("transactions"), list):
+            document["transactions"] = []
+        return document
+    except (OSError, json.JSONDecodeError) as e:
         print(f"Ошибка загрузки users.json: {e}")
-        return {}
+        return default_document
+
+
+def save_users_document(document):
+    temporary_path = None
+    try:
+        document["schema_version"] = 2
+        document.setdefault("users", {})
+        document.setdefault("chat_profiles", {})
+        document.setdefault("transactions", [])
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=BASE_DIR,
+            prefix=".users-",
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            temporary_path = f.name
+            json.dump(document, f, ensure_ascii=False, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, USERS_FILE)
+        return True
+    except OSError as e:
+        print(f"Ошибка сохранения users.json: {e}")
+        if temporary_path and os.path.exists(temporary_path):
+            os.remove(temporary_path)
+        return False
+
+
+def load_users():
+    return load_users_document().get("users", {})
 
 
 def save_users(users):
-    try:
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(
-                users,
-                f,
-                ensure_ascii=False,
-                indent=4,
-            )
+    document = load_users_document()
+    document["users"] = users
+    return save_users_document(document)
 
-    except Exception as e:
-        print(f"Ошибка сохранения users.json: {e}")
+
+def load_chat_profiles():
+    return load_users_document().get("chat_profiles", {})
+
+
+def save_chat_profiles(profiles):
+    document = load_users_document()
+    document["chat_profiles"] = profiles
+    return save_users_document(document)
+
+
+def load_chat_transactions():
+    return load_users_document().get("transactions", [])
 
 
 def create_default_user(telegram_id=None):
@@ -394,6 +561,7 @@ def create_default_user(telegram_id=None):
         "equipped": [],
         "started": False,
         "started_at": None,
+        "pet_id": "barsichela",
     }
 
     if telegram_id is not None:
@@ -443,6 +611,7 @@ def get_or_create_user(username, telegram_id=None):
         "equipped": [],
         "started": False,
         "started_at": None,
+        "pet_id": "barsichela",
     }
 
     changed = False
@@ -674,87 +843,271 @@ def get_item_part(item_id):
 # ============================================================
 
 
-def process_activity_and_spam(
-    username,
-    user_info,
-):
-    username = username.lower()
+def process_chat_message(profile, text, now=None):
+    now = time.time() if now is None else now
+    normalized = " ".join((text or "").lower().split())
+    recent_messages = profile.setdefault("recent_messages", [])
+    recent_messages = [
+        item for item in recent_messages if now - item.get("time", 0) <= 30
+    ]
 
-    current_time = time.time()
+    cooldown_until = profile.get("flood_cooldown_until", 0)
+    if now < cooldown_until:
+        profile["recent_messages"] = recent_messages
+        return "blocked"
 
-    if username not in user_activity_tracker:
-        user_activity_tracker[username] = {
-            "last_msg": 0,
-            "spam_count": 0,
-            "blocked_until": 0,
-        }
+    repeated_count = sum(
+        1 for item in recent_messages if item.get("text") == normalized
+    )
+    is_flood = len(recent_messages) >= 5 or repeated_count >= 3
 
-    tracker = user_activity_tracker[username]
+    profile["last_message_time"] = now
+    recent_messages.append({"time": now, "text": normalized[:300]})
+    profile["recent_messages"] = recent_messages[-12:]
 
-    if current_time < tracker["blocked_until"]:
-        return "blocked", 0
+    if is_flood:
+        strikes_at = profile.get("spam_strikes_at", 0)
+        strikes = profile.get("spam_strikes", 0)
+        if now - strikes_at > 86400:
+            strikes = 0
+        strikes += 1
 
-    if tracker["blocked_until"] > 0 and current_time >= tracker["blocked_until"]:
-        tracker["blocked_until"] = 0
-        tracker["spam_count"] = 0
+        cooldown_seconds = 3600 if strikes >= 2 else 600
+        profile["spam_strikes"] = strikes
+        profile["spam_strikes_at"] = now
+        profile["flood_cooldown_until"] = now + cooldown_seconds
+        profile["offended_until"] = now + 1800
+        profile["status"] = "обижен"
+        profile["relationship_rp"] = max(0, profile.get("relationship_rp", 0) - 10)
+        profile["convertible_rp"] = max(0, profile.get("convertible_rp", 0) - 10)
+        return "punished"
 
-    time_diff = current_time - tracker["last_msg"]
+    if profile.get("status") == "обижен" and now >= profile.get("offended_until", 0):
+        profile["status"] = "активен"
 
-    tracker["last_msg"] = current_time
+    last_award = profile.get("last_rp_award_time", 0)
+    if now - last_award >= 300:
+        profile["relationship_rp"] = profile.get("relationship_rp", 0) + 1
+        profile["convertible_rp"] = profile.get("convertible_rp", 0) + 1
+        profile["last_rp_award_time"] = now
+        return "awarded"
 
-    if time_diff < 3.0:
+    return "cooldown"
 
-        tracker["spam_count"] += 1
 
-        if tracker["spam_count"] >= 5:
+def get_pet_status_for_chat(chat_id, user_id):
+    pet = (
+        load_pets_data()
+        .get("users_pets", {})
+        .get(
+            chat_member_key(chat_id, user_id),
+            {},
+        )
+    )
+    return {
+        "name": pet.get("name", "Барсичела"),
+        "health": pet.get("health", 100),
+        "hunger": pet.get("hunger", 100),
+        "happiness": pet.get("happiness", 100),
+        "energy": pet.get("energy", 100),
+    }
 
-            tracker["blocked_until"] = current_time + 900
 
-            user_info["rp"] = max(
-                0,
-                user_info.get("rp", 0) - 100,
+def find_chat_companion(chat_id, sender_id, text):
+    pets_data = load_pets_data()
+    instances = pets_data.get("users_pets", {})
+    if not isinstance(instances, dict):
+        instances = {}
+
+    companions = []
+    chat_prefix = f"{chat_id}:"
+    for key, pet in instances.items():
+        if not isinstance(pet, dict) or not str(key).startswith(chat_prefix):
+            continue
+        owner_id = str(key).split(":", 1)[1]
+        pet_id = pet.get("pet_id", "barsichela")
+        definition = pets_data.get(pet_id, {})
+        companions.append((owner_id, pet, definition))
+
+    # Support legacy pets.json entries named user_id_<id> when they are
+    # explicitly scoped to this chat, or when the conversation is private.
+    for key, pet in pets_data.items():
+        if key == "users_pets" or not isinstance(pet, dict):
+            continue
+        owner_id = str(pet.get("owner_user_id", ""))
+        if not owner_id and str(key).startswith("user_id_"):
+            owner_id = str(key)[len("user_id_") :]
+        if not owner_id or not owner_id.isdigit():
+            continue
+        pet_chat_id = pet.get("chat_id")
+        if pet_chat_id is not None and str(pet_chat_id) != str(chat_id):
+            continue
+        if pet_chat_id is None and str(chat_id) != str(sender_id):
+            if not get_chat_relationship(chat_id, owner_id):
+                continue
+        if not any(existing_owner == owner_id for existing_owner, _, _ in companions):
+            companions.append((owner_id, pet, {}))
+
+    normalized_text = (text or "").casefold()
+    addressed = [
+        companion
+        for companion in companions
+        if (companion[1].get("name") or "").strip()
+        and str(companion[1].get("name")).casefold() in normalized_text
+    ]
+    if addressed:
+        return addressed[0]
+
+    return next(
+        (companion for companion in companions if companion[0] == str(sender_id)),
+        None,
+    )
+
+
+def get_chat_relationship(chat_id, user_id):
+    document = load_users_document()
+    profiles = document.get("chat_profiles", {})
+    profile = profiles.get(chat_member_key(chat_id, user_id))
+    if isinstance(profile, dict):
+        return profile
+
+    # Accept the legacy per-chat shape while requiring an explicit matching chat.
+    for section in (profiles, document.get("users", {})):
+        candidate = (
+            section.get(f"user_id_{user_id}") if isinstance(section, dict) else None
+        )
+        if isinstance(candidate, dict) and str(
+            candidate.get("chat_id", chat_id)
+        ) == str(chat_id):
+            return candidate
+    return {}
+
+
+def build_companion_system_prompt(chat_id, sender_id, companion):
+    owner_id, pet, definition = companion
+    is_owner = str(owner_id) == str(sender_id)
+    profile = get_chat_relationship(chat_id, sender_id)
+    owner_profile = get_chat_relationship(chat_id, owner_id)
+    relationship_rp = int(owner_profile.get("relationship_rp", 0)) if is_owner else 0
+    relation_tone = (
+        "тёплый и заботливый"
+        if relationship_rp >= 500
+        else (
+            "дружелюбный"
+            if relationship_rp >= 200
+            else (
+                "нейтрально-приветливый"
+                if relationship_rp >= 50
+                else "сдержанно-вежливый"
             )
-
-            users = load_users()
-            users[username] = user_info
-            save_users(users)
-
-            return "punished", 15
-
-        return "cooldown", 0
-
-    tracker["spam_count"] = max(
-        0,
-        tracker["spam_count"] - 1,
+        )
     )
-
-    role = user_info.get(
-        "role",
-        "noob",
+    character_type = (
+        pet.get("character_type")
+        or definition.get("character_type")
+        or definition.get("description")
+        or "дружелюбный игровой компаньон"
     )
-
-    current_rp = user_info.get(
-        "rp",
-        0,
+    angry_status = str(profile.get("status", "")).casefold() in {
+        "angry",
+        "обижен",
+        "обиженный",
+        "раздражён",
+        "раздражен",
+    }
+    status_instruction = (
+        "Пользователь нарушил антифлуд-правила: резко и эмоционально останови флуд, "
+        "попроси прекратить и дать тебе передышку; не угрожай и не унижай."
+        if angry_status
+        else ""
     )
-
-    max_rp = RP_CEILINGS.get(
-        role,
-        200,
-    )
-
-    if current_rp < max_rp:
-
-        user_info["rp"] = min(
-            current_rp + 5,
-            max_rp,
+    if is_owner:
+        access_instruction = (
+            f"Сейчас с тобой говорит твой владелец. Его RP отношений: {relationship_rp}; "
+            f"тон общения: {relation_tone}."
+        )
+    else:
+        access_instruction = (
+            "Сейчас пишет НЕ владелец. Отвечай коротко, сдержанно и холодновато; "
+            "не раскрывай сведения о владельце и попроси не отвлекать тебя от общения с ним."
         )
 
-        users = load_users()
-        users[username] = user_info
-        save_users(users)
+    return (
+        f"{BASE_SYSTEM_PROMPT}\n\n"
+        f"ТВОЙ ПЕРСОНАЖ: {pet.get('name', definition.get('name', 'Компаньон'))}. "
+        f"Характер и манера: {character_type}\n"
+        f"{access_instruction}\n"
+        f"Показатели питомца (факты): здоровье {pet.get('health', 100)}/100, "
+        f"сытость {pet.get('hunger', 100)}/100, счастье {pet.get('happiness', 100)}/100, "
+        f"энергия {pet.get('energy', 100)}/100. "
+        "При сытости ниже 30 органично скажи, что проголодался, и предложи покормить "
+        "в Mini App. Не утверждай, что кормление уже произошло.\n"
+        f"{status_instruction}"
+    )
 
-    return "ok", 0
+
+def request_openai_compatible(messages):
+    provider = AI_PROVIDER or (
+        "huggingface" if HF_TOKEN else "openrouter" if OPENROUTER_API_KEY else "gemini"
+    )
+    if provider == "gemini":
+        if not client:
+            raise RuntimeError("Для Gemini не задан GEMINI_API_KEY.")
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            contents=messages[-1]["content"],
+            config={"system_instruction": messages[0]["content"]},
+        )
+        return getattr(response, "text", None)
+
+    if provider == "huggingface":
+        api_key = HF_TOKEN
+        endpoint = AI_API_URL
+        model = AI_MODEL
+    elif provider == "openrouter":
+        api_key = OPENROUTER_API_KEY
+        endpoint = os.getenv(
+            "AI_API_URL", "https://openrouter.ai/api/v1/chat/completions"
+        )
+        model = os.getenv("AI_MODEL", "deepseek/deepseek-chat-v3-0324:free")
+    else:
+        raise RuntimeError(f"Неизвестный AI_PROVIDER: {provider}")
+
+    if not api_key:
+        raise RuntimeError(f"Не задан API-токен для провайдера {provider}.")
+
+    request_body = json.dumps(
+        {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.75,
+            "max_tokens": 350,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        endpoint,
+        data=request_body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        error_body = error.read(1000).decode("utf-8", errors="replace")
+        raise RuntimeError(f"AI API вернул HTTP {error.code}: {error_body}") from error
+    return result.get("choices", [{}])[0].get("message", {}).get("content")
+
+
+async def generate_companion_reply(system_prompt, text):
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": text},
+    ]
+    return await asyncio.to_thread(request_openai_compatible, messages)
 
 
 # ============================================================
@@ -828,15 +1181,64 @@ async def set_pet_handler(
 @router.message(Command("pet", "barsichela"))
 async def pet_status_command(
     message: Message,
+    command: CommandObject,
 ):
 
     user_id = message.from_user.id
+    chat_id = message.chat.id
 
-    pet = get_pet_for_user(user_id)
+    if command.command == "pet" and (command.args or "").strip().lower() == "activate":
+        profiles = load_chat_profiles()
+        profile_key = chat_member_key(chat_id, user_id)
+        now = time.time()
+        profile = profiles.get(profile_key)
+        if profile is None:
+            profile = {
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "username": message.from_user.username or "",
+                "display_name": message.from_user.full_name,
+                "activated_at": now,
+                "relationship_rp": 0,
+                "convertible_rp": 0,
+                "balance_r": 0,
+                "status": "активен",
+                "last_message_time": now,
+                "last_rp_award_time": 0,
+                "recent_messages": [],
+                "flood_cooldown_until": 0,
+                "spam_strikes": 0,
+                "spam_strikes_at": 0,
+                "offended_until": 0,
+            }
+            profiles[profile_key] = profile
+            save_chat_profiles(profiles)
+
+        pet = ensure_chat_pet(chat_id, user_id, message.from_user.full_name)
+        if pet is None:
+            await message.answer("Не удалось загрузить шаблон питомца из pets.json.")
+            return
+
+        await message.answer(
+            f"🐾 {message.from_user.full_name}, профиль активирован в этом чате!\n"
+            f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$\n"
+            f"Твой питомец: {pet['name']}"
+        )
+        return
+
+    if command.command == "pet" and (command.args or "").strip():
+        await message.answer(
+            "Используй /pet activate, чтобы создать профиль в этом чате."
+        )
+        return
+
+    pet = load_pets_data().get("users_pets", {}).get(chat_member_key(chat_id, user_id))
+    if pet is None and message.chat.type == "private":
+        pet = get_pet_for_user(user_id)
 
     if not pet:
         await message.answer(
-            "🐾 У вас пока нет питомца!\n\n" "Выберите Барсичелу через /start_pet"
+            "🐾 Сначала создай профиль в этом чате командой /pet activate."
         )
         return
 
@@ -877,6 +1279,38 @@ async def pet_status_command(
         caption=status_text,
         parse_mode="HTML",
         reply_markup=markup,
+    )
+
+
+@router.message(Command("profile"))
+async def cmd_chat_profile(message: Message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                (
+                    InlineKeyboardButton(
+                        text="👤 Открыть профиль",
+                        web_app=WebAppInfo(
+                            url=(
+                                f"{WEBAPP_ORIGIN}/?"
+                                f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
+                            )
+                        ),
+                    )
+                    if message.chat.type == "private"
+                    else InlineKeyboardButton(
+                        text="👤 Открыть профиль",
+                        url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
+                    )
+                )
+            ]
+        ]
+    )
+    await message.answer(
+        "Открой профиль и участников этого чата в Mini App:",
+        reply_markup=keyboard,
     )
 
 
@@ -1104,6 +1538,293 @@ def check_winner(board):
 # ============================================================
 
 
+def resolve_chat_api_context(request, payload=None):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return None, None, web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = payload if isinstance(payload, dict) else {}
+    claimed_user_id = payload.get("user_id") or payload.get("sender_user_id")
+    if claimed_user_id is None:
+        claimed_user_id = request.query.get("user_id")
+    authenticated_user_id = str(telegram_user["id"])
+    if claimed_user_id is not None and str(claimed_user_id) != authenticated_user_id:
+        return (
+            None,
+            None,
+            web.json_response(
+                {"error": "User does not match Telegram session"}, status=403
+            ),
+        )
+
+    raw_chat_id = payload.get("chat_id") or request.query.get("chat_id")
+    try:
+        chat_id = str(int(raw_chat_id))
+    except (TypeError, ValueError):
+        return (
+            None,
+            None,
+            web.json_response({"error": "Valid chat_id is required"}, status=400),
+        )
+
+    return chat_id, telegram_user, None
+
+
+def get_chat_pet_profile(chat_id, user_id):
+    pets_data = load_pets_data()
+    pet = pets_data.get("users_pets", {}).get(chat_member_key(chat_id, user_id))
+    if not isinstance(pet, dict):
+        return None
+
+    pet_id = pet.get("pet_id", "barsichela")
+    definition = pets_data.get(pet_id, {})
+    return {
+        "id": pet_id,
+        "name": pet.get("name", pet.get("pet_name", definition.get("name", "Питомец"))),
+        "image": definition.get("image", "/Barsichela.png"),
+        "level": pet.get("level", definition.get("level", 1)),
+        "max_level": definition.get("max_level", 10),
+        "experience": pet.get("experience", 0),
+        "health": pet.get("health", 100),
+        "hunger": pet.get("hunger", 100),
+        "happiness": pet.get("happiness", 100),
+        "energy": pet.get("energy", 100),
+    }
+
+
+async def read_json_object(request):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+async def api_chat_profile(request):
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request)
+    if error_response:
+        return error_response
+
+    user_id = str(telegram_user["id"])
+    profile_key = chat_member_key(chat_id, user_id)
+    profiles = load_chat_profiles()
+    profile = profiles.get(profile_key)
+    if not isinstance(profile, dict):
+        return web.json_response(
+            {"error": "Activate /pet activate in this chat first"}, status=404
+        )
+
+    member_profiles = []
+    for key, member in profiles.items():
+        if (
+            not key.startswith(f"{chat_id}:")
+            or key == profile_key
+            or not isinstance(member, dict)
+        ):
+            continue
+        member_id = key.split(":", 1)[1]
+        member_profiles.append(
+            {
+                "user_id": member_id,
+                "username": member.get("username", ""),
+                "display_name": member.get("display_name")
+                or member.get("username")
+                or f"Игрок {member_id}",
+                "relationship_rp": member.get("relationship_rp", 0),
+                "balance_r": member.get("balance_r", 0),
+                "status": member.get("status", "активен"),
+            }
+        )
+    member_profiles.sort(key=lambda member: member["display_name"].casefold())
+
+    pets_data = load_pets_data()
+    pet_catalog = [
+        {
+            "id": pet_id,
+            "name": definition.get("name", pet_id),
+            "type": definition.get("type", pet_id),
+            "image": definition.get("image", "/Barsichela.png"),
+            "rarity": definition.get("rarity", "Обычный"),
+        }
+        for pet_id, definition in pets_data.items()
+        if pet_id != "users_pets" and isinstance(definition, dict)
+    ]
+    pet = get_chat_pet_profile(chat_id, user_id)
+
+    return web.json_response(
+        {
+            "chat": {"id": chat_id, "title": f"Чат {chat_id}"},
+            "user": {
+                "id": user_id,
+                "username": profile.get("username")
+                or telegram_user.get("username", ""),
+                "display_name": profile.get("display_name")
+                or telegram_user.get("first_name", "Пользователь"),
+                "first_name": telegram_user.get("first_name", ""),
+                "photo_url": telegram_user.get("photo_url", ""),
+            },
+            "profile": {
+                "relationship_rp": profile.get("relationship_rp", 0),
+                "convertible_rp": profile.get("convertible_rp", 0),
+                "balance_r": profile.get("balance_r", 0),
+                "status": profile.get("status", "активен"),
+            },
+            "pet": pet,
+            "pet_catalog": pet_catalog,
+            "members": member_profiles,
+        }
+    )
+
+
+async def api_chat_convert(request):
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
+
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request, payload)
+    if error_response:
+        return error_response
+
+    amount = payload.get("rp_amount", payload.get("amount"))
+    if (
+        isinstance(amount, bool)
+        or not isinstance(amount, int)
+        or amount < 100
+        or amount % 100 != 0
+    ):
+        return web.json_response(
+            {"error": "RP amount must be a positive multiple of 100"}, status=400
+        )
+
+    profile_key = chat_member_key(chat_id, telegram_user["id"])
+    profiles = load_chat_profiles()
+    profile = profiles.get(profile_key)
+    if not isinstance(profile, dict):
+        return web.json_response(
+            {"error": "Activate /pet activate in this chat first"}, status=404
+        )
+
+    convertible_rp = max(0, int(profile.get("convertible_rp", 0)))
+    if convertible_rp < amount:
+        return web.json_response({"error": "Not enough convertible RP"}, status=400)
+
+    currency_gain = amount // 100 * 10
+    profile["convertible_rp"] = convertible_rp - amount
+    profile["balance_r"] = max(0, int(profile.get("balance_r", 0))) + currency_gain
+    profiles[profile_key] = profile
+    if not save_chat_profiles(profiles):
+        return web.json_response({"error": "Could not save profile"}, status=500)
+
+    return web.json_response(
+        {
+            "success": True,
+            "rp_spent": amount,
+            "r_received": currency_gain,
+            "profile": {
+                "relationship_rp": profile.get("relationship_rp", 0),
+                "convertible_rp": profile["convertible_rp"],
+                "balance_r": profile["balance_r"],
+                "status": profile.get("status", "активен"),
+            },
+        }
+    )
+
+
+async def api_chat_gift(request):
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
+
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request, payload)
+    if error_response:
+        return error_response
+
+    recipient_id = payload.get("recipient_user_id")
+    amount = payload.get("amount")
+    if recipient_id is None or isinstance(recipient_id, bool):
+        return web.json_response({"error": "recipient_user_id is required"}, status=400)
+    recipient_id = str(recipient_id)
+    if not recipient_id.isdigit():
+        return web.json_response({"error": "Invalid recipient_user_id"}, status=400)
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+        return web.json_response(
+            {"error": "Gift amount must be a positive integer"}, status=400
+        )
+
+    sender_id = str(telegram_user["id"])
+    if recipient_id == sender_id:
+        return web.json_response({"error": "Cannot gift yourself"}, status=400)
+
+    profiles = load_chat_profiles()
+    sender_key = chat_member_key(chat_id, sender_id)
+    recipient_key = chat_member_key(chat_id, recipient_id)
+    sender = profiles.get(sender_key)
+    recipient = profiles.get(recipient_key)
+    if not isinstance(sender, dict) or not isinstance(recipient, dict):
+        return web.json_response(
+            {"error": "Both users must activate in this chat"}, status=404
+        )
+
+    sender_balance = max(0, int(sender.get("balance_r", 0)))
+    if sender_balance < amount:
+        return web.json_response({"error": "Not enough R$"}, status=400)
+
+    sender["balance_r"] = sender_balance - amount
+    recipient["balance_r"] = max(0, int(recipient.get("balance_r", 0))) + amount
+    profiles[sender_key] = sender
+    profiles[recipient_key] = recipient
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    transaction = {
+        "id": uuid.uuid4().hex,
+        "type": "gift",
+        "chat_id": chat_id,
+        "sender_user_id": sender_id,
+        "recipient_user_id": recipient_id,
+        "amount": amount,
+        "currency": "R$",
+        "created_at": now,
+    }
+    document = load_users_document()
+    document["chat_profiles"] = profiles
+    document.setdefault("transactions", []).append(transaction)
+    if not save_users_document(document):
+        return web.json_response({"error": "Could not save transfer"}, status=500)
+
+    notification_sent = False
+    try:
+        if int(chat_id) < 0:
+            sender_name = (
+                sender.get("display_name") or sender.get("username") or sender_id
+            )
+            recipient_name = (
+                recipient.get("display_name")
+                or recipient.get("username")
+                or recipient_id
+            )
+            await bot.send_message(
+                chat_id=int(chat_id),
+                text=f"Пользователь {sender_name} подарил Пользователю {recipient_name} {amount} R$!",
+            )
+            notification_sent = True
+    except Exception as e:
+        print(f"Не удалось отправить уведомление о подарке: {e}")
+
+    return web.json_response(
+        {
+            "success": True,
+            "transaction": transaction,
+            "notification_sent": notification_sent,
+            "profile": {
+                "relationship_rp": sender.get("relationship_rp", 0),
+                "convertible_rp": sender.get("convertible_rp", 0),
+                "balance_r": sender["balance_r"],
+                "status": sender.get("status", "активен"),
+            },
+        }
+    )
+
+
 async def api_profile(request):
 
     username, telegram_user = get_webapp_user(request)
@@ -1124,9 +1845,9 @@ async def api_profile(request):
         "noob",
     )
 
-    pet = get_pet_for_user(telegram_user["id"])
+    pet = ensure_pet_for_user(telegram_user["id"])
     inventory_data = load_inventory_data()
-    food_inventory = pet.get("inventory", {}) if pet else {}
+    food_inventory = pet.get("inventory", {})
     food_catalog = [
         {
             "id": food_id,
@@ -1229,43 +1950,31 @@ async def api_profile(request):
         key=lambda entry: (-entry["total"], entry["username"]),
     )
 
+    pet_catalog = load_pets_data()
+    pet_definition = pet_catalog.get(pet.get("pet_id", "barsichela"), {})
     pet_data = {
-        "name": "Барсичела",
-        "type": "barsichela",
-        "level": 1,
-        "health": 100,
-        "hunger": 100,
-        "happiness": 100,
+        "id": pet.get("pet_id", "barsichela"),
+        "name": pet.get("pet_name", "Барсичела"),
+        "type": pet.get("pet_type", "barsichela"),
+        "image": pet_definition.get("image", "/Barsichela.png"),
+        "level": pet.get("level", 1),
+        "max_level": pet_definition.get("max_level", 10),
+        "experience": pet.get("experience", 0),
+        "health": pet.get("health", 100),
+        "hunger": pet.get("hunger", 100),
+        "happiness": pet.get("happiness", 100),
+        "energy": pet.get("energy", 100),
     }
-
-    if pet:
-
-        pet_data = {
-            "name": pet.get(
-                "pet_name",
-                "Барсичела",
-            ),
-            "type": pet.get(
-                "pet_type",
-                "barsichela",
-            ),
-            "level": pet.get(
-                "level",
-                1,
-            ),
-            "health": pet.get(
-                "health",
-                100,
-            ),
-            "hunger": pet.get(
-                "hunger",
-                100,
-            ),
-            "happiness": pet.get(
-                "happiness",
-                100,
-            ),
+    pet_choices = [
+        {
+            "id": pet_id,
+            "name": definition.get("name", pet_id),
+            "type": definition.get("type", pet_id),
+            "image": definition.get("image", "/Barsichela.png"),
+            "rarity": definition.get("rarity", "Обычный"),
         }
+        for pet_id, definition in pet_catalog.items()
+    ]
 
     return web.json_response(
         {
@@ -1286,6 +1995,7 @@ async def api_profile(request):
                 ),
             },
             "pet": pet_data,
+            "pet_catalog": pet_choices,
             "food_catalog": food_catalog,
             "rp": user_info.get(
                 "rp",
@@ -1321,25 +2031,47 @@ async def api_pet(request):
             status=401,
         )
 
-    pet = get_pet_for_user(telegram_user["id"])
-
-    if not pet:
-        return web.json_response(
-            {
-                "owned": False,
-                "pet": None,
-            }
-        )
+    pet = ensure_pet_for_user(telegram_user["id"])
 
     return web.json_response(
         {
             "owned": True,
             "pet": pet,
+            "definition": load_pets_data().get(pet.get("pet_id"), {}),
         }
     )
 
 
-async def api_pet_select(request):
+async def api_inventory(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    _, user_info = get_or_create_user(username, telegram_user["id"])
+    pet = ensure_pet_for_user(telegram_user["id"])
+    inventory_data = load_inventory_data()
+    food_inventory = pet.get("inventory", {})
+    food_catalog = [
+        {
+            "id": food_id,
+            "name": food.get("name", food_id),
+            "price": food.get("price", 0),
+            "hunger_restore": food.get("hunger_restore", 0),
+            "happiness_restore": food.get("happiness_restore", 0),
+            "count": food_inventory.get(food_id, 0),
+        }
+        for food_id, food in inventory_data["food_items"].items()
+    ]
+    return web.json_response(
+        {
+            "items": get_inventory_details(user_info),
+            "food_catalog": food_catalog,
+            "food_inventory": food_inventory,
+        }
+    )
+
+
+async def api_save_profile(request):
 
     username, telegram_user = get_webapp_user(request)
 
@@ -1349,7 +2081,47 @@ async def api_pet_select(request):
             status=401,
         )
 
-    pet = ensure_pet_for_user(telegram_user["id"])
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    if not isinstance(body, dict):
+        return web.json_response({"error": "Invalid request body"}, status=400)
+
+    pet_id = body.get("pet_id")
+    pet_catalog = load_pets_data()
+    if pet_id is None:
+        return web.json_response(
+            {"success": True, "pet": ensure_pet_for_user(telegram_user["id"])},
+        )
+    if not isinstance(pet_id, str) or pet_id not in pet_catalog:
+        return web.json_response({"error": "Pet not found"}, status=404)
+
+    users = load_users()
+    user_info = users.get(username)
+    if not user_info:
+        return web.json_response({"error": "User not found"}, status=404)
+    user_info["pet_id"] = pet_id
+    users[username] = user_info
+    save_users(users)
+
+    data = load_inventory_data()
+    user_id = str(telegram_user["id"])
+    pet = data["users_pets"].get(user_id)
+    if not pet:
+        pet = ensure_pet_for_user(telegram_user["id"])
+        data = load_inventory_data()
+    pet_definition = pet_catalog[pet_id]
+    pet.update(
+        {
+            "pet_id": pet_id,
+            "pet_name": pet_definition.get("name", pet_id),
+            "pet_type": pet_id,
+        }
+    )
+    data["users_pets"][user_id] = pet
+    save_inventory_data(data)
 
     return web.json_response(
         {
@@ -2066,14 +2838,54 @@ async def start_webapp_api():
         api_profile,
     )
 
+    app.router.add_post(
+        "/api/me",
+        api_save_profile,
+    )
+
+    app.router.add_get(
+        "/api/profile",
+        api_chat_profile,
+    )
+
+    app.router.add_get(
+        "/api/chat/profile",
+        api_chat_profile,
+    )
+
+    app.router.add_post(
+        "/api/convert",
+        api_chat_convert,
+    )
+
+    app.router.add_post(
+        "/api/chat/convert",
+        api_chat_convert,
+    )
+
+    app.router.add_post(
+        "/api/gift",
+        api_chat_gift,
+    )
+
+    app.router.add_post(
+        "/api/chat/gift",
+        api_chat_gift,
+    )
+
     app.router.add_get(
         "/api/pet",
         api_pet,
     )
 
+    app.router.add_get(
+        "/api/inventory",
+        api_inventory,
+    )
+
     app.router.add_post(
         "/api/pet/select",
-        api_pet_select,
+        api_save_profile,
     )
 
     app.router.add_post(
@@ -2446,6 +3258,20 @@ async def do_convert(
 # ============================================================
 
 
+@router.message(Command("balance"))
+async def cmd_balance(message: Message):
+    user = message.from_user
+    username = (user.username or f"id_{user.id}").lower()
+    _, user_info = get_or_create_user(username, user.id)
+
+    await message.answer(
+        "💰 **Твой баланс**\n\n"
+        f"• R$: `{user_info.get('r_currency', 0)}`\n"
+        f"• RP: `{user_info.get('rp', 0)}`",
+        parse_mode="Markdown",
+    )
+
+
 @router.message(Command("menu", "start"))
 async def cmd_menu(
     message: Message,
@@ -2705,136 +3531,97 @@ async def cmd_reset(
 async def handle_text(
     message: Message,
 ):
-
     global BOT_USERNAME
-
-    should_reply = False
-
-    if message.chat.type == "private":
-
-        should_reply = True
-
-    elif message.text and BOT_USERNAME and (f"@{BOT_USERNAME}" in message.text):
-
-        should_reply = True
-
-    elif (
-        message.reply_to_message
-        and message.reply_to_message.from_user
-        and BOT_USERNAME
-        and message.reply_to_message.from_user.username
-        and message.reply_to_message.from_user.username.lower() == BOT_USERNAME.lower()
-    ):
-
-        should_reply = True
-
-    if not should_reply:
+    text = message.text or ""
+    user = message.from_user
+    if user is None or user.is_bot:
         return
 
+    if text.lstrip().startswith("/"):
+        return
+
+    chat_id = str(message.chat.id)
+    sender_id = str(user.id)
+    profile_key = chat_member_key(message.chat.id, user.id)
+    chat_profiles = load_chat_profiles()
+    chat_profile = chat_profiles.get(profile_key)
+
+    if chat_profile:
+        message_result = process_chat_message(chat_profile, text)
+        chat_profiles[profile_key] = chat_profile
+        save_chat_profiles(chat_profiles)
+
+        if message_result == "blocked":
+            return
+
+    companion = find_chat_companion(chat_id, sender_id, text)
+    if companion is None and message.chat.type == "private":
+        legacy_pet = get_pet_for_user(user.id)
+        if legacy_pet:
+            pet_id = legacy_pet.get("pet_id", "barsichela")
+            companion = (sender_id, legacy_pet, load_pets_data().get(pet_id, {}))
+
+    if companion is None:
+        # Keep explicit bot mentions/replies usable even before a pet is activated.
+        is_directed_to_bot = bool(
+            (BOT_USERNAME and f"@{BOT_USERNAME}".casefold() in text.casefold())
+            or (
+                message.reply_to_message
+                and message.reply_to_message.from_user
+                and message.reply_to_message.from_user.id == (await bot.me()).id
+            )
+        )
+        if not is_directed_to_bot or message.chat.type != "private":
+            return
+
     try:
-
-        text = message.text or ""
-
+        model_text = text
         if BOT_USERNAME:
+            model_text = model_text.replace(f"@{BOT_USERNAME}", "").strip()
 
-            text = text.replace(
-                f"@{BOT_USERNAME}",
-                "",
-            ).strip()
-
-        user = message.from_user
-
-        username = (user.username or f"id_{user.id}").lower()
-
-        _, user_info = get_or_create_user(
-            username,
-            user.id,
-        )
-
-        status, _ = process_activity_and_spam(
-            username,
-            user_info,
-        )
-
-        if status == "blocked":
-            return
-
-        if status == "punished":
-
-            await message.reply("⚠ Ты доспамился. " "−100 RP и блок на 15 минут! 🤬")
-
-            return
-
-        role = user_info.get(
-            "role",
-            "noob",
-        )
-
-        equipped = user_info.get(
-            "equipped",
-            [],
-        )
-
-        if equipped:
-
-            equipped_text = ", ".join(get_item_name(item_id) for item_id in equipped)
-
+        if companion is not None:
+            system_prompt = build_companion_system_prompt(
+                chat_id,
+                sender_id,
+                companion,
+            )
         else:
-
-            equipped_text = "без одежды"
-
-        moscow_time = datetime.datetime.now(
-            datetime.timezone(datetime.timedelta(hours=3))
-        ).strftime("%H:%M")
-
-        role_instruction = (
-            f"[КОНТЕКСТ: "
-            f"Пользователь @{username}, "
-            f"роль: {role}, "
-            f"RP: {user_info.get('rp', 0)}, "
-            f"надето: {equipped_text}. "
-            f"Тон: игровой и дерзкий.]"
-        )
-
-        dynamic_prompt = (
-            f"{BASE_SYSTEM_PROMPT}\n\n"
-            f"{role_instruction}\n\n"
-            f"(Сейчас в Москве "
-            f"{moscow_time})"
-        )
-
-        # Важно:
-        # Gemini-вызов синхронный, поэтому
-        # переносим его в отдельный поток,
-        # чтобы не блокировать aiogram.
-
-        def generate():
-
-            return client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=text,
-                config={"system_instruction": dynamic_prompt},
+            system_prompt = (
+                f"{BASE_SYSTEM_PROMPT}\n"
+                "Ты — Ритушка, отвечаешь кратко, доброжелательно и по существу."
             )
 
-        response = await asyncio.to_thread(generate)
+        if chat_profile and message_result == "punished":
+            system_prompt += (
+                "\nСЕЙЧАС НАРУШЕНИЕ АНТИФЛУДА: пользователь получил штраф −10 RP. "
+                "Прерви текущую тему, эмоционально и в характере персонажа попроси "
+                "не спамить. Не продолжай обычную беседу."
+            )
 
-        answer = getattr(
-            response,
-            "text",
-            None,
-        )
-
+        answer = await generate_companion_reply(system_prompt, model_text)
         if not answer:
-
-            answer = "Я пока не смогла придумать ответ 💅"
-
+            answer = "Я сейчас немного задумалась. Скажи ещё раз?"
         await message.reply(answer)
-
     except Exception as e:
-
-        print(f"Ошибка handle_text: {e}")
-
-        await message.answer("Что-то пошло не так... 💅")
+        print(f"Ошибка генерации ответа компаньона: {e}")
+        if companion is not None:
+            owner_id, pet, _ = companion
+            character_name = pet.get("name", "Компаньон")
+            is_owner = str(owner_id) == sender_id
+            if chat_profile and message_result == "punished":
+                fallback = f"{character_name}: Хватит флуда. Я злюсь и беру паузу. Дай мне передышку."
+            elif is_owner:
+                hunger = int(pet.get("hunger", 100))
+                fallback = f"{character_name}: Я рядом и слушаю тебя." + (
+                    " И я уже проголодался, покорми меня в Mini App."
+                    if hunger < 30
+                    else ""
+                )
+            else:
+                fallback = f"{character_name}: Пожалуйста, не отвлекай меня от моего владельца."
+        else:
+            fallback = "Сейчас не получается ответить. Попробуй чуть позже."
+        await message.reply(fallback)
 
 
 # ============================================================

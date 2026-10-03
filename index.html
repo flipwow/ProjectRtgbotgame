@@ -18,9 +18,9 @@
                 <div class="avatar-wrapper">
                     <img
                         id="user-avatar"
-                        src="https://via.placeholder.com/50"
                         alt="Avatar"
                     >
+                    <span id="avatar-fallback" class="avatar-fallback" aria-hidden="true">🐾</span>
                 </div>
 
                 <div>
@@ -38,11 +38,11 @@
         <div class="content-area">
 
             <!-- Питомец -->
-            <div id="tab-home" class="tab-content active">
+            <div id="tab-home" class="tab-content">
 
                 <div class="pet-section-header">
                     <div class="vip-tag">RITUSHKA PET</div>
-                    <h3>Барсичела</h3>
+                    <h3 id="pet-name">Барсичела</h3>
                     <div class="subtitle">
                         Твой любимый дерзкий пушистик 💅
                     </div>
@@ -91,6 +91,24 @@
                             </div>
                             <div class="pet-stat-track" role="progressbar" aria-label="Сытость питомца">
                                 <div id="pet-hunger-bar" class="pet-stat-fill hunger-fill"></div>
+                            </div>
+                        </div>
+                        <div class="pet-stat">
+                            <div class="pet-stat-heading">
+                                <span>Счастье</span>
+                                <span id="pet-happiness-value">100 / 100</span>
+                            </div>
+                            <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
+                                <div id="pet-happiness-bar" class="pet-stat-fill happiness-fill"></div>
+                            </div>
+                        </div>
+                        <div class="pet-stat">
+                            <div class="pet-stat-heading">
+                                <span>Энергия</span>
+                                <span id="pet-energy-value">100 / 100</span>
+                            </div>
+                            <div class="pet-stat-track" role="progressbar" aria-label="Энергия питомца">
+                                <div id="pet-energy-bar" class="pet-stat-fill energy-fill"></div>
                             </div>
                         </div>
                     </div>
@@ -326,35 +344,108 @@
                     id="shopItemsGrid"
                 ></div>
 
+                <div class="inventory-section">
+                    <div class="inventory-heading">
+                        <h4>Холодильник</h4>
+                        <span>Запасы еды</span>
+                    </div>
+                    <div id="inventoryGrid" class="inventory-grid"></div>
+                </div>
+
             </div>
 
             <!-- Профиль -->
-            <div id="tab-profile" class="tab-content">
-
-                <div class="section-heading">
-                    <h3>👤 Профиль</h3>
-
-                    <div class="subtitle">
-                        Твой аккаунт и участники бота
+            <div id="tab-profile" class="tab-content active">
+                <div class="profile-page-header">
+                    <div class="profile-kicker">ПРОФИЛЬ ЧАТА</div>
+                    <div class="profile-title-row">
+                        <div>
+                            <h1 id="profile-username">Загрузка...</h1>
+                            <p id="profile-chat-title" class="subtitle">Telegram Mini App</p>
+                        </div>
+                        <span id="profile-status" class="profile-status">Загрузка</span>
                     </div>
                 </div>
 
-                <div
-                    class="glass-card info-card"
-                    style="margin-bottom: 12px;"
-                >
-                    <p><strong>Пользователь:</strong> <span id="profile-username">Загрузка...</span></p>
-                    <p style="margin-top: 6px;"><strong>RP:</strong> <span id="profile-rp">0</span> / <span id="profile-max-rp">0</span></p>
-                    <p style="margin-top: 6px;"><strong>Счёт:</strong> <span id="profile-currency">0</span> R$</p>
-                </div>
+                <section class="profile-metrics" aria-label="Баланс и отношения">
+                    <article class="metric-tile balance-tile">
+                        <span class="metric-label">Баланс</span>
+                        <strong><span id="profile-currency">0</span><small>R$</small></strong>
+                    </article>
+                    <article class="metric-tile relationship-tile">
+                        <span class="metric-label">Отношения</span>
+                        <strong><span id="profile-rp">0</span><small>RP</small></strong>
+                    </article>
+                    <article class="metric-tile convertible-tile">
+                        <span class="metric-label">Доступно к обмену</span>
+                        <strong><span id="profile-convertible-rp">0</span><small>RP</small></strong>
+                    </article>
+                </section>
 
-                <div class="section-heading">
-                    <h3>👑 Участники</h3>
-                    <div class="subtitle">Аккаунты пользователей, запустивших бота</div>
-                </div>
+                <section class="conversion-panel" aria-labelledby="conversion-title">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 id="conversion-title">Обмен RP на R$</h2>
+                            <p>Курс: 100 RP = 10 R$</p>
+                        </div>
+                        <span class="conversion-mark" aria-hidden="true">↗</span>
+                    </div>
+                    <div class="conversion-controls">
+                        <label class="amount-field" for="convert-rp-amount">
+                            <span>Сумма RP</span>
+                            <input id="convert-rp-amount" type="number" min="100" step="100" value="100" inputmode="numeric">
+                        </label>
+                        <button id="convert-rp-button" class="primary-action" type="button" onclick="convertRp()">
+                            Обменять RP на R$
+                        </button>
+                    </div>
+                    <p id="convert-preview" class="conversion-preview">Будет начислено 10 R$</p>
+                </section>
 
-                <div id="profileUsersList" class="profile-users-list"></div>
+                <section class="pet-profile-panel" aria-labelledby="profile-pet-name">
+                    <div class="panel-heading pet-panel-heading">
+                        <div>
+                            <span class="panel-eyebrow">ТВОЙ СПУТНИК</span>
+                            <h2 id="profile-pet-name">Барсичела</h2>
+                        </div>
+                        <div class="profile-pet-level">Ур. <strong id="profile-pet-level">1</strong></div>
+                    </div>
+                    <div class="profile-pet-content">
+                        <div id="profile-pet-image" class="profile-pet-image" aria-hidden="true">🐾</div>
+                        <div class="profile-pet-stats">
+                            <div class="profile-stat-row">
+                                <div><span>Здоровье</span><strong id="profile-pet-health-value">100 / 100</strong></div>
+                                <div class="profile-stat-track" role="progressbar" aria-label="Здоровье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
+                            </div>
+                            <div class="profile-stat-row">
+                                <div><span>Сытость</span><strong id="profile-pet-hunger-value">100 / 100</strong></div>
+                                <div class="profile-stat-track" role="progressbar" aria-label="Сытость питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
+                            </div>
+                            <div class="profile-stat-row">
+                                <div><span>Счастье</span><strong id="profile-pet-happiness-value">100 / 100</strong></div>
+                                <div class="profile-stat-track" role="progressbar" aria-label="Счастье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
+                            </div>
+                            <div class="profile-stat-row">
+                                <div><span>Энергия</span><strong id="profile-pet-energy-value">100 / 100</strong></div>
+                                <div class="profile-stat-track" role="progressbar" aria-label="Энергия питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-energy-bar" class="profile-stat-fill energy-fill"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
+                <section class="members-section" aria-labelledby="members-title">
+                    <div class="members-heading">
+                        <div>
+                            <span class="panel-eyebrow">СООБЩЕСТВО</span>
+                            <h2 id="members-title">Участники чата</h2>
+                        </div>
+                        <span id="members-count" class="members-count">0</span>
+                    </div>
+                    <div id="profileUsersList" class="profile-users-list" aria-live="polite">
+                        <p class="list-state">Загрузка участников...</p>
+                    </div>
+                </section>
+                <p id="profile-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
             </div>
 
         </div>
@@ -363,11 +454,11 @@
         <div class="glass-card bottom-nav">
 
             <button
-                class="nav-item active"
+                class="nav-item"
                 onclick="switchTab('home')"
             >
                 <span class="nav-icon">🐾</span>
-                <span>Pet</span>
+                <span>Питомец</span>
             </button>
 
             <button
@@ -375,7 +466,7 @@
                 onclick="switchTab('leaderboard')"
             >
                 <span class="nav-icon">👑</span>
-                <span>Leaderboard</span>
+                <span>Лидеры</span>
             </button>
 
             <button
@@ -383,7 +474,7 @@
                 onclick="switchTab('play')"
             >
                 <span class="nav-icon">🎮</span>
-                <span>Games</span>
+                <span>Игры</span>
             </button>
 
             <button
@@ -391,15 +482,15 @@
                 onclick="switchTab('shop')"
             >
                 <span class="nav-icon">🛍️</span>
-                <span>Shop</span>
+                <span>Еда</span>
             </button>
 
             <button
-                class="nav-item"
+                class="nav-item active"
                 onclick="switchTab('profile')"
             >
                 <span class="nav-icon">⚙️</span>
-                <span>Profile</span>
+                <span>Профиль</span>
             </button>
 
         </div>
@@ -433,46 +524,34 @@
         </div>
     </div>
 
-    <!-- Профиль участника -->
+    <!-- Перевод валюты -->
     <div
-        id="userProfileModal"
+        id="giftModal"
         class="pet-modal-overlay"
         style="display: none;"
     >
-        <div class="pet-modal-content">
-
+        <div class="pet-modal-content gift-modal-content">
             <div class="pet-modal-header">
-                <h3 id="modalUsername">
-                    Профиль
-                </h3>
-
+                <div>
+                    <span class="panel-eyebrow">ПОДАРОК</span>
+                    <h3 id="gift-recipient-name">Перевод R$</h3>
+                </div>
                 <button
                     class="close-modal-btn"
-                    onclick="closeUserProfileModal()"
+                    type="button"
+                    aria-label="Закрыть"
+                    onclick="closeGiftModal()"
                 >
                     ✕
                 </button>
             </div>
-
-            <div
-                id="modalUserDetails"
-                style="
-                    font-size: 13px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                    margin-bottom: 16px;
-                "
-            ></div>
-
-            <button
-                class="wardrobe-shortcut-btn"
-                onclick="closeUserProfileModal()"
-                style="justify-content: center;"
-            >
-                Закрыть
-            </button>
-
+            <p id="gift-balance-note" class="gift-balance-note">Доступно: 0 R$</p>
+            <label class="amount-field gift-amount-field" for="gift-amount">
+                <span>Сумма перевода</span>
+                <input id="gift-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="Например, 25">
+            </label>
+            <p id="gift-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+            <button id="gift-submit" class="primary-action" type="button" onclick="sendGift()">Отправить подарок</button>
         </div>
     </div>
 
