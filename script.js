@@ -1,5 +1,45 @@
 const tg = window.Telegram?.WebApp;
 
+function initTelegramUser() {
+    if (!tg) {
+        console.warn('Telegram WebApp не обнаружен');
+        return;
+    }
+
+    tg.ready();
+    tg.expand();
+
+    const user = tg.initDataUnsafe?.user;
+
+    console.log('Telegram user:', user);
+    console.log('Photo URL:', user?.photo_url);
+
+    if (!user) {
+        console.warn('Данные пользователя не получены');
+        return;
+    }
+
+    const usernameElement = document.getElementById('username');
+    const avatarElement = document.getElementById('user-avatar');
+
+    if (usernameElement) {
+        usernameElement.textContent = user.first_name || 'Пользователь';
+    }
+
+    if (avatarElement && user.photo_url) {
+        avatarElement.src = user.photo_url;
+
+        avatarElement.onerror = () => {
+            console.warn('Не удалось загрузить аватарку');
+        };
+    } else {
+        console.warn('Telegram не предоставил photo_url');
+    }
+}
+
+initTelegramUser();
+
+
 let userData = {
     currency: 0,
     inventory: [],
@@ -28,18 +68,6 @@ let tttGameOver = false;
 let mySymbol = null;
 let socket = null;
 let currentRoomId = null;
-
-if (tg) {
-    tg.ready();
-    tg.expand();
-    const user = tg.initDataUnsafe?.user;
-    if (user) {
-        document.getElementById('username').textContent = user.first_name || 'Пользователь';
-        if (user.photo_url) {
-            document.getElementById('user-avatar').src = user.photo_url;
-        }
-    }
-}
 
 async function fetchUserData() {
     try {
@@ -546,29 +574,51 @@ function connectToRoom(roomId) {
     };
 }
 
-// ===== Автозапуск из ссылки =====
 function checkDuelParams() {
     const params = new URLSearchParams(window.location.search);
+
     const mode = params.get('mode');
     const room = params.get('room');
+
+    // Параметр запуска Telegram Mini App
     const startParam = tg?.initDataUnsafe?.start_param || '';
 
-    if ((mode === 'online' && room) || startParam.startsWith('online_')) {
-        const roomId = room || startParam.replace('online_', '');
-        
-        switchTab('play');
-        
-        setTimeout(() => {
-            document.getElementById('games-menu').style.display = 'none';
-            document.getElementById('tictactoe-modes').style.display = 'none';
-            document.getElementById('game-tictactoe').style.display = 'flex';
-            
-            connectToRoom(roomId);
-        }, 300);
+    // Поддержка обоих форматов:
+    // duel_XXXXXXXX
+    // online_XXXXXXXX
+    let roomId = null;
+
+    if (startParam.startsWith('duel_')) {
+        roomId = startParam.substring(5);
+    } else if (startParam.startsWith('online_')) {
+        roomId = startParam.substring(7);
+    } else if (mode === 'online' && room) {
+        roomId = room;
     }
-    else if (mode === 'duo' || startParam.startsWith('duo')) {
+
+    if (roomId) {
+        console.log('Найдена комната дуэли:', roomId);
+
         switchTab('play');
-        setTimeout(() => startTttGame('duo'), 300);
+
+        setTimeout(() => {
+            const gamesMenu = document.getElementById('games-menu');
+            const modesMenu = document.getElementById('tictactoe-modes');
+            const game = document.getElementById('game-tictactoe');
+
+            if (gamesMenu) gamesMenu.style.display = 'none';
+            if (modesMenu) modesMenu.style.display = 'none';
+            if (game) game.style.display = 'flex';
+
+            connectToRoom(roomId);
+        }, 500);
+
+    } else if (mode === 'duo' || startParam.startsWith('duo')) {
+        switchTab('play');
+
+        setTimeout(() => {
+            startTttGame('duo');
+        }, 500);
     }
 }
 
