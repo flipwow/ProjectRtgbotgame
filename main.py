@@ -2360,11 +2360,7 @@ async def cmd_lvlup(
 async def cmd_approve_role(
     message: Message,
 ):
-
-    # Здесь лучше хранить ID администратора
-    # в .env, а не непосредственно в коде.
     admin_id_raw = os.getenv("ADMIN_ID")
-
     admin_username = os.getenv(
         "ADMIN_USERNAME",
         "",
@@ -2373,68 +2369,48 @@ async def cmd_approve_role(
     is_admin = False
 
     if admin_id_raw:
-
         try:
-
             is_admin = message.from_user.id == int(admin_id_raw)
-
         except ValueError:
             pass
 
-    if admin_username and (message.from_user.username or "").lower() == admin_username:
-        is_admin = True
+    if not is_admin and admin_username:
+        if (message.from_user.username or "").lower() == admin_username:
+            is_admin = True
 
     if not is_admin:
-
-        await message.reply("Только хозяйка может это делать 💅")
-
+        await message.reply("❌ У тебя нет прав администратора.")
         return
 
     args = (message.text or "").split()
-
     if len(args) < 2:
-
         await message.reply(
-            "Использование: " "`/approve <username>`",
-            parse_mode="Markdown",
+            "Использование: `/approve <username>`", parse_mode="Markdown"
         )
-
         return
 
-    target = args[1].lower().replace("@", "")
-
+    target_username = args[1].lower().lstrip("@")
     users = load_users()
 
-    if target not in users:
-
-        await message.reply("Пользователь не найден.")
-
+    if target_username not in users:
+        await message.reply("❌ Пользователь не найден.")
         return
 
-    requested_role = users[target].get("requested_role")
+    user_info = users[target_username]
+    requested_role = user_info.get("requested_role")
 
     if not requested_role:
-
-        await message.reply("Нет активных запросов.")
-
+        await message.reply("❌ У этого пользователя нет активных запросов на роль.")
         return
 
-    users[target]["role"] = requested_role
-
-    users[target]["requested_role"] = None
-
+    user_info["role"] = requested_role
+    user_info["requested_role"] = None
+    users[target_username] = user_info
     save_users(users)
 
-    role_name = ROLES_HIERARCHY.get(
-        requested_role,
-        {},
-    ).get(
-        "name",
-        requested_role,
-    )
-
+    role_name = ROLES_HIERARCHY.get(requested_role, {}).get("name", requested_role)
     await message.reply(
-        f"✅ @{target} получил роль " f"**{role_name}** 👑",
+        f"✅ Роль пользователя @{target_username} успешно изменена на **{role_name}**!",
         parse_mode="Markdown",
     )
 
