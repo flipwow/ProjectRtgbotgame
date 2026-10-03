@@ -65,33 +65,70 @@
                         Питомец сыт и доволен ✨
                     </div>
 
+                    <div class="pet-stats" aria-label="Характеристики питомца">
+                        <div class="pet-stat">
+                            <div class="pet-stat-heading">
+                                <span>Уровень</span>
+                                <span id="pet-level-value">1 / 10</span>
+                            </div>
+                            <div class="pet-stat-track" role="progressbar" aria-label="Уровень питомца">
+                                <div id="pet-level-bar" class="pet-stat-fill level-fill"></div>
+                            </div>
+                        </div>
+                        <div class="pet-stat">
+                            <div class="pet-stat-heading">
+                                <span>Здоровье</span>
+                                <span id="pet-health-value">100 / 100</span>
+                            </div>
+                            <div class="pet-stat-track" role="progressbar" aria-label="Здоровье питомца">
+                                <div id="pet-health-bar" class="pet-stat-fill health-fill"></div>
+                            </div>
+                        </div>
+                        <div class="pet-stat">
+                            <div class="pet-stat-heading">
+                                <span>Голод</span>
+                                <span id="pet-hunger-value">100 / 100</span>
+                            </div>
+                            <div class="pet-stat-track" role="progressbar" aria-label="Сытость питомца">
+                                <div id="pet-hunger-bar" class="pet-stat-fill hunger-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
-                <button
-                    class="wardrobe-shortcut-btn"
-                    onclick="openFeedMenuModal()"
-                >
-                    <span>🥣 Покормить питомца</span>
-                    <span>→</span>
-                </button>
+                <div class="pet-actions">
+                    <button
+                        class="wardrobe-shortcut-btn pet-action-btn"
+                        onclick="openPetSelector()"
+                    >
+                        <span>🐾</span>
+                        <span>Сменить питомца</span>
+                    </button>
+
+                    <button
+                        class="wardrobe-shortcut-btn pet-action-btn"
+                        onclick="openFeedMenuModal()"
+                    >
+                        <span>🥣</span>
+                        <span>Покормить питомца</span>
+                    </button>
+                </div>
 
             </div>
 
-            <!-- Реестр -->
+            <!-- Таблица лидеров -->
             <div id="tab-leaderboard" class="tab-content">
 
                 <div class="section-heading">
-                    <h3>👑 Реестр чата</h3>
+                    <h3>👑 Таблица лидеров</h3>
 
                     <div class="subtitle">
-                        Список всех участников и их статусы
+                        Очки за победы в онлайн-крестиках-ноликах
                     </div>
                 </div>
 
-                <div
-                    id="chatUsersList"
-                    style="display: flex; flex-direction: column; gap: 8px;"
-                ></div>
+                <div id="leaderboardList" class="leaderboard-list"></div>
 
             </div>
 
@@ -133,7 +170,7 @@
                                     color: var(--text-secondary);
                                 "
                             >
-                                Классическая дуэль
+                                Играй с ботом или устрой дуэль с другом
                             </p>
                         </div>
 
@@ -168,7 +205,7 @@
 
                     <button
                         class="wardrobe-shortcut-btn"
-                        onclick="startTttGame('online')"
+                        onclick="startTttGame('local')"
                         style="
                             background:
                             linear-gradient(
@@ -178,8 +215,12 @@
                             );
                         "
                     >
-                        🌐 Играть с другом (Онлайн)
+                        👥 Играть с другом (на одном телефоне)
                     </button>
+
+                    <div class="info-card game-duel-note">
+                        Чтобы вызвать друга на дуэль онлайн, отправь боту команду <strong>/duel</strong> в чате.
+                    </div>
 
                     <button
                         class="category-tab"
@@ -259,10 +300,10 @@
             <div id="tab-shop" class="tab-content">
 
                 <div class="section-heading">
-                    <h3>🛍️ Королевский магазин</h3>
+                    <h3>🥣 Магазин питомца</h3>
 
                     <div class="subtitle">
-                        Покупай роли и редкие вещицы
+                        Покупай еду за R$ и пополняй холодильник
                     </div>
                 </div>
 
@@ -275,28 +316,7 @@
                         class="category-tab active"
                         data-shopcat="all"
                     >
-                        Всё
-                    </button>
-
-                    <button
-                        class="category-tab"
-                        data-shopcat="sale"
-                    >
-                        Распродажа
-                    </button>
-
-                    <button
-                        class="category-tab"
-                        data-shopcat="luxury"
-                    >
-                        Люкс
-                    </button>
-
-                    <button
-                        class="category-tab"
-                        data-shopcat="roles"
-                    >
-                        Роли
+                        Еда
                     </button>
 
                 </div>
@@ -312,10 +332,10 @@
             <div id="tab-profile" class="tab-content">
 
                 <div class="section-heading">
-                    <h3>⚙️ Меню питомца</h3>
+                    <h3>👤 Профиль</h3>
 
                     <div class="subtitle">
-                        Управление Барсичелой
+                        Твой аккаунт и участники бота
                     </div>
                 </div>
 
@@ -323,31 +343,17 @@
                     class="glass-card info-card"
                     style="margin-bottom: 12px;"
                 >
-                    <p>
-                        <strong>Статус:</strong>
-                        <span class="status-active">
-                            Активен 💅
-                        </span>
-                    </p>
-
-                    <p
-                        style="
-                            margin-top: 6px;
-                            color: var(--text-secondary);
-                            font-size: 12px;
-                        "
-                    >
-                        Твой питомец всегда готов слэйнить вместе с тобой
-                        в Telegram-чатах.
-                    </p>
+                    <p><strong>Пользователь:</strong> <span id="profile-username">Загрузка...</span></p>
+                    <p style="margin-top: 6px;"><strong>RP:</strong> <span id="profile-rp">0</span> / <span id="profile-max-rp">0</span></p>
+                    <p style="margin-top: 6px;"><strong>Счёт:</strong> <span id="profile-currency">0</span> R$</p>
                 </div>
 
-                <button
-                    class="wardrobe-shortcut-btn"
-                    onclick="openPetSelector()"
-                >
-                    🐾 Сменить питомца
-                </button>
+                <div class="section-heading">
+                    <h3>👑 Участники</h3>
+                    <div class="subtitle">Аккаунты пользователей, запустивших бота</div>
+                </div>
+
+                <div id="profileUsersList" class="profile-users-list"></div>
 
             </div>
 
@@ -361,7 +367,7 @@
                 onclick="switchTab('home')"
             >
                 <span class="nav-icon">🐾</span>
-                <span>Питомец</span>
+                <span>Pet</span>
             </button>
 
             <button
@@ -369,7 +375,7 @@
                 onclick="switchTab('leaderboard')"
             >
                 <span class="nav-icon">👑</span>
-                <span>Реестр</span>
+                <span>Leaderboard</span>
             </button>
 
             <button
@@ -377,7 +383,7 @@
                 onclick="switchTab('play')"
             >
                 <span class="nav-icon">🎮</span>
-                <span>Игры</span>
+                <span>Games</span>
             </button>
 
             <button
@@ -385,7 +391,7 @@
                 onclick="switchTab('shop')"
             >
                 <span class="nav-icon">🛍️</span>
-                <span>Магазин</span>
+                <span>Shop</span>
             </button>
 
             <button
@@ -393,7 +399,7 @@
                 onclick="switchTab('profile')"
             >
                 <span class="nav-icon">⚙️</span>
-                <span>Профиль</span>
+                <span>Profile</span>
             </button>
 
         </div>

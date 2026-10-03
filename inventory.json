@@ -1,7 +1,7 @@
 {
   "food_items": {
     "fish": {
-      "name": "🐟 Свежая рыбкка",
+      "name": "🐟 Свежая рыбка",
       "hunger_restore": 35,
       "happiness_restore": 20,
       "price": 50
@@ -17,6 +17,24 @@
       "hunger_restore": 15,
       "happiness_restore": 25,
       "price": 25
+    },
+    "chicken": {
+      "name": "🍗 Куриное филе",
+      "hunger_restore": 45,
+      "happiness_restore": 22,
+      "price": 70
+    },
+    "treat": {
+      "name": "🍪 Печенье для питомца",
+      "hunger_restore": 20,
+      "happiness_restore": 45,
+      "price": 65
+    },
+    "pumpkin": {
+      "name": "🍠 Запечённая тыква",
+      "hunger_restore": 30,
+      "happiness_restore": 15,
+      "price": 35
     }
   },
   "users_pets": {

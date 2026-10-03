@@ -5,10 +5,14 @@ let userData = {
     inventory: [],
     catalog: [],
     equipped: [],
-    registry: []
+    registry: [],
+    leaderboard: [],
+    foodCatalog: [],
+    pet: null,
+    user: null,
+    rp: 0,
+    maxRp: 0
 };
-
-let selectedShopCategory = 'all';
 
 const AVAILABLE_PETS = [
     {
@@ -104,6 +108,12 @@ async function fetchUserData() {
         userData.catalog = data.catalog || [];
         userData.equipped = data.equipped || [];
         userData.registry = data.registry || [];
+        userData.leaderboard = data.leaderboard || [];
+        userData.foodCatalog = data.food_catalog || [];
+        userData.pet = data.pet || null;
+        userData.user = data.user || null;
+        userData.rp = data.rp || 0;
+        userData.maxRp = data.max_rp || 0;
 
         const balanceEl =
             document.getElementById('user-balance');
@@ -112,9 +122,27 @@ async function fetchUserData() {
             balanceEl.textContent = userData.currency;
         }
 
+        const profileUsername =
+            document.getElementById('profile-username');
+        const profileRp =
+            document.getElementById('profile-rp');
+        const profileMaxRp =
+            document.getElementById('profile-max-rp');
+        const profileCurrency =
+            document.getElementById('profile-currency');
+
+        if (profileUsername) {
+            profileUsername.textContent =
+                userData.user?.username || 'Пользователь';
+        }
+        if (profileRp) profileRp.textContent = userData.rp;
+        if (profileMaxRp) profileMaxRp.textContent = userData.maxRp;
+        if (profileCurrency) profileCurrency.textContent = userData.currency;
+
         updatePetView();
         renderShop();
         renderChatRegistry();
+        renderLeaderboard();
 
     } catch (error) {
         console.error(
@@ -166,32 +194,22 @@ function switchTab(tabName) {
         updatePetView();
     }
 
-    if (
-        tabName === 'leaderboard' ||
-        tabName === 'shop'
-    ) {
-        fetchUserData();
-    }
-
-    if (tabName === 'profile') {
+    if (['leaderboard', 'shop', 'profile'].includes(tabName)) {
         fetchUserData();
     }
 }
 
 
 function renderChatRegistry() {
-    const container =
-        document.getElementById('chatUsersList');
+    const containers = [document.getElementById('profileUsersList')].filter(Boolean);
 
-    if (!container) return;
+    if (containers.length === 0) return;
 
-    container.innerHTML = '';
+    containers.forEach(container => {
+        container.innerHTML = '';
 
-    if (
-        !userData.registry ||
-        userData.registry.length === 0
-    ) {
-        container.innerHTML = `
+        if (!userData.registry || userData.registry.length === 0) {
+            container.innerHTML = `
             <p
                 style="
                     text-align: center;
@@ -200,66 +218,68 @@ function renderChatRegistry() {
                     font-size: 13px;
                 "
             >
-                В реестре пока никого нет 💅
+                Пока никто не запустил бота через /start
             </p>
         `;
 
+            return;
+        }
+
+        userData.registry.forEach(member => {
+            const card = document.createElement('div');
+            card.className = 'glass-card registry-user-card';
+            card.innerHTML = `
+                <div>
+                    <h4>@${escapeHtml(member.username)}</h4>
+                    <p>${escapeHtml(member.role_name)} · RP: ${member.rp}</p>
+                    <p>Счёт: ${member.currency} R$</p>
+                </div>
+                <span class="registry-user-arrow">→</span>
+            `;
+
+            card.onclick = () => showUserProfileModal(member);
+            container.appendChild(card);
+        });
+    });
+}
+
+
+function renderLeaderboard() {
+    const container = document.getElementById('leaderboardList');
+
+    if (!container) return;
+
+    if (!userData.leaderboard || userData.leaderboard.length === 0) {
+        container.innerHTML = `
+            <p class="leaderboard-empty">
+                Пока нет набранных игровых очков
+            </p>
+        `;
         return;
     }
 
-    userData.registry.forEach(member => {
-        const card = document.createElement('div');
+    const modeNames = {
+        tictactoe_online: 'Крестики-нолики · онлайн'
+    };
 
-        card.className = 'glass-card';
+    container.innerHTML = userData.leaderboard.map((member, index) => {
+        const modeScores = Object.entries(member.modes || {})
+            .map(([mode, points]) => `
+                <p>${escapeHtml(modeNames[mode] || mode)}: ${points} очков</p>
+            `)
+            .join('');
 
-        card.style.cssText = `
-            padding: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
+        return `
+            <article class="leaderboard-row">
+                <span class="leaderboard-rank">${index + 1}</span>
+                <div class="leaderboard-user">
+                    <h4>@${escapeHtml(member.username)}</h4>
+                    ${modeScores}
+                </div>
+                <strong class="leaderboard-total">${member.total} очков</strong>
+            </article>
         `;
-
-        card.innerHTML = `
-            <div>
-                <h4
-                    style="
-                        font-size: 14px;
-                        margin-bottom: 2px;
-                    "
-                >
-                    @${escapeHtml(member.username)}
-                </h4>
-
-                <p
-                    style="
-                        font-size: 11px;
-                        color: var(--text-secondary);
-                    "
-                >
-                    ${escapeHtml(member.role_name)}
-                    • RP: ${member.rp}
-                </p>
-            </div>
-
-            <button
-                class="category-tab active"
-                style="
-                    padding: 6px 12px;
-                    font-size: 11px;
-                    pointer-events: none;
-                "
-            >
-                Профиль
-            </button>
-        `;
-
-        card.onclick = () => {
-            showUserProfileModal(member);
-        };
-
-        container.appendChild(card);
-    });
+    }).join('');
 }
 
 
@@ -411,6 +431,35 @@ function updatePetView() {
         AVAILABLE_PETS.find(
             pet => pet.id === currentPetId
         ) || AVAILABLE_PETS[0];
+    const level = Math.max(1, Number(userData.pet?.level || 1));
+    const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
+    const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
+
+    const statValues = {
+        'pet-level-value': `${level} / 10`,
+        'pet-health-value': `${health} / 100`,
+        'pet-hunger-value': `${hunger} / 100`
+    };
+    const statProgress = {
+        'pet-level-bar': { value: level, max: 10, width: Math.min(level * 10, 100) },
+        'pet-health-bar': { value: health, max: 100, width: health },
+        'pet-hunger-bar': { value: hunger, max: 100, width: hunger }
+    };
+
+    Object.entries(statValues).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
+
+    Object.entries(statProgress).forEach(([id, progress]) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+
+        element.style.width = `${progress.width}%`;
+        element.setAttribute('aria-valuemin', '0');
+        element.setAttribute('aria-valuemax', String(progress.max));
+        element.setAttribute('aria-valuenow', String(progress.value));
+    });
 
     const petHtml = `
         <img
@@ -426,8 +475,7 @@ function updatePetView() {
 
     if (equippedItems.length === 0) {
         petDisplay.innerHTML = petHtml;
-        equippedPreview.textContent =
-            'Ничего не надето';
+        equippedPreview.textContent = 'Питомец сыт и доволен ✨';
     } else {
         petDisplay.innerHTML = `
             <div
@@ -467,92 +515,7 @@ function renderShop() {
 
     grid.innerHTML = '';
 
-    if (selectedShopCategory === 'roles') {
-        grid.innerHTML = `
-            <div
-                style="
-                    grid-column: span 2;
-                    padding: 16px;
-                "
-                class="glass-card"
-            >
-                <h3
-                    style="
-                        margin-bottom: 14px;
-                        font-size: 16px;
-                        text-align: center;
-                    "
-                >
-                    👑 Прайс ролей
-                </h3>
-
-                <div
-                    style="
-                        display: flex;
-                        flex-direction: column;
-                        gap: 10px;
-                        font-size: 13px;
-                        line-height: 1.45;
-                    "
-                >
-                    <div class="role-price-card">
-                        <strong>👑 boss</strong>
-                        — Легенда / Босс
-                        <br>
-                        <span class="role-price">
-                            500 руб.
-                        </span>
-                        · Потолок RP: 1000
-                    </div>
-
-                    <div class="role-price-card">
-                        <strong>💎 dura</strong>
-                        — VIP-гость
-                        <br>
-                        <span class="role-price">
-                            250 руб.
-                        </span>
-                        · Потолок RP: 700
-                    </div>
-
-                    <div class="role-price-card">
-                        <strong>💅 peshka</strong>
-                        — Модник
-                        <br>
-                        <span class="role-price">
-                            100 руб.
-                        </span>
-                        · Потолок RP: 425
-                    </div>
-
-                    <div class="role-price-card">
-                        <strong>🧊 noob</strong>
-                        — Пешка (NPC)
-                        <br>
-                        <span class="role-price">
-                            0 руб.
-                        </span>
-                        · Потолок RP: 200
-                    </div>
-                </div>
-            </div>
-        `;
-
-        return;
-    }
-
-    const filtered =
-        userData.catalog.filter(item => {
-            if (selectedShopCategory === 'all') {
-                return true;
-            }
-
-            return (
-                item.category === selectedShopCategory
-            );
-        });
-
-    if (filtered.length === 0) {
+    if (!userData.foodCatalog || userData.foodCatalog.length === 0) {
         grid.innerHTML = `
             <p
                 style="
@@ -562,115 +525,58 @@ function renderShop() {
                     padding: 20px;
                 "
             >
-                В этой категории пусто
+                Магазин еды пока пуст
             </p>
         `;
 
         return;
     }
 
-    filtered.forEach(item => {
-        const card =
-            document.createElement('div');
-
-        card.className =
-            `item-card ${
-                item.owned ? 'equipped' : ''
-            }`;
-
-        let badgeText =
-            `${item.price} R$`;
-
-        if (item.owned) {
-            badgeText = 'Куплено ✓';
-        } else if (!item.allowed) {
-            badgeText = 'Нужен VIP 🛑';
-        }
-
+    userData.foodCatalog.forEach(food => {
+        const card = document.createElement('article');
+        card.className = 'item-card food-item-card';
         card.innerHTML = `
-            <div class="item-art">
-                🛍️
-            </div>
-
-            <div class="item-name">
-                ${escapeHtml(item.name)}
-            </div>
-
-            <div class="item-status-badge">
-                ${badgeText}
-            </div>
+            <div class="item-art">${escapeHtml(food.name.split(' ')[0])}</div>
+            <div class="item-name">${escapeHtml(food.name.replace(/^\S+\s*/, ''))}</div>
+            <div class="food-item-effect">🍖 +${food.hunger_restore} · 💖 +${food.happiness_restore}</div>
+            <div class="item-status-badge">В холодильнике: ${food.count || 0}</div>
+            <button class="food-buy-button" type="button" ${userData.currency < food.price ? 'disabled' : ''}>
+                Купить · ${food.price} R$
+            </button>
         `;
 
-        card.addEventListener(
-            'click',
-            async () => {
-                if (
-                    item.owned ||
-                    !item.allowed
-                ) {
+        card.querySelector('.food-buy-button').addEventListener('click', async event => {
+            event.stopPropagation();
+            try {
+                const response = await fetch(
+                    `/api/buy-food/${encodeURIComponent(food.id)}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-Telegram-Init-Data': tg?.initData || ''
+                        }
+                    }
+                );
+                const data = await response.json();
+                if (!response.ok) {
+                    tg?.showAlert?.(data.error === 'Not enough currency'
+                        ? 'Недостаточно R$ для покупки.'
+                        : 'Не удалось купить еду.');
                     return;
                 }
 
-                try {
-                    const response =
-                        await fetch(
-                            `/api/buy/${encodeURIComponent(item.id)}`,
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'X-Telegram-Init-Data':
-                                        tg?.initData || ''
-                                }
-                            }
-                        );
-
-                    if (!response.ok) {
-                        console.error(
-                            'Ошибка покупки:',
-                            response.status
-                        );
-                        return;
-                    }
-
-                    const data =
-                        await response.json();
-
-                    userData.currency =
-                        data.currency;
-
-                    userData.inventory =
-                        data.inventory;
-
-                    userData.catalog =
-                        data.catalog;
-
-                    const balanceEl =
-                        document.getElementById(
-                            'user-balance'
-                        );
-
-                    if (balanceEl) {
-                        balanceEl.textContent =
-                            userData.currency;
-                    }
-
-                    renderShop();
-                    updatePetView();
-
-                    if (tg?.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred(
-                            'success'
-                        );
-                    }
-
-                } catch (error) {
-                    console.error(
-                        'Ошибка при покупке:',
-                        error
-                    );
-                }
+                userData.currency = data.currency;
+                userData.foodCatalog = data.food_catalog;
+                userData.pet = data.pet;
+                document.getElementById('user-balance').textContent = userData.currency;
+                const profileCurrency = document.getElementById('profile-currency');
+                if (profileCurrency) profileCurrency.textContent = userData.currency;
+                renderShop();
+                updatePetView();
+            } catch (error) {
+                console.error('Ошибка при покупке еды:', error);
             }
-        );
+        });
 
         grid.appendChild(card);
     });
@@ -722,7 +628,7 @@ function startTttGame(mode) {
         gameTtt.style.display = 'flex';
     }
 
-    if (mode === 'solo') {
+    if (mode === 'solo' || mode === 'local') {
         resetTtt();
     }
 }
@@ -1032,6 +938,11 @@ function connectToRoom(roomId) {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
+        socket.send(JSON.stringify({
+            type: 'auth',
+            init_data: tg?.initData || ''
+        }));
+
         const statusEl =
             document.getElementById('ttt-status');
 
@@ -1222,18 +1133,9 @@ function renderFeedItems() {
         return;
     }
 
-    /*
-     * В текущем API нет отдельного endpoint
-     * для кормления питомца.
-     *
-     * Поэтому пока показываем предметы
-     * инвентаря как содержимое холодильника.
-     */
+    const availableFood = userData.foodCatalog.filter(food => food.count > 0);
 
-    if (
-        !userData.inventory ||
-        userData.inventory.length === 0
-    ) {
+    if (availableFood.length === 0) {
         grid.innerHTML = `
             <p
                 style="
@@ -1242,29 +1144,57 @@ function renderFeedItems() {
                     padding: 15px;
                 "
             >
-                Холодильник пока пуст 🛍
+                Холодильник пуст. Загляни в магазин еды 🛍
             </p>
         `;
 
         return;
     }
 
-    grid.innerHTML =
-        userData.inventory
-            .map(item => `
-                <button
-                    class="category-tab"
-                    style="
-                        width: 100%;
-                        padding: 12px;
-                        text-align: left;
-                    "
-                    disabled
-                >
-                    🍖 ${escapeHtml(item.name)}
-                </button>
-            `)
-            .join('');
+    grid.innerHTML = availableFood.map(food => `
+        <button class="feed-food-button" type="button" data-food-id="${escapeHtml(food.id)}">
+            <span>${escapeHtml(food.name)} <small>×${food.count}</small></span>
+            <span class="feed-food-effect">Накормить</span>
+        </button>
+    `).join('');
+
+    grid.querySelectorAll('[data-food-id]').forEach(button => {
+        button.addEventListener('click', () => feedPet(button.dataset.foodId));
+    });
+}
+
+
+async function feedPet(foodId) {
+    try {
+        const response = await fetch('/api/pet/feed', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ food_id: foodId })
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            tg?.showAlert?.('Не удалось покормить питомца.');
+            return;
+        }
+
+        userData.pet = data.pet;
+        userData.foodCatalog = userData.foodCatalog.map(food => ({
+            ...food,
+            count: data.pet.inventory?.[food.id] || 0
+        }));
+        renderFeedItems();
+        renderShop();
+        updatePetView();
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+    } catch (error) {
+        console.error('Ошибка при кормлении питомца:', error);
+    }
 }
 
 
@@ -1273,44 +1203,6 @@ document.addEventListener(
     () => {
 
         initTelegramUser();
-
-        const shopTabs =
-            document.getElementById(
-                'shopCategoryTabs'
-            );
-
-        if (shopTabs) {
-            shopTabs.addEventListener(
-                'click',
-                event => {
-
-                    const tab =
-                        event.target.closest(
-                            '[data-shopcat]'
-                        );
-
-                    if (!tab) {
-                        return;
-                    }
-
-                    selectedShopCategory =
-                        tab.dataset.shopcat;
-
-                    shopTabs
-                        .querySelectorAll(
-                            '.category-tab'
-                        )
-                        .forEach(button => {
-                            button.classList.toggle(
-                                'active',
-                                button === tab
-                            );
-                        });
-
-                    renderShop();
-                }
-            );
-        }
 
         fetchUserData();
         checkDuelParams();
