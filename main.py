@@ -82,6 +82,36 @@ WEBAPP_PORT = 8080
 
 WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
+SCORES_FILE = "scores.json"
+
+
+def load_scores():
+    if not os.path.exists(SCORES_FILE):
+        # Если файла нет, создаем шаблон по умолчанию
+        default_data = {"tictactoe": {}, "general": {}}
+        save_scores(default_data)
+        return default_data
+    try:
+        with open(SCORES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"tictactoe": {}, "general": {}}
+
+
+def update_score(game_type, user_id, points):
+    scores = load_scores()
+    if game_type not in scores:
+        scores[game_type] = {}
+
+    # Увеличиваем очки игрока
+    user_id_str = str(user_id)
+    current = scores[game_type].get(user_id_str, 0)
+    scores[game_type][user_id_str] = current + points
+
+    # Сохраняем обратно в файл
+    with open(SCORES_FILE, "w", encoding="utf-8") as f:
+        json.dump(scores, f, ensure_ascii=False, indent=4)
+
 
 # ============================================================
 # SHOP

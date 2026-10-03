@@ -648,3 +648,45 @@ window.addEventListener('DOMContentLoaded', () => {
     fetchUserData();
     checkDuelParams();
 });
+
+// Функция отправки реванша боту
+function triggerRematch() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const opponentId = urlParams.get('opponent');
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.sendData(JSON.stringify({
+            action: "rematch",
+            opponent_id: opponentId
+        }));
+    }
+}
+
+// Пример функции загрузки лидеров (можно связать с вашим бэкендом)
+function loadLeaderboard(gameType) {
+    const listEl = document.getElementById('leaderboard-list');
+    listEl.innerHTML = `<li style="color: var(--text-secondary); text-align: center; padding: 8px;">Загрузка ${gameType}...</li>`;
+    
+    // Здесь делается запрос к вашему серверу (или берутся данные из глобального объекта)
+    // Пример отрисовки:
+    setTimeout(() => {
+        listEl.innerHTML = `
+            <li style="display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+                <span>1. Ритушка</span> <b>150 очков</b>
+            </li>
+            <li style="display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+                <span>2. Игрок</span> <b>90 очков</b>
+            </li>
+        `;
+    }, 300);
+}
+
+// Вызываем загрузку по умолчанию при старте вкладки
+document.addEventListener("DOMContentLoaded", () => {
+    loadLeaderboard('tictactoe');
+    
+    // Если игра открыта по ссылке вызова друга / реванша, показываем кнопку реванша
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('opponent')) {
+        document.getElementById('rematch-container').style.display = 'block';
+    }
+});

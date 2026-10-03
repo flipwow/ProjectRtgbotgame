@@ -154,6 +154,52 @@
             <button class="category-tab active" onclick="resetTtt()" style="margin-top: 4px; padding: 8px 16px;">Заново</button>
         </div>
     </div>
+
+    <!-- Главное меню игр -->
+    <div id="games-menu" class="games-grid" style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="glass-card game-card" onclick="openGameMenu('tictactoe')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+                <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕</h4>
+                <p style="font-size: 12px; color: var(--text-secondary);">С ботом или дуэль с другом</p>
+            </div>
+            <button class="category-tab active" style="pointer-events: none;">Играть</button>
+        </div>
+
+        <div class="glass-card game-card" onclick="openGameMenu('fortune')" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+            <div>
+                <h4 style="font-size: 15px; margin-bottom: 4px;">🎰 Колесо Фортуны</h4>
+                <p style="font-size: 12px; color: var(--text-secondary);">Испытай удачу и выиграй R$</p>
+            </div>
+            <button class="category-tab" style="pointer-events: none; opacity: 0.6;">Скоро</button>
+        </div>
+    </div>
+
+    <!-- ================= НОВЫЕ БЛОКИ (РЕВАНШ И ТАБЛИЦА ЛИДЕРОВ) ================= -->
+    
+    <!-- Кнопка реванша (по умолчанию скрыта) -->
+    <div id="rematch-container" style="margin-top: 14px; display: none;">
+        <button id="rematch-btn" onclick="triggerRematch()" class="wardrobe-shortcut-btn" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); width: 100%; justify-content: center;">
+            <span class="btn-icon">🔄</span>
+            <span>Сыграть реванш с тем же игроком</span>
+        </button>
+    </div>
+
+    <!-- Секция Таблицы лидеров во вкладке Play -->
+    <div class="glass-card" style="margin-top: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="font-size: 15px; margin: 0;">🏆 Таблица лидеров</h4>
+            <!-- Выбор игры для таблицы лидеров -->
+            <select id="leaderboard-game-select" onchange="loadLeaderboard(this.value)" style="background: var(--card-bg); border: 1px solid var(--card-border); color: white; padding: 6px 10px; border-radius: 8px; font-size: 12px; outline: none;">
+                <option value="tictactoe" style="background: #181925;">Крестики-нолики</option>
+                <option value="general" style="background: #181925;">Общий счет</option>
+            </select>
+        </div>
+        <ul id="leaderboard-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+            <li style="color: var(--text-secondary); text-align: center; padding: 8px;">Загрузка очков...</li>
+        </ul>
+    </div>
+    <!-- ================= КОНЕЦ НОВЫХ БЛОКОВ ================= -->
+     
 </section>
 
             <!-- Вкладка 4: Магазин -->
