@@ -16,6 +16,7 @@ let userData = {
     maxRp: 0
 };
 
+let selectedLeaderboardMode = 'online';
 let currentPetId = 'bars';
 let chatContext = { chatId: null, userId: null };
 
@@ -74,6 +75,19 @@ const englishText = {
     'Играйте честно и уважайте других участников чата.': 'Play fair and respect other chat members.'
   };
 
+Object.assign(englishText, {
+    'Общий рейтинг и очки по игровым режимам': 'Overall ranking and points by game mode',
+    'Общий рейтинг · за всё время': 'Overall ranking · all time',
+    'Очки по режимам': 'Points by mode',
+    'Режим игры': 'Game mode',
+    'Онлайн-дуэли': 'Online duels',
+    'С ботом': 'Against the bot',
+    'На одном телефоне': 'Local two-player',
+    'Суммарные очки во всех игровых режимах': 'Total points across all game modes',
+    'Пока нет набранных очков.': 'No points have been earned yet.',
+    'В этом режиме пока нет набранных очков.': 'No points have been earned in this mode yet.'
+});
+
 function loadAppSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -92,6 +106,8 @@ function translateSource(source) {
     let result = englishText[clean];
     if (!result) {
         const patterns = [
+            [/^Очки: (\d+)$/, 'Points: $1'],
+            [/^(\d+) очк\.$/, '$1 pts.'],
             [/^Будет начислено (\d+) R\$$/, 'You will receive $1 R$'],
             [/^Обмен завершён: (\d+) RP → (\d+) R\$$/, 'Exchange complete: $1 RP → $2 R$'],
             [/^Подарок отправлен: (\d+) R\$$/, 'Gift sent: $1 R$'],
@@ -1054,6 +1070,77 @@ function renderLeaderboard() {
     container.replaceChildren(fragment);
 }
 
+
+
+
+function selectLeaderboardMode(mode) {
+    if (!['online', 'solo', 'local'].includes(mode)) return;
+    selectedLeaderboardMode = mode;
+    document.querySelectorAll('[data-leaderboard-mode]').forEach(button => {
+        const isActive = button.dataset.leaderboardMode === mode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+    });
+        renderLeaderboard();
+    fetchLeaderboard();
+}
+
+function renderLeaderboard() {
+    const overallContainer = document.getElementById('overallLeaderboardList');
+    const modeContainer = document.getElementById('leaderboardList');
+    const leaderboard = Array.isArray(userData.leaderboard) ? userData.leaderboard : [];
+
+    const renderRows = (container, rows, emptyMessage, mode) => {
+        if (!container) return;
+        if (rows.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'leaderboard-empty';
+            empty.textContent = emptyMessage;
+            container.replaceChildren(empty);
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        rows.forEach((member, index) => {
+            const row = document.createElement('article');
+            row.className = 'leaderboard-row';
+            const rank = document.createElement('span');
+            rank.className = 'leaderboard-rank';
+            rank.textContent = String(index + 1);
+            const user = document.createElement('div');
+            user.className = 'leaderboard-user';
+            const name = document.createElement('h4');
+            name.textContent = member.display_name
+                || (member.username ? `@${member.username}` : `Игрок ${member.user_id || ''}`);
+            const stats = document.createElement('p');
+            stats.textContent = mode === null
+                ? 'Суммарные очки во всех игровых режимах'
+                : `Очки: ${Number(member.mode_scores?.[mode] || 0)}`;
+            const points = document.createElement('strong');
+            points.className = 'leaderboard-total';
+            const score = mode === null
+                ? Number(member.score_value || 0)
+                : Number(member.mode_scores?.[mode] || 0);
+            points.textContent = `${score} очк.`;
+            user.append(name, stats);
+            row.append(rank, user, points);
+            fragment.appendChild(row);
+        });
+        container.replaceChildren(fragment);
+    };
+
+    const totals = leaderboard
+        .filter(member => Number(member.score_value || 0) > 0)
+        .slice()
+        .sort((a, b) => Number(b.score_value || 0) - Number(a.score_value || 0));
+    renderRows(overallContainer, totals, 'Пока нет набранных очков.', null);
+
+    const modeRows = leaderboard
+        .filter(member => Number(member.mode_scores?.[selectedLeaderboardMode] || 0) > 0)
+        .slice()
+        .sort((a, b) => Number(b.mode_scores?.[selectedLeaderboardMode] || 0) - Number(a.mode_scores?.[selectedLeaderboardMode] || 0));
+    renderRows(modeContainer, modeRows, 'В этом режиме пока нет набранных очков.', selectedLeaderboardMode);
+}
 
 function escapeHtml(value) {
     const div = document.createElement('div');

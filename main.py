@@ -1965,6 +1965,32 @@ def award_chat_game_reward(chat_id, user_id, amount):
     return save_chat_profiles(profiles)
 
 
+LEADERBOARD_MODES = {
+    "online": "Онлайн-дуэли",
+    "solo": "Игра с ботом",
+    "local": "Игра на одном телефоне",
+}
+
+
+def _get_mode_scores(scores_document, user_id):
+    """Return the recorded points for each tic-tac-toe mode."""
+    game_scores = scores_document.get("tictactoe", {})
+    raw_score = game_scores.get(str(user_id), 0) if isinstance(game_scores, dict) else 0
+    if isinstance(raw_score, dict):
+        result = {}
+        for mode in LEADERBOARD_MODES:
+            try:
+                result[mode] = max(0, int(raw_score.get(mode, 0) or 0))
+            except (TypeError, ValueError):
+                result[mode] = 0
+        return result
+    try:
+        legacy_points = max(0, int(raw_score or 0))
+    except (TypeError, ValueError):
+        legacy_points = 0
+    return {"online": legacy_points, "solo": 0, "local": 0}
+
+
 def get_chat_leaderboard(chat_id):
     document = load_users_document()
     chat_members = {}
@@ -1987,21 +2013,21 @@ def get_chat_leaderboard(chat_id):
     chat_scores_by_user = {
         str(row["user_id"]): int(row["score_value"] or 0) for row in score_rows
     }
-    game_scores = load_scores().get("tictactoe", {})
-    scores_by_user = {}
-    if isinstance(game_scores, dict):
-        for user_id, score in game_scores.items():
-            if isinstance(score, dict):
-                score = score.get("online", 0)
-            try:
-                scores_by_user[str(user_id)] = max(0, int(score or 0))
-            except (TypeError, ValueError):
-                scores_by_user[str(user_id)] = 0
+    scores_document = load_scores()
+    modes_by_user = {
+        member_id: _get_mode_scores(scores_document, member_id)
+        for member_id in chat_members
+    }
     for user_id, score in chat_scores_by_user.items():
-        scores_by_user[user_id] = max(scores_by_user.get(user_id, 0), score)
+        modes_by_user.setdefault(user_id, _get_mode_scores(scores_document, user_id))
+        modes_by_user[user_id]["online"] = max(modes_by_user[user_id]["online"], score)
     leaderboard = []
 
     for member_id, member in chat_members.items():
+        mode_scores = modes_by_user.get(
+            member_id, {mode: 0 for mode in LEADERBOARD_MODES}
+        )
+        total_score = sum(mode_scores.values())
         leaderboard.append(
             {
                 "user_id": member_id,
@@ -2013,7 +2039,8 @@ def get_chat_leaderboard(chat_id):
                 "convertible_rp": int(member.get("convertible_rp", 0) or 0),
                 "balance_r": int(member.get("balance_r", 0) or 0),
                 "status": member.get("status", "активен"),
-                "score_value": scores_by_user.get(member_id, 0),
+                "score_value": total_score,
+                "mode_scores": mode_scores,
             }
         )
 
@@ -2028,28 +2055,43 @@ def get_chat_leaderboard(chat_id):
 
 
 def load_global_leaderboard(limit=100):
-    with db_connection() as connection:
-        rows = connection.execute(
-            """
-            SELECT * FROM users
-            WHERE chat_id = '' AND record_type = 'user'
-            ORDER BY convertible_rp DESC, relationship_rp DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+    scores_document = load_scores()
+    game_scores = scores_document.get("tictactoe", {})
+    if not isinstance(game_scores, dict):
+        return []
 
-    return [
-        {
-            "user_id": row["user_id"],
-            "username": row["username"],
-            "convertible_rp": row["convertible_rp"],
-            "relationship_rp": row["relationship_rp"],
-            "balance_r": row["balance_r"],
-            "status": row["status"],
-        }
-        for row in rows
-    ]
+    users_by_telegram_id = {}
+    for username, user in load_users().items():
+        if isinstance(user, dict) and user.get("telegram_id") is not None:
+            users_by_telegram_id[str(user["telegram_id"])] = (username, user)
+
+    leaderboard = []
+    for user_id in set(str(key) for key in game_scores):
+        mode_scores = _get_mode_scores(scores_document, user_id)
+        total_score = sum(mode_scores.values())
+        username, user_data = users_by_telegram_id.get(user_id, ("", {}))
+        display_name = (
+            user_data.get("display_name")
+            or user_data.get("first_name")
+            or (f"@{username}" if username else f"Игрок {user_id}")
+        )
+        leaderboard.append(
+            {
+                "user_id": user_id,
+                "username": username,
+                "display_name": display_name,
+                "convertible_rp": int(user_data.get("convertible_rp", 0) or 0),
+                "relationship_rp": int(user_data.get("rp", 0) or 0),
+                "balance_r": int(user_data.get("r_currency", 0) or 0),
+                "score_value": total_score,
+                "mode_scores": mode_scores,
+            }
+        )
+
+    leaderboard.sort(
+        key=lambda member: (-member["score_value"], member["display_name"].casefold())
+    )
+    return leaderboard[:limit]
 
 
 async def api_chat_leaderboard(request):

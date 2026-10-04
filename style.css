@@ -413,6 +413,29 @@ body {
     margin-bottom: 12px;
 }
 
+.leaderboard-heading {
+    text-align: center;
+}
+
+.leaderboard-heading h3 {
+    margin-bottom: 5px;
+}
+
+.leaderboard-section {
+    margin-top: 16px;
+}
+
+.leaderboard-section-title {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.leaderboard-tabs {
+    margin-bottom: 10px;
+}
+
 .category-tabs {
     display: flex;
     gap: 6px;
@@ -586,6 +609,7 @@ body {
     color: #f2c14e;
     font-size: 12px;
     text-align: right;
+    white-space: nowrap;
 }
 
 .food-item-card {

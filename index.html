@@ -131,15 +131,25 @@
             <!-- Таблица лидеров -->
             <div id="tab-leaderboard" class="tab-content">
 
-                <div class="section-heading">
+                                <div class="section-heading leaderboard-heading">
                     <h3>👑 Таблица лидеров</h3>
-
-                    <div class="subtitle">
-                        Очки за победы в онлайн-крестиках-ноликах
-                    </div>
+                    <div class="subtitle">Общий рейтинг и очки по игровым режимам</div>
                 </div>
 
-                <div id="leaderboardList" class="leaderboard-list"></div>
+                <section class="leaderboard-section" aria-labelledby="overall-leaderboard-title">
+                    <h4 id="overall-leaderboard-title" class="leaderboard-section-title">Общий рейтинг · за всё время</h4>
+                    <div id="overallLeaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                </section>
+
+                <section class="leaderboard-section" aria-labelledby="mode-leaderboard-title">
+                    <h4 id="mode-leaderboard-title" class="leaderboard-section-title">Очки по режимам</h4>
+                    <div class="category-tabs leaderboard-tabs" id="leaderboardModeTabs" role="tablist" aria-label="Режим игры">
+                        <button class="category-tab active" type="button" role="tab" aria-selected="true" data-leaderboard-mode="online" onclick="selectLeaderboardMode('online')">Онлайн-дуэли</button>
+                        <button class="category-tab" type="button" role="tab" aria-selected="false" data-leaderboard-mode="solo" onclick="selectLeaderboardMode('solo')">С ботом</button>
+                        <button class="category-tab" type="button" role="tab" aria-selected="false" data-leaderboard-mode="local" onclick="selectLeaderboardMode('local')">На одном телефоне</button>
+                    </div>
+                    <div id="leaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                </section>
 
             </div>
 
