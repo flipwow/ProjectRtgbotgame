@@ -19,6 +19,7 @@ let userData = {
 let selectedLeaderboardMode = 'online';
 let currentPetId = 'bars';
 let chatContext = { chatId: null, userId: null };
+let chatMembersRefreshInFlight = false;
 
 let tttMode = 'solo';
 let tttBoard = Array(9).fill(null);
@@ -287,14 +288,11 @@ async function loadTelegramAvatar(user = {}) {
     setAvatarFallback(user);
     if (!avatarElement || !tg?.initData) return;
 
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
     try {
-        const response = await fetch('/api/avatar', {
+        const response = await fetchWithTimeout('/api/avatar', {
             headers: { 'X-Telegram-Init-Data': tg.initData },
-            cache: 'no-store',
-            signal: controller.signal
-        });
+            cache: 'no-store'
+        }, 10000);
         if (!response.ok) throw new Error(`Avatar request failed: ${response.status}`);
 
         const image = await response.blob();
@@ -314,8 +312,6 @@ async function loadTelegramAvatar(user = {}) {
     } catch (error) {
         console.info('Profile photo unavailable; showing the default avatar.', error);
         setAvatarFallback(user);
-    } finally {
-        window.clearTimeout(timeoutId);
     }
 }
 
@@ -570,6 +566,37 @@ async function fetchUserData() {
     } finally {
         const status = document.getElementById('profile-status');
         if (status && !userData.user) status.textContent = 'Unavailable';
+    }
+}
+
+
+
+
+async function refreshChatMembers() {
+    const profileTab = document.getElementById('tab-profile');
+    if (
+        !chatContext.chatId
+        || document.hidden
+        || !profileTab?.classList.contains('active')
+        || chatMembersRefreshInFlight
+    ) return;
+
+    chatMembersRefreshInFlight = true;
+    try {
+        const response = await fetchWithTimeout(
+            `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+            { headers: { 'X-Telegram-Init-Data': tg?.initData || '' } },
+            10000
+        );
+        if (!response.ok) return;
+
+        const data = await response.json().catch(() => ({}));
+        userData.registry = Array.isArray(data.members) ? data.members : [];
+        renderChatRegistry();
+    } catch (error) {
+        console.debug('Chat member list refresh failed.', error);
+    } finally {
+        chatMembersRefreshInFlight = false;
     }
 }
 
@@ -1790,13 +1817,12 @@ function connectToRoom(roomId) {
     tttMode = 'online';
     tttGameOver = false;
 
-    const protocol =
-        window.location.protocol === 'https:'
-            ? 'wss:'
-            : 'ws:';
-
+    const backendOrigin = API_BASE_URL
+        ? new URL(API_BASE_URL, window.location.href)
+        : window.location;
+    const protocol = backendOrigin.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl =
-        `${protocol}//${window.location.host}/ws/game/${encodeURIComponent(roomId)}`;
+        `${protocol}//${backendOrigin.host}/ws/game/${encodeURIComponent(roomId)}`;
 
     socket = new WebSocket(wsUrl);
 
@@ -1924,18 +1950,17 @@ function connectToRoom(roomId) {
 
 
 function checkDuelParams() {
+    const params = new URLSearchParams(window.location.search);
     const startParam =
-        tg?.initDataUnsafe?.start_param || '';
-
-    let roomId = null;
-
-    if (startParam.startsWith('duel_')) {
-        roomId = startParam.substring(5);
-    } else if (
-        startParam.startsWith('online_')
-    ) {
-        roomId = startParam.substring(7);
-    }
+        tg?.initDataUnsafe?.start_param
+        || params.get('tgWebAppStartParam')
+        || params.get('startapp')
+        || params.get('start_param')
+        || '';
+    let roomId = params.get('duel_id') || params.get('room_id') || '';
+    const duelStartMatch = startParam.match(/^(?:duel|online)_(.+)$/);
+    if (!roomId && duelStartMatch) roomId = duelStartMatch[1];
+    roomId = roomId.trim();
 
     if (!roomId) {
         return;
@@ -2071,18 +2096,24 @@ async function feedPet(foodId) {
 document.addEventListener(
     'DOMContentLoaded',
     () => {
-
-                initSettings();
+        initSettings();
         initTelegramUser();
 
         document.getElementById('convert-rp-amount')
             ?.addEventListener('input', updateConvertPreview);
         updateConvertPreview();
-        checkDuelParams();
 
         void (async () => {
             await waitForServerWakeup();
+            checkDuelParams();
             await fetchUserData();
         })();
+
+        window.setInterval(() => {
+            void refreshChatMembers();
+        }, 15000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) void refreshChatMembers();
+        });
     }
 );

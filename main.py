@@ -1939,6 +1939,61 @@ def get_active_chat_profile(chat_id, user_id):
     return profile if isinstance(profile, dict) else None
 
 
+def upsert_chat_profile_from_telegram(chat_id, telegram_user):
+    user_id = str(telegram_user["id"])
+    chat_id = str(chat_id)
+    profile_key = chat_member_key(chat_id, user_id)
+    profiles = load_chat_profiles()
+    if not isinstance(profiles, dict):
+        profiles = {}
+
+    profile = profiles.get(profile_key)
+    now = time.time()
+    if not isinstance(profile, dict):
+        profile = {
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "username": "",
+            "display_name": "",
+            "activated_at": now,
+            "relationship_rp": 0,
+            "convertible_rp": 0,
+            "balance_r": 0,
+            "status": "active",
+            "last_message_time": now,
+            "last_rp_award_time": 0,
+            "recent_messages": [],
+            "flood_cooldown_until": 0,
+            "spam_strikes": 0,
+            "spam_strikes_at": 0,
+            "offended_until": 0,
+        }
+        profiles[profile_key] = profile
+        changed = True
+    else:
+        changed = False
+
+    first_name = str(telegram_user.get("first_name", "") or "").strip()
+    last_name = str(telegram_user.get("last_name", "") or "").strip()
+    display_name = " ".join(part for part in (first_name, last_name) if part)
+    username = str(telegram_user.get("username", "") or "").strip()
+    for field, value in (
+        ("chat_id", chat_id),
+        ("user_id", user_id),
+        ("username", username),
+        ("display_name", display_name),
+    ):
+        if value and profile.get(field) != value:
+            profile[field] = value
+            changed = True
+
+    if changed:
+        profiles[profile_key] = profile
+        if not save_chat_profiles(profiles):
+            return None
+    return profile
+
+
 async def read_json_object(request):
     try:
         payload = await request.json()
@@ -2115,13 +2170,9 @@ async def api_chat_profile(request):
         return error_response
 
     user_id = str(telegram_user["id"])
-    profile_key = chat_member_key(chat_id, user_id)
-    profiles = load_chat_profiles()
-    profile = profiles.get(profile_key)
-    if not isinstance(profile, dict):
-        return web.json_response(
-            {"error": "Activate /pet activate in this chat first"}, status=404
-        )
+    profile = upsert_chat_profile_from_telegram(chat_id, telegram_user)
+    if profile is None:
+        return web.json_response({"error": "Could not save chat member"}, status=500)
 
     leaderboard = get_chat_leaderboard(chat_id)
     member_profiles = [member for member in leaderboard if member["user_id"] != user_id]
