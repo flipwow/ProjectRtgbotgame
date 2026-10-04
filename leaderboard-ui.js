@@ -155,9 +155,6 @@
         element('leaderboardGameModal')?.addEventListener('click', event => {
             if (event.target.id === 'leaderboardGameModal') event.currentTarget.style.display = 'none';
         });
-        document.querySelectorAll('.nav-item').forEach((button, index) => {
-            if (index === 1) button.addEventListener('click', () => setTimeout(renderLeaderboard, 0));
-        });
         renderLeaderboard();
     }
 

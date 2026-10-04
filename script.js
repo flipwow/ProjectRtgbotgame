@@ -285,8 +285,21 @@ function setAvatarFallback(user = {}) {
 
 async function loadTelegramAvatar(user = {}) {
     const avatarElement = document.getElementById('user-avatar');
+    const avatarFallback = document.getElementById('avatar-fallback');
     setAvatarFallback(user);
-    if (!avatarElement || !tg?.initData) return;
+    if (!avatarElement) return;
+
+    const photoUrl = user.photo_url || tg?.initDataUnsafe?.user?.photo_url;
+    if (photoUrl) {
+        avatarElement.onload = () => {
+            avatarElement.classList.add('is-visible');
+            if (avatarFallback) avatarFallback.hidden = true;
+        };
+        avatarElement.onerror = () => setAvatarFallback(user);
+        avatarElement.src = photoUrl;
+        return;
+    }
+    if (!tg?.initData) return;
 
     try {
         const response = await fetchWithTimeout('/api/avatar', {
@@ -341,7 +354,7 @@ function resolveChatContext() {
 }
 
 
-const API_REQUEST_TIMEOUT_MS = 120000;
+const API_REQUEST_TIMEOUT_MS = 30000;
 const PING_REQUEST_TIMEOUT_MS = 4500;
 const PING_RETRY_INTERVAL_MS = 5000;
 
@@ -511,7 +524,7 @@ async function fetchUserData() {
             showProfileFeedback('Открой профиль через кнопку бота в нужном чате.', 'error');
                         renderChatRegistry();
             return;
-        }
+                }
         showProfileFeedback('');
 
         const isChatProfile = Boolean(chatContext.chatId);
@@ -521,24 +534,17 @@ async function fetchUserData() {
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
         };
-        let response;
-        let data;
-        for (let attempt = 0; attempt < 4; attempt += 1) {
-            response = await fetchWithTimeout(
-                endpoint,
-                { headers },
-                API_REQUEST_TIMEOUT_MS
-            );
-            data = await response.json().catch(() => ({}));
-            if (response.ok || response.status !== 404 || attempt === 3) break;
-            await delay(500);
-        }
+        const response = await fetchWithTimeout(
+            endpoint,
+                        { headers },
+            API_REQUEST_TIMEOUT_MS
+        );
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
-                
-        userData.foodCatalog = data.food_catalog || data.catalog || [];
+                userData.foodCatalog = data.food_catalog || data.catalog || [];
         userData.petCatalog = data.pet_catalog || [];
         if (isChatProfile) {
             if (data.chat?.id) chatContext.chatId = String(data.chat.id);
@@ -548,7 +554,8 @@ async function fetchUserData() {
         }
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
         currentPetId = userData.pet?.id || 'bars';
-        await fetchLeaderboard();
+        userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+        renderLeaderboard();
         renderProfile();
 
         updatePetView();
@@ -1027,16 +1034,14 @@ function switchTab(tabName) {
 
     const index = indexes[tabName];
 
-    if (index !== undefined) {
+        if (index !== undefined) {
         navButtons[index]?.classList.add('active');
     }
 
     if (tabName === 'home') {
         updatePetView();
-    }
-
-    if (['leaderboard', 'shop', 'profile'].includes(tabName)) {
-        fetchUserData();
+    } else if (tabName === 'profile' && chatContext.chatId) {
+        void refreshChatMembers();
     }
 }
 
@@ -2097,23 +2102,14 @@ document.addEventListener(
     'DOMContentLoaded',
     () => {
         initSettings();
-        initTelegramUser();
+                initTelegramUser();
 
         document.getElementById('convert-rp-amount')
             ?.addEventListener('input', updateConvertPreview);
+
         updateConvertPreview();
 
-        void (async () => {
-            await waitForServerWakeup();
-            checkDuelParams();
-            await fetchUserData();
-        })();
-
-        window.setInterval(() => {
-            void refreshChatMembers();
-        }, 15000);
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) void refreshChatMembers();
-        });
+        checkDuelParams();
+        void fetchUserData();
     }
 );
