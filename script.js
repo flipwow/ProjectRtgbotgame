@@ -101,12 +101,38 @@ const API_REQUEST_TIMEOUT_MS = 120000;
 const PING_REQUEST_TIMEOUT_MS = 4500;
 const PING_RETRY_INTERVAL_MS = 5000;
 
+const API_BASE_URL = (() => {
+    const configuredUrl =
+        window.APP_CONFIG?.apiBaseUrl
+        || new URLSearchParams(window.location.search).get('api_url');
+
+    if (configuredUrl) {
+        return configuredUrl.replace(/\/+$/, '');
+    }
+
+    const isLocalHost = ['localhost', '127.0.0.1', '::1']
+        .includes(window.location.hostname);
+
+    if (isLocalHost && window.location.port === '4173') {
+        const host = window.location.hostname === '::1'
+            ? '[::1]'
+            : window.location.hostname;
+        return `${window.location.protocol}//${host}:8080`;
+    }
+
+    return '';
+})();
+
+function apiUrl(path) {
+    return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = API_REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-        return await fetch(url, {
+        return await fetch(apiUrl(url), {
             ...options,
             signal: controller.signal
         });

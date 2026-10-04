@@ -11,7 +11,7 @@ import time
 import uuid
 import urllib.error
 import urllib.request
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from aiohttp import web, WSMsgType
 from dotenv import load_dotenv
@@ -1714,6 +1714,10 @@ async def rematch_callback(callback: CallbackQuery):
 # ============================================================
 
 
+async def api_ping(request):
+    return web.json_response({"status": "ok"})
+
+
 def resolve_chat_api_context(request, payload=None):
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
@@ -3035,25 +3039,30 @@ async def webapp_cors(
 ):
 
     if request.method == "OPTIONS":
-
         response = web.Response(status=204)
-
     else:
-
         response = await handler(request)
 
     origin = request.headers.get("Origin")
+    allowed_origin = origin == WEBAPP_ORIGIN
 
-    if origin == WEBAPP_ORIGIN:
+    if origin:
+        try:
+            parsed_origin = urlsplit(origin)
+            allowed_origin = allowed_origin or (
+                parsed_origin.scheme == "http"
+                and parsed_origin.hostname in {"localhost", "127.0.0.1", "::1"}
+            )
+        except ValueError:
+            allowed_origin = False
 
+    if origin and allowed_origin:
         response.headers["Access-Control-Allow-Origin"] = origin
-
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, " "X-Telegram-Init-Data"
+            "Content-Type, X-Telegram-Init-Data"
         )
-
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-
+        response.headers["Access-Control-Max-Age"] = "600"
         response.headers["Vary"] = "Origin"
 
     return response
@@ -3090,6 +3099,11 @@ async def start_webapp_api():
     )
 
     # API
+    app.router.add_get(
+        "/api/ping",
+        api_ping,
+    )
+
     app.router.add_get(
         "/api/me",
         api_profile,
