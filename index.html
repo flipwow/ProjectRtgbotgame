@@ -396,6 +396,8 @@
                     <p id="convert-preview" class="conversion-preview">Будет начислено 10 R$</p>
                 </section>
 
+                <button class="settings-open-button" type="button" onclick="openSettings()">⚙️ Настройки</button>
+
                 <section class="members-section" aria-labelledby="members-title">
                     <div class="members-heading">
                         <div>
@@ -458,6 +460,51 @@
 
         </div>
 
+    </div>
+
+    <!-- Настройки приложения -->
+    <div id="settingsModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <section class="pet-modal-content settings-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="settings-title">Настройки</h3>
+                <button class="close-modal-btn" type="button" aria-label="Закрыть" onclick="closeSettings()">✕</button>
+            </div>
+            <label class="settings-field" for="language-select">
+                <span>Язык / Language</span>
+                <select id="language-select" onchange="setAppLanguage(this.value)">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                </select>
+            </label>
+            <label class="settings-field" for="theme-select">
+                <span>Тема</span>
+                <select id="theme-select" onchange="setAppTheme(this.value)">
+                    <option value="current">Текущая</option>
+                    <option value="light">Светлая</option>
+                    <option value="dark">Тёмная</option>
+                </select>
+            </label>
+            <button class="settings-rules-button" type="button" onclick="openRules()">📖 Правила</button>
+        </section>
+    </div>
+
+    <div id="rulesModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+        <section class="pet-modal-content rules-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="rules-title">Правила</h3>
+                <button class="close-modal-btn" type="button" aria-label="Закрыть" onclick="closeRules()">✕</button>
+            </div>
+            <div class="rules-copy">
+                <p><strong>Основные команды бота</strong></p>
+                <p><code>/start</code> — запустить бота и открыть приложение.</p>
+                <p><code>/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.</p>
+                <p><code>/profile</code> — открыть профиль чата; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.</p>
+                <p>В онлайн-дуэли ходи только в свой ход. Победитель получает 30–60 RP, ничья не награждается.</p>
+                <p>Заботься о питомце, покупай еду за R$ и используй RP для обмена на валюту.</p>
+                <p class="rules-note">Играйте честно и уважайте других участников чата.</p>
+            </div>
+            <button class="settings-rules-button" type="button" onclick="closeRules()">Готово</button>
+        </section>
     </div>
 
     <!-- Выбор питомца -->

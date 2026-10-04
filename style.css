@@ -1494,8 +1494,188 @@ body {
         gap: 10px;
     }
 
-    .profile-pet-image {
+        .profile-pet-image {
         width: 62px;
         height: 62px;
     }
+}
+
+:root[data-theme="dark"] {
+    --bg-color: #10101a;
+    --card-bg: rgba(35, 32, 51, 0.88);
+    --card-border: rgba(196, 181, 253, 0.18);
+    --text-primary: #f5f3ff;
+    --text-secondary: #aaa5bd;
+    --accent-color: #a78bfa;
+    --accent-gradient: linear-gradient(120deg, #8b5cf6 0%, #ec4899 100%);
+}
+
+:root[data-theme="dark"] body {
+    background-image: radial-gradient(rgba(196, 181, 253, 0.1) 0.65px, transparent 0.75px), linear-gradient(145deg, #0d0d16, #191525 58%, #12111c);
+}
+
+:root[data-theme="light"] {
+    --bg-color: #f4f6f7;
+    --card-bg: rgba(255, 255, 255, 0.92);
+    --card-border: rgba(45, 75, 65, 0.16);
+    --text-primary: #24332f;
+    --text-secondary: #667873;
+    --accent-color: #299b78;
+    --accent-gradient: linear-gradient(120deg, #50c99e 0%, #f2a18b 100%);
+}
+
+:root[data-theme="light"] body {
+    background-image: radial-gradient(rgba(49, 110, 89, 0.1) 0.65px, transparent 0.75px), linear-gradient(145deg, #f8fbfa, #e9f1ee 58%, #f5f2ef);
+}
+
+:root[data-theme="light"] .pet-modal-content {
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(30, 50, 43, 0.18);
+}
+
+:root[data-theme="light"] .amount-field input {
+    background: rgba(235, 242, 239, 0.9);
+}
+
+:root[data-theme="light"] .metric-tile {
+    background: linear-gradient(145deg, #fff, #edf4f1);
+}
+
+:root[data-theme="light"] .conversion-panel,
+:root[data-theme="light"] .pet-profile-panel {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 243, 239, 0.96));
+}
+
+:root[data-theme="light"] .balance-badge {
+    background: rgba(111, 78, 176, 0.1);
+    color: #614a91;
+}
+
+:root[data-theme="light"] .profile-kicker,
+:root[data-theme="light"] .panel-eyebrow {
+    color: #26785f;
+}
+
+:root[data-theme="light"] .profile-status {
+    color: #247153;
+}
+
+:root[data-theme="light"] .conversion-mark {
+    color: #26785f;
+}
+
+:root[data-theme="light"] .metric-tile small {
+    color: #566e65;
+}
+
+:root[data-theme="light"] .balance-tile strong {
+    color: #9b6418;
+}
+
+:root[data-theme="light"] .relationship-tile strong {
+    color: #26785f;
+}
+
+:root[data-theme="light"] .convertible-tile strong {
+    color: #a4513e;
+}
+
+:root[data-theme="light"] .conversion-preview {
+    color: #42695b;
+}
+
+:root[data-theme="light"] .members-count {
+    color: #42695b;
+}
+
+:root[data-theme="light"] .member-pet-action {
+    color: #26785f;
+}
+
+:root[data-theme="light"] .member-gift-action {
+    color: #a4513e;
+}
+
+:root[data-theme="light"] .pet-stat-track,
+:root[data-theme="light"] .profile-stat-track {
+    background: rgba(30, 60, 48, 0.12);
+}
+
+:root[data-theme="light"] .primary-action {
+    color: #10201b;
+}
+
+:root[data-theme="light"] .profile-feedback.is-success {
+    color: #26785f;
+}
+
+:root[data-theme="light"] .profile-feedback.is-error {
+    color: #a23d2a;
+}
+
+
+.settings-open-button,
+.settings-rules-button {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid var(--card-border);
+    border-radius: 11px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.settings-open-button {
+    margin: 2px 0 14px;
+}
+
+.settings-modal-content,
+.rules-modal-content {
+    display: grid;
+    gap: 14px;
+}
+
+.settings-modal-content .pet-modal-header,
+.rules-modal-content .pet-modal-header {
+    margin-bottom: 0;
+}
+
+.settings-field {
+    display: grid;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.settings-field select {
+    width: 100%;
+    min-height: 42px;
+    padding: 0 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font: inherit;
+}
+
+.rules-copy {
+    display: grid;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.rules-copy strong,
+.rules-copy code {
+    color: var(--text-primary);
+}
+
+.rules-note {
+    padding-top: 8px;
+    border-top: 1px solid var(--card-border);
 }

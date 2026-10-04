@@ -27,6 +27,188 @@ let mySymbol = null;
 let socket = null;
 let currentRoomId = null;
 
+const SETTINGS_KEY = 'ritushka-miniapp-settings';
+const textSourceCache = new WeakMap();
+let appSettings = loadAppSettings();
+
+const englishText = {
+    'Загрузка...': 'Loading...', 'Пользователь': 'User', 'Питомец': 'Pet', 'Лидеры': 'Leaders', 'Игры': 'Games', 'Еда': 'Food', 'Профиль': 'Profile',
+    'Твой любимый дерзкий пушистик 💅': 'Your favorite sassy fluffball 💅', 'Переименовать питомца': 'Rename pet', 'Уровень': 'Level', 'Здоровье': 'Health', 'Голод': 'Hunger', 'Счастье': 'Happiness', 'Энергия': 'Energy',
+    'Сменить питомца': 'Change pet', 'Покормить питомца': 'Feed pet', '👑 Таблица лидеров': '👑 Leaderboard', 'Очки за победы в онлайн-крестиках-ноликах': 'Points for online tic-tac-toe wins',
+    '🎮 Мини-игры': '🎮 Mini-games', 'Сразись с другими пешками': 'Challenge other pawns', '❌ Крестики-нолики ⭕️': '❌ Tic-tac-toe ⭕️', 'Играй с ботом или устрой дуэль с другом': 'Play with the bot or challenge a friend',
+    '🤖 Играть с ботом': '🤖 Play against the bot', '👥 Играть с другом (на одном телефоне)': '👥 Play with a friend (on one phone)', '◀️ Назад к играм': '◀️ Back to games', 'Сдаться / Назад': 'Forfeit / Back',
+    'Чтобы вызвать друга на дуэль онлайн, отправь боту команду': 'To challenge a friend online, send the bot the command', '🥣 Магазин питомца': '🥣 Pet shop', 'Покупай еду за R$ и пополняй холодильник': 'Buy food with R$ and stock the fridge', 'Еда': 'Food',
+    'ПРОФИЛЬ ЧАТА': 'CHAT PROFILE', 'Telegram Mini App': 'Telegram Mini App', 'Загрузка': 'Loading', 'Баланс': 'Balance', 'Отношения': 'Relationship', 'Доступно к обмену': 'Available to exchange',
+    'Обмен RP на R$': 'Exchange RP for R$', 'Курс: 100 RP = 10 R$': 'Rate: 100 RP = 10 R$', 'Сумма RP': 'RP amount', 'Обменять RP на R$': 'Exchange RP for R$',
+    'СООБЩЕСТВО': 'COMMUNITY', 'Участники чата': 'Chat members', '⚙️ Настройки': '⚙️ Settings', 'Настройки': 'Settings', 'Язык / Language': 'Language', 'Язык: Русский / English': 'Language: Russian / English',
+    'Тема': 'Theme', 'Текущая': 'Current', 'Светлая': 'Light', 'Тёмная': 'Dark', '📖 Правила': '📖 Rules', 'Правила': 'Rules', 'Готово': 'Done',
+    'Основные команды бота': 'Main bot commands', '/start</code> — запустить бота и открыть приложение.': '/start</code> — start the bot and open the app.',
+    '/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.': '/duel</code> — create an online tic-tac-toe duel and post the challenge in chat.',
+    '/profile</code> — открыть профиль чата; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.': '/profile</code> — open chat profile; <code>/balance</code> — check your balance; <code>/pet</code> — view your pet.',
+    'В онлайн-дуэли ходи только в свой ход. Победитель получает 30–60 RP, ничья не награждается.': 'In an online duel, make a move only on your turn. The winner receives 30–60 RP; a draw has no reward.',
+    'Заботься о питомце, покупай еду за R$ и используй RP для обмена на валюту.': 'Take care of your pet, buy food with R$, and exchange RP for currency.', 'Играйте честно и уважайте других участников чата.': 'Play fair and respect other chat members.',
+    'Другие участники пока не активировали бота в этом чате.': 'Other members have not activated the bot in this chat yet.', 'В этом чате пока нет участников рейтинга.': 'There are no ranked players in this chat yet.',
+    'Очки за победы': 'win points', 'Подарить R$': 'Gift R$', 'Посмотреть питомца': 'View pet', 'Профиль чата': 'Chat profile', 'Участники и экономика чата': 'Chat members and economy',
+    'Обмен завершён': 'Exchange complete', 'Подарок отправлен': 'Gift sent', 'Имя питомца изменено.': 'Pet name updated.', 'Новое имя': 'New name', 'Имя питомца': 'Pet name', 'Отмена': 'Cancel', 'Сохранить': 'Save',
+    'Выбор питомца': 'Choose a pet', 'Покормить Барсичелу': 'Feed Barsichela', 'Выбери лакомство из инвентаря:': 'Choose a treat from your inventory:', 'Холодильник пока пуст 🛍': 'The fridge is empty 🛍',
+    'Холодильник пуст. Загляни в магазин еды 🛍': 'The fridge is empty. Visit the food shop 🛍', 'Накормить': 'Feed', 'Магазин еды пока пуст': 'The food shop is empty', 'В холодильнике:': 'In fridge:', 'Купить ·': 'Buy ·',
+    'Режимы': 'Modes', 'Ходит: X': 'Turn: X', 'Победа:': 'Winner:', 'Ничья! 🤝': 'Draw! 🤝', 'Ожидание соперника...': 'Waiting for opponent...', 'Твой ход!': 'Your turn!', 'Победил': 'Winner', 'Ты победил! 🎉': 'You won! 🎉', 'Награда:': 'Reward:', 'R$.': 'RP.', 'Твой ход': 'Your turn',
+    'Твой любимый дерзкий пушистик': 'Your favorite sassy fluffball', 'Питомец участника': 'MEMBER PET', 'Участник': 'Member', 'Участники пока не активировали бота': 'Members have not activated the bot yet',
+    'Доступно:': 'Available:', 'Сумма перевода': 'Transfer amount', 'Например, 25': 'For example, 25', 'Отправить подарок': 'Send gift', 'Перевод R$': 'Transfer R$', 'Закрыть': 'Close',
+    'Ракурс': 'View', 'Назад': 'Back', 'Уровень питомца': 'Pet level', 'Синхронизация с питомцем... Наш сервер на Render просыпается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾': 'Syncing with your pet... The server is waking up and may take about a minute. Please keep the app open 🐾',
+    'Барсичела': 'Barsichela', 'RITUSHKA PET': 'RITUSHKA PET', 'Переименовать питомца': 'Rename pet', 'Имя питомца': 'Pet name', 'Новое имя': 'New name', 'Отмена': 'Cancel', 'Сохранить': 'Save',
+    'Сменить питомца': 'Change pet', 'Покормить питомца': 'Feed pet', 'Сытость': 'Satiety', 'Выбери лакомство из инвентаря:': 'Choose a treat from your inventory:',
+    'Очки за победы в онлайн-крестиках-ноликах': 'Points for online tic-tac-toe wins', 'Сразись с другими пешками': 'Challenge other players', 'Играй с ботом или устрой дуэль с другом': 'Play the bot or challenge a friend',
+    'Играть с другом (на одном телефоне)': 'Play with a friend (on one phone)', 'Назад к играм': 'Back to games', 'Сдаться / Назад': 'Forfeit / Back', 'Магазин питомца': 'Pet shop',
+    'Покупай еду за R$ и пополняй холодильник': 'Buy food with R$ and stock the fridge', 'ПРОФИЛЬ ЧАТА': 'CHAT PROFILE', 'Загрузка участников...': 'Loading members...',
+    'Курс: 100 RP = 10 R$': 'Rate: 100 RP = 10 R$', 'Сумма RP': 'RP amount', 'Участники чата': 'Chat members',
+    'Другие участники пока не активировали бота в этом чате.': 'Other members have not activated the bot in this chat yet.', 'В этом чате пока нет участников рейтинга.': 'There are no ranked members in this chat yet.',
+    'Недостаточно R$ для покупки.': 'Not enough R$ to buy this.', 'Магазин еды пока пуст': 'The food shop is empty', 'Холодильник пока пуст': 'The fridge is empty',
+    'Покормить Барсичелу': 'Feed Barsichela', 'Отправить подарок': 'Send gift', 'Сумма перевода': 'Transfer amount', 'Ожидание соперника...': 'Waiting for opponent...',
+    'Ходит: X (Крестики)': 'Turn: X (Crosses)', 'Язык / Language': 'Language', 'Русский': 'Russian', 'Текущая': 'Current', 'Светлая': 'Light', 'Тёмная': 'Dark',
+    'Основные команды бота': 'Main bot commands', ' — запустить бота и открыть приложение.': ' — start the bot and open the app.',
+    ' — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.': ' — create an online tic-tac-toe duel and send a challenge to the chat.',
+    ' — открыть профиль чата; ': ' — open the chat profile; ', ' — проверить баланс; ': ' — check your balance; ', ' — посмотреть питомца.': ' — view your pet.',
+    'В онлайн-дуэли ходи только в свой ход. Победитель получает 30–60 RP, ничья не награждается.': 'In an online duel, make a move only on your turn. The winner receives 30–60 RP; draws have no reward.',
+    'Заботься о питомце, покупай еду за R$ и используй RP для обмена на валюту.': 'Care for your pet, buy food with R$, and exchange RP for currency.',
+    'Играйте честно и уважайте других участников чата.': 'Play fair and respect other chat members.'
+  };
+
+function loadAppSettings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        return {
+            language: saved.language === 'en' ? 'en' : 'ru',
+            theme: ['current', 'light', 'dark'].includes(saved.theme) ? saved.theme : 'current'
+        };
+    } catch {
+        return { language: 'ru', theme: 'current' };
+    }
+}
+
+function translateSource(source) {
+    if (appSettings.language !== 'en') return source;
+    const clean = source.trim();
+    let result = englishText[clean];
+    if (!result) {
+        const patterns = [
+            [/^Будет начислено (\d+) R\$$/, 'You will receive $1 R$'],
+            [/^Обмен завершён: (\d+) RP → (\d+) R\$$/, 'Exchange complete: $1 RP → $2 R$'],
+            [/^Подарок отправлен: (\d+) R\$$/, 'Gift sent: $1 R$'],
+                        [/^Награда: (\d+) RP\.$/, 'Reward: $1 RP.'],
+            [/^Ты победил! 🎉 Награда: (\d+) RP\.$/, 'You won! 🎉 Reward: $1 RP.'],
+            [/^Ты играешь за ([XO])\. Ожидание соперника\.\.\.$/, 'You are playing as $1. Waiting for opponent...'],
+            [/^Ты: ([XO]) \| Твой ход!$/, 'You: $1 | Your turn!'],
+            [/^Ты: ([XO]) \| Ход соперника \(([XO])\)$/, "You: $1 | Opponent's turn ($2)"],
+            [/^Ты: ([XO]) \| Ходит: ([XO])$/, 'You: $1 | Turn: $2'],
+            [/^Ты: ([XO]) \| (.+)$/, 'You: $1 | $2'],
+            [/^Ход соперника \(([XO])\)$/, "Opponent's turn ($1)"],
+            [/^Победил ([XO])$/, 'Player $1 won'],
+            [/^Победа: ([XO])! 🎉$/, 'Winner: $1! 🎉'],
+            [/^В холодильнике: (\d+)$/, 'In fridge: $1'],
+            [/^Купить · (\d+) R\$$/, 'Buy · $1 R$'],
+            [/^Игрок (.+)$/, 'Player $1'],
+            [/^(\d+) очков побед · (\d+) RP · (\d+) R\$$/, '$1 win points · $2 RP · $3 R$'],
+            [/^(\d+) очк\.$/, '$1 pts.'],
+            [/^(\d+) RP · (\d+) R\$$/, '$1 RP · $2 R$'],
+            [/^Доступно: (\d+) R\$$/, 'Available: $1 R$'],
+            [/^(\d+) \/ (\d+)$/, '$1 / $2']
+        ];
+        for (const [pattern, replacement] of patterns) {
+            if (pattern.test(clean)) {
+                result = clean.replace(pattern, replacement);
+                break;
+            }
+        }
+    }
+    if (!result) return source;
+    const leading = source.match(/^\s*/)?.[0] || '';
+    const trailing = source.match(/\s*$/)?.[0] || '';
+    return `${leading}${result}${trailing}`;
+}
+
+function translateNode(node) {
+    if (!node || node.nodeType !== Node.TEXT_NODE) return;
+    if (!textSourceCache.has(node)) textSourceCache.set(node, node.nodeValue);
+    const translated = translateSource(textSourceCache.get(node));
+    if (node.nodeValue !== translated) node.nodeValue = translated;
+}
+
+function applyLanguage() {
+    document.documentElement.lang = appSettings.language;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) translateNode(node);
+    document.querySelectorAll('[title], [aria-label], [placeholder]').forEach(element => {
+        ['title', 'aria-label', 'placeholder'].forEach(attribute => {
+            if (!element.hasAttribute(attribute)) return;
+            const key = `${attribute}:${element}`;
+            if (!element.dataset[`i18n${attribute}`]) {
+                element.dataset[`i18n${attribute}`] = element.getAttribute(attribute);
+            }
+            element.setAttribute(attribute, translateSource(element.dataset[`i18n${attribute}`]));
+        });
+    });
+}
+
+function persistAppSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings)); } catch (error) { console.warn('Не удалось сохранить настройки', error); }
+}
+
+function applyTheme() {
+    if (appSettings.theme === 'current') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.dataset.theme = appSettings.theme;
+}
+
+function setAppLanguage(language) {
+    appSettings.language = language === 'en' ? 'en' : 'ru';
+    persistAppSettings();
+    applyLanguage();
+}
+
+function setAppTheme(theme) {
+    appSettings.theme = ['current', 'light', 'dark'].includes(theme) ? theme : 'current';
+    persistAppSettings();
+    applyTheme();
+}
+
+function openSettings() {
+    document.getElementById('language-select').value = appSettings.language;
+    document.getElementById('theme-select').value = appSettings.theme;
+    document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').style.display = 'none';
+}
+
+function openRules() {
+    closeSettings();
+    document.getElementById('rulesModal').style.display = 'flex';
+}
+
+function closeRules() {
+    document.getElementById('rulesModal').style.display = 'none';
+}
+
+function initSettings() {
+    applyTheme();
+    applyLanguage();
+    const observer = new MutationObserver(records => {
+        records.forEach(record => {
+            if (record.type === 'characterData') translateNode(record.target);
+            record.addedNodes?.forEach(added => {
+                if (added.nodeType === Node.TEXT_NODE) translateNode(added);
+                else if (added.nodeType === Node.ELEMENT_NODE) {
+                    const walker = document.createTreeWalker(added, NodeFilter.SHOW_TEXT);
+                    let text;
+                    while ((text = walker.nextNode())) translateNode(text);
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+}
 
 function initTelegramUser() {
     if (!tg) {
@@ -1509,33 +1691,30 @@ function connectToRoom(roomId) {
 
                 updateTttUI();
 
-                if (data.status === 'finished') {
-
+                                if (data.status === 'finished') {
                     if (data.winner === 'draw') {
                         if (statusEl) {
-                            statusEl.textContent =
-                                'Ничья! 🤝';
+                            statusEl.textContent = 'Ничья! 🤝';
                         }
                     } else {
-                        const isWin =
-                            data.winner === mySymbol;
+                        const isWin = data.winner === mySymbol;
 
                         if (statusEl) {
-                            statusEl.textContent =
-                                isWin
-                                    ? 'Ты победил! 🎉'
-                                    : `Победил ${data.winner}`;
+                            statusEl.textContent = isWin
+                                ? `Ты победил! 🎉${Number(data.reward) > 0 ? ` Награда: ${Number(data.reward)} RP.` : ''}`
+                                : `Победил ${data.winner}`;
                         }
 
-                        if (
-                            isWin &&
-                            tg?.HapticFeedback
-                        ) {
-                            tg.HapticFeedback.notificationOccurred(
-                                'success'
-                            );
+                        if (isWin && Number(data.reward) > 0) {
+                            void fetchUserData();
+                        }
+
+                        if (isWin && tg?.HapticFeedback) {
+                            tg.HapticFeedback.notificationOccurred('success');
                         }
                     }
+
+
 
                 } else {
                     const turnText =
@@ -1722,6 +1901,7 @@ document.addEventListener(
     'DOMContentLoaded',
     () => {
 
+                initSettings();
         initTelegramUser();
 
         document.getElementById('convert-rp-amount')

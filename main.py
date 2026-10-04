@@ -444,14 +444,23 @@ def chat_member_key(chat_id, user_id):
 
 def ensure_chat_pet(chat_id, user_id):
     pets = load_pets_data()
-    pet_id = (
-        DEFAULT_PET_ID
-        if DEFAULT_PET_ID in pets
-        else next(
-            (key for key in pets if key != "users_pets"),
-            None,
+    users = load_users()
+    user_info = users.get(f"id_{user_id}", {})
+    for candidate in users.values():
+        if str(candidate.get("telegram_id", "")) == str(user_id):
+            user_info = candidate
+            break
+    pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
+    if pet_id not in pets or pet_id == "users_pets":
+        pet_id = (
+            DEFAULT_PET_ID
+            if DEFAULT_PET_ID in pets
+            else next(
+                (key for key in pets if key != "users_pets"),
+                None,
+            )
         )
-    )
+
     if pet_id is None:
         return None
 
@@ -1920,10 +1929,29 @@ async def read_json_object(request):
     return payload if isinstance(payload, dict) else None
 
 
+def award_chat_game_reward(chat_id, user_id, amount):
+    if chat_id is None or user_id is None or amount <= 0:
+        return False
+
+    profile_key = chat_member_key(chat_id, user_id)
+    profiles = load_chat_profiles()
+    profile = profiles.get(profile_key)
+    if not isinstance(profile, dict):
+        return False
+
+    profile["relationship_rp"] = max(
+        0, int(profile.get("relationship_rp", 0) or 0)
+    ) + int(amount)
+    profile["convertible_rp"] = max(
+        0, int(profile.get("convertible_rp", 0) or 0)
+    ) + int(amount)
+    profiles[profile_key] = profile
+    return save_chat_profiles(profiles)
+
+
 def get_chat_leaderboard(chat_id):
     document = load_users_document()
     chat_members = {}
-
     for key, member in document.get("chat_profiles", {}).items():
         if not isinstance(member, dict) or ":" not in str(key):
             continue
@@ -1940,11 +1968,23 @@ def get_chat_leaderboard(chat_id):
             "SELECT user_id, score_value FROM scores WHERE chat_id = ?",
             (str(chat_id),),
         ).fetchall()
-    scores_by_user = {
+    chat_scores_by_user = {
         str(row["user_id"]): int(row["score_value"] or 0) for row in score_rows
     }
-
+    game_scores = load_scores().get("tictactoe", {})
+    scores_by_user = {}
+    if isinstance(game_scores, dict):
+        for user_id, score in game_scores.items():
+            if isinstance(score, dict):
+                score = score.get("online", 0)
+            try:
+                scores_by_user[str(user_id)] = max(0, int(score or 0))
+            except (TypeError, ValueError):
+                scores_by_user[str(user_id)] = 0
+    for user_id, score in chat_scores_by_user.items():
+        scores_by_user[user_id] = max(scores_by_user.get(user_id, 0), score)
     leaderboard = []
+
     for member_id, member in chat_members.items():
         leaderboard.append(
             {
@@ -2970,44 +3010,34 @@ async def websocket_game_handler(request):
                 winner = check_winner(room["board"])
 
                 if winner:
-
                     room["status"] = "finished"
                     room["winner"] = winner
 
-                    if winner in (
-                        "X",
-                        "O",
-                    ):
-
+                    if winner in ("X", "O"):
                         for player_ws, player_data in list(room["players"].items()):
+                            if player_data["symbol"] != winner:
+                                continue
 
-                            player_symbol = player_data["symbol"]
+                            tg_id = room.get("player_telegram_ids", {}).get(player_ws)
+                            if not tg_id:
+                                continue
 
-                            if player_symbol == winner:
+                            points = 10
+                            update_score("tictactoe", tg_id, points)
+                            update_chat_score(room.get("chat_id"), tg_id, points)
 
-                                user_data = room.get(
-                                    "player_telegram_ids",
-                                    {},
-                                )
-
-                                tg_id = user_data.get(player_ws)
-
-                                if tg_id:
-                                    update_score(
-                                        "tictactoe",
-                                        tg_id,
-                                        10,
-                                    )
-                                    update_chat_score(
-                                        room.get("chat_id"),
-                                        tg_id,
-                                        10,
-                                    )
+                            reward = random.randint(30, 60)
+                            if award_chat_game_reward(
+                                room.get("chat_id"), tg_id, reward
+                            ):
+                                room["winner_reward"] = reward
+                                room["winner_user_id"] = str(tg_id)
+                            else:
+                                room["winner_reward"] = 0
 
                     await finish_duel(room_id, room, winner)
 
                 else:
-
                     room["current"] = "O" if room["current"] == "X" else "X"
 
                 update_payload = {
@@ -3016,6 +3046,7 @@ async def websocket_game_handler(request):
                     "current": room["current"],
                     "status": room["status"],
                     "winner": room.get("winner"),
+                    "reward": room.get("winner_reward", 0),
                 }
 
                 for player_ws in list(room["players"].keys()):
