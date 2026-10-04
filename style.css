@@ -176,6 +176,36 @@ body {
     margin: 4px 0;
 }
 
+.pet-name-heading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pet-name-heading h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.pet-name-edit-button {
+    display: inline-grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: rgba(120, 218, 186, 0.1);
+    color: var(--accent-color);
+    cursor: pointer;
+    font-size: 17px;
+}
+
+.pet-name-edit-button:hover {
+    background: rgba(120, 218, 186, 0.2);
+}
+
 .subtitle {
     font-size: 12px;
     color: var(--text-secondary);
@@ -770,6 +800,21 @@ body {
 .pet-modal-header h3 {
     font-size: 18px;
     color: var(--text-primary);
+}
+
+.rename-pet-modal-content form {
+    display: grid;
+    gap: 14px;
+}
+
+.rename-pet-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.rename-pet-actions .primary-action {
+    margin: 0;
 }
 
 .close-modal-btn {

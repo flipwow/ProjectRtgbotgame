@@ -439,7 +439,7 @@ def chat_member_key(chat_id, user_id):
     return f"{chat_id}:{user_id}"
 
 
-def ensure_chat_pet(chat_id, user_id, pet_name=None):
+def ensure_chat_pet(chat_id, user_id):
     pets = load_pets_data()
     pet_id = (
         "barsichela"
@@ -453,24 +453,44 @@ def ensure_chat_pet(chat_id, user_id, pet_name=None):
         return None
 
     definition = pets[pet_id]
-    instances = pets.setdefault("users_pets", {})
-    key = chat_member_key(chat_id, user_id)
-    pet = instances.get(key)
-    if pet is None:
-        stats = definition.get("stats", {})
-        pet = {
-            "pet_id": pet_id,
-            "name": pet_name or definition.get("name", "Питомец"),
-            "level": definition.get("level", 1),
-            "experience": 0,
-            "health": stats.get("health", 100),
-            "hunger": stats.get("hunger", 100),
-            "happiness": stats.get("happiness", 100),
-            "energy": stats.get("energy", 100),
-        }
-        instances[key] = pet
-        save_pets_data(pets)
-    return pet
+    stats = definition.get("stats", {})
+    with db_connection() as connection:
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO pets (
+                chat_id, user_id, name, health, hunger, happiness, energy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(chat_id),
+                str(user_id),
+                definition.get("name", "Питомец"),
+                stats.get("health", 100),
+                stats.get("hunger", 100),
+                stats.get("happiness", 100),
+                stats.get("energy", 100),
+            ),
+        )
+        row = connection.execute(
+            """
+            SELECT name, health, hunger, happiness, energy
+            FROM pets WHERE chat_id = ? AND user_id = ?
+            """,
+            (str(chat_id), str(user_id)),
+        ).fetchone()
+
+    if row is None:
+        return None
+    return {
+        "pet_id": pet_id,
+        "name": row["name"],
+        "level": definition.get("level", 1),
+        "experience": 0,
+        "health": row["health"],
+        "hunger": row["hunger"],
+        "happiness": row["happiness"],
+        "energy": row["energy"],
+    }
 
 
 def ensure_pet_for_user(telegram_id):
@@ -997,10 +1017,41 @@ def find_chat_companion(chat_id, sender_id, text):
 
     companions = []
     chat_prefix = f"{chat_id}:"
+    default_pet_id = "barsichela" if "barsichela" in pets_data else None
+    default_definition = pets_data.get(default_pet_id, {}) if default_pet_id else {}
+
+    with db_connection() as connection:
+        pet_rows = connection.execute(
+            """
+            SELECT user_id, name, health, hunger, happiness, energy
+            FROM pets WHERE chat_id = ?
+            """,
+            (str(chat_id),),
+        ).fetchall()
+
+    for row in pet_rows:
+        owner_id = str(row["user_id"])
+        companions.append(
+            (
+                owner_id,
+                {
+                    "pet_id": default_pet_id or "barsichela",
+                    "name": row["name"],
+                    "health": row["health"],
+                    "hunger": row["hunger"],
+                    "happiness": row["happiness"],
+                    "energy": row["energy"],
+                },
+                default_definition,
+            )
+        )
+
     for key, pet in instances.items():
         if not isinstance(pet, dict) or not str(key).startswith(chat_prefix):
             continue
         owner_id = str(key).split(":", 1)[1]
+        if any(existing_owner == owner_id for existing_owner, _, _ in companions):
+            continue
         pet_id = pet.get("pet_id", "barsichela")
         definition = pets_data.get(pet_id, {})
         companions.append((owner_id, pet, definition))
@@ -1246,7 +1297,11 @@ async def pet_status_command(
     user_id = message.from_user.id
     chat_id = message.chat.id
 
-    if command.command == "pet" and (command.args or "").strip().lower() == "activate":
+    activation_action = (command.args or "").strip().lower()
+    if command.command == "pet" and activation_action in {
+        "activate",
+        "activate_custom",
+    }:
         profiles = load_chat_profiles()
         profile_key = chat_member_key(chat_id, user_id)
         now = time.time()
@@ -1271,17 +1326,18 @@ async def pet_status_command(
                 "offended_until": 0,
             }
             profiles[profile_key] = profile
-            save_chat_profiles(profiles)
+            if not save_chat_profiles(profiles):
+                await message.answer("Не удалось сохранить профиль в базе данных.")
+                return
 
-        pet = ensure_chat_pet(chat_id, user_id, message.from_user.full_name)
+        pet = ensure_chat_pet(chat_id, user_id)
         if pet is None:
-            await message.answer("Не удалось загрузить шаблон питомца из pets.json.")
+            await message.answer("Не удалось создать запись питомца в базе данных.")
             return
 
         await message.answer(
             f"🐾 {message.from_user.full_name}, профиль активирован в этом чате!\n"
-            f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$\n"
-            f"Твой питомец: {pet['name']}"
+            f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$"
         )
         return
 
@@ -1291,9 +1347,12 @@ async def pet_status_command(
         )
         return
 
-    pet = load_pets_data().get("users_pets", {}).get(chat_member_key(chat_id, user_id))
-    if pet is None and message.chat.type == "private":
+    if message.chat.type == "private":
         pet = get_pet_for_user(user_id)
+    elif get_active_chat_profile(chat_id, user_id):
+        pet = get_chat_pet_profile(chat_id, user_id)
+    else:
+        pet = None
 
     if not pet:
         await message.answer(
@@ -1303,7 +1362,7 @@ async def pet_status_command(
 
     status_text = (
         f"🐾 <b>Ваш питомец: "
-        f"{pet.get('pet_name', 'Барсичела')}</b>\n\n"
+        f"{pet.get('name', pet.get('pet_name', 'Барсичела'))}</b>\n\n"
         f"🍖 Сытость: "
         f"{pet.get('hunger', 0)}/100\n"
         f"💖 Счастье: "
@@ -1800,15 +1859,15 @@ def resolve_chat_api_context(request, payload=None):
 
 def get_chat_pet_profile(chat_id, user_id):
     pets_data = load_pets_data()
-    pet = pets_data.get("users_pets", {}).get(chat_member_key(chat_id, user_id))
-    if not isinstance(pet, dict):
+    pet = ensure_chat_pet(chat_id, user_id)
+    if not pet:
         return None
 
     pet_id = pet.get("pet_id", "barsichela")
     definition = pets_data.get(pet_id, {})
     return {
         "id": pet_id,
-        "name": pet.get("name", pet.get("pet_name", definition.get("name", "Питомец"))),
+        "name": pet["name"],
         "image": definition.get("image", "/Barsichela.png"),
         "level": pet.get("level", definition.get("level", 1)),
         "max_level": definition.get("max_level", 10),
@@ -1977,6 +2036,52 @@ async def api_chat_profile(request):
             "food_catalog": build_food_catalog(pet.get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
+        }
+    )
+
+
+async def api_pet_rename(request):
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
+
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request, payload)
+    if error_response:
+        return error_response
+
+    user_id = str(telegram_user["id"])
+    if not get_active_chat_profile(chat_id, user_id):
+        return web.json_response(
+            {"error": "Activate /pet activate in this chat first"}, status=404
+        )
+
+    new_name = payload.get("new_name")
+    if not isinstance(new_name, str):
+        return web.json_response({"error": "new_name must be text"}, status=400)
+    new_name = new_name.strip()
+    if not new_name or len(new_name) > 32:
+        return web.json_response(
+            {"error": "Pet name must contain 1 to 32 characters"}, status=400
+        )
+
+    pet = ensure_chat_pet(chat_id, user_id)
+    if pet is None:
+        return web.json_response({"error": "Pet not found"}, status=404)
+
+    try:
+        with db_connection() as connection:
+            connection.execute(
+                "UPDATE pets SET name = ? WHERE chat_id = ? AND user_id = ?",
+                (new_name, chat_id, user_id),
+            )
+    except sqlite3.Error as error:
+        print(f"Ошибка переименования питомца в SQLite: {error}")
+        return web.json_response({"error": "Could not rename pet"}, status=500)
+
+    return web.json_response(
+        {
+            "success": True,
+            "pet": {"id": pet["pet_id"], "name": new_name},
         }
     )
 
@@ -3040,6 +3145,11 @@ async def start_webapp_api():
     app.router.add_post(
         "/api/chat/member/pet",
         api_chat_member_pet,
+    )
+
+    app.router.add_post(
+        "/api/pet/rename",
+        api_pet_rename,
     )
 
     app.router.add_get(

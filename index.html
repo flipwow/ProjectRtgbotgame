@@ -42,7 +42,16 @@
 
                 <div class="pet-section-header">
                     <div class="vip-tag">RITUSHKA PET</div>
-                    <h3 id="pet-name">Барсичела</h3>
+                    <div class="pet-name-heading">
+                        <h3 id="pet-name">Барсичела</h3>
+                        <button
+                            class="pet-name-edit-button"
+                            type="button"
+                            aria-label="Переименовать питомца"
+                            title="Переименовать питомца"
+                            onclick="openRenamePetModal()"
+                        >✎</button>
+                    </div>
                     <div class="subtitle">
                         Твой любимый дерзкий пушистик 💅
                     </div>
@@ -615,6 +624,44 @@
             </div>
 
         </div>
+    </div>
+
+    <div
+        id="renamePetModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rename-pet-title"
+    >
+        <section class="pet-modal-content rename-pet-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="rename-pet-title">Имя питомца</h3>
+                <button
+                    class="close-modal-btn"
+                    type="button"
+                    aria-label="Закрыть"
+                    onclick="closeRenamePetModal()"
+                >✕</button>
+            </div>
+            <form onsubmit="submitPetRename(event)">
+                <label class="amount-field" for="rename-pet-input">
+                    <span>Новое имя</span>
+                    <input
+                        id="rename-pet-input"
+                        type="text"
+                        maxlength="32"
+                        autocomplete="off"
+                        required
+                    >
+                </label>
+                <p id="rename-pet-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+                <div class="rename-pet-actions">
+                    <button class="category-tab" type="button" onclick="closeRenamePetModal()">Отмена</button>
+                    <button id="rename-pet-submit" class="primary-action" type="submit">Сохранить</button>
+                </div>
+            </form>
+        </section>
     </div>
 
     <script src="/script.js" defer></script>

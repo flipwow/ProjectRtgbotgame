@@ -418,6 +418,78 @@ function renderProfilePet(pet) {
 }
 
 
+function openRenamePetModal() {
+    const modal = document.getElementById('renamePetModal');
+    const input = document.getElementById('rename-pet-input');
+    const feedback = document.getElementById('rename-pet-feedback');
+    if (!modal || !input) return;
+
+    input.value = userData.pet?.name || '';
+    if (feedback) feedback.textContent = '';
+    modal.style.display = 'flex';
+    input.focus();
+    input.select();
+}
+
+
+function closeRenamePetModal() {
+    const modal = document.getElementById('renamePetModal');
+    if (modal) modal.style.display = 'none';
+}
+
+
+async function submitPetRename(event) {
+    event.preventDefault();
+
+    const input = document.getElementById('rename-pet-input');
+    const feedback = document.getElementById('rename-pet-feedback');
+    const button = document.getElementById('rename-pet-submit');
+    const newName = input?.value.trim();
+    if (!newName || newName.length > 32) {
+        if (feedback) feedback.textContent = 'Имя должно содержать от 1 до 32 символов.';
+        return;
+    }
+    if (!chatContext.chatId || !chatContext.userId) {
+        if (feedback) feedback.textContent = 'Не удалось определить чат и пользователя.';
+        return;
+    }
+
+    if (button) button.disabled = true;
+    try {
+        const response = await fetchWithTimeout('/api/pet/rename', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({
+                user_id: chatContext.userId,
+                chat_id: chatContext.chatId,
+                new_name: newName
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        userData.pet = {
+            ...userData.pet,
+            name: data.pet?.name || newName
+        };
+        updatePetView();
+        renderProfilePet(userData.pet);
+        closeRenamePetModal();
+        showProfileFeedback('Имя питомца изменено.', 'success');
+        tg?.HapticFeedback?.notificationOccurred('success');
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Не удалось изменить имя.';
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+
 function showProfileFeedback(message, kind = '') {
     const feedback = document.getElementById('profile-feedback');
     if (!feedback) return;
