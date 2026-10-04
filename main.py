@@ -2117,7 +2117,7 @@ async def api_chat_profile(request):
             },
             "pet": pet,
             "pet_catalog": pet_catalog,
-            "food_catalog": build_food_catalog(pet.get("inventory", {})),
+            "food_catalog": build_food_catalog((pet or {}).get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
         }
@@ -2254,6 +2254,14 @@ async def api_profile(request):
                 "username": username,
                 "first_name": telegram_user.get("first_name", ""),
                 "last_name": telegram_user.get("last_name", ""),
+                "display_name": " ".join(
+                    part
+                    for part in (
+                        telegram_user.get("first_name", ""),
+                        telegram_user.get("last_name", ""),
+                    )
+                    if part
+                ),
                 "photo_url": telegram_user.get("photo_url", ""),
             },
             "pet": pet,

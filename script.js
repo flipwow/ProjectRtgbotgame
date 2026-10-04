@@ -447,13 +447,17 @@ async function waitForServerWakeup() {
 
 async function fetchUserData() {
     try {
-        if (!chatContext.chatId || !chatContext.userId) {
+        if (chatContext.chatId && !chatContext.userId) {
             showProfileFeedback('Открой профиль через кнопку бота в нужном чате.', 'error');
-            renderChatRegistry();
+                        renderChatRegistry();
             return;
         }
-                showProfileFeedback('');
+        showProfileFeedback('');
 
+        const isChatProfile = Boolean(chatContext.chatId);
+        const endpoint = isChatProfile
+            ? `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`
+            : '/api/me';
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
         };
@@ -461,7 +465,7 @@ async function fetchUserData() {
         let data;
         for (let attempt = 0; attempt < 4; attempt += 1) {
             response = await fetchWithTimeout(
-                `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+                endpoint,
                 { headers },
                 API_REQUEST_TIMEOUT_MS
             );
@@ -473,10 +477,15 @@ async function fetchUserData() {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
-        if (data.chat?.id) chatContext.chatId = String(data.chat.id);
-        applyChatProfile(data);
-        userData.foodCatalog = data.food_catalog || [];
+                
+        userData.foodCatalog = data.food_catalog || data.catalog || [];
         userData.petCatalog = data.pet_catalog || [];
+        if (isChatProfile) {
+            if (data.chat?.id) chatContext.chatId = String(data.chat.id);
+            applyChatProfile(data);
+        } else {
+            applyPersonalProfile(data);
+        }
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
         currentPetId = userData.pet?.id || 'bars';
         await fetchLeaderboard();
@@ -492,13 +501,40 @@ async function fetchUserData() {
             'Не удалось загрузить данные профиля:',
             error
         );
-        showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
+                showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
         renderChatRegistry();
+    } finally {
+        const status = document.getElementById('profile-status');
+        if (status && !userData.user) status.textContent = 'Unavailable';
     }
 }
 
 
+function applyPersonalProfile(data) {
+    const user = data.user || tg?.initDataUnsafe?.user || {};
+    const relationshipRp = Number(data.rp ?? 0);
+    const balance = Number(data.currency ?? 0);
+    userData.user = {
+        ...user,
+        display_name: user.display_name || [user.first_name, user.last_name].filter(Boolean).join(' ')
+    };
+    userData.chat = null;
+    userData.chatProfile = {
+        status: 'Active',
+        balance_r: balance,
+        relationship_rp: relationshipRp,
+        convertible_rp: 0
+    };
+    userData.registry = [];
+    userData.currency = balance;
+    userData.rp = relationshipRp;
+    userData.convertibleRp = 0;
+    userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+}
+
+
 function applyChatProfile(data) {
+
     const profile = data.profile || data;
     userData.chatProfile = profile;
     userData.chat = data.chat || null;
@@ -515,15 +551,12 @@ function applyChatProfile(data) {
 
 
 async function fetchLeaderboard() {
-    if (!chatContext.chatId) {
-        userData.leaderboard = [];
-        renderLeaderboard();
-        return;
-    }
-
     try {
+        const endpoint = chatContext.chatId
+            ? `/api/chat/leaderboard?chat_id=${encodeURIComponent(chatContext.chatId)}`
+            : '/api/leaderboard';
         const response = await fetchWithTimeout(
-            `/api/chat/leaderboard?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+            endpoint,
             {
                 headers: {
                     'X-Telegram-Init-Data': tg?.initData || ''
