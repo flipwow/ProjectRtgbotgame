@@ -29,7 +29,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-from google import genai
+import google.generativeai as genai
 
 # Имя файла базы данных
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
@@ -139,7 +139,7 @@ init_db()
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "").strip().lower()
@@ -160,7 +160,8 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
 
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 # ============================================================
@@ -1244,97 +1245,46 @@ def build_companion_system_prompt(chat_id, sender_id, companion):
 
 
 def request_openai_compatible(messages):
-    provider = AI_PROVIDER or (
-        "huggingface" if HF_TOKEN else "openrouter" if OPENROUTER_API_KEY else "gemini"
+    if not GEMINI_API_KEY:
+        raise RuntimeError("Переменная окружения GEMINI_API_KEY не задана.")
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("Для Gemini требуется непустой список сообщений.")
+
+    system_prompt = next(
+        (item.get("content", "") for item in messages if item.get("role") == "system"),
+        "",
     )
-    if provider == "gemini":
-        if not client:
-            raise RuntimeError("Для Gemini не задан GEMINI_API_KEY.")
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-            contents=messages[-1]["content"],
-            config={"system_instruction": messages[0]["content"]},
-        )
-        return getattr(response, "text", None)
+    user_text = next(
+        (item.get("content", "") for item in reversed(messages) if item.get("role") == "user"),
+        "",
+    )
+    if not isinstance(user_text, str) or not user_text.strip():
+        raise ValueError("Текст пользователя для Gemini пуст.")
 
-    if provider == "huggingface":
-        api_key = HF_TOKEN
-        endpoint = AI_API_URL
-        model = AI_MODEL
-    elif provider == "openrouter":
-        api_key = OPENROUTER_API_KEY
-        endpoint = os.getenv(
-            "AI_API_URL", "https://openrouter.ai/api/v1/chat/completions"
-        )
-        model = os.getenv("AI_MODEL", "deepseek/deepseek-chat-v3-0324:free")
-    else:
-        raise RuntimeError(f"Неизвестный AI_PROVIDER: {provider}")
-
-    if not api_key:
-        raise RuntimeError(f"Не задан API-токен для провайдера {provider}.")
-
-    request_body = json.dumps(
-        {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.75,
-            "max_tokens": 350,
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        endpoint,
-        data=request_body,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
+    model = genai.GenerativeModel(
+        model_name="gemini-3.5-flash-lite",
+        system_instruction=system_prompt,
+    )
+    response = model.generate_content(
+        user_text,
+        generation_config={"temperature": 0.75, "max_output_tokens": 350},
     )
     try:
-        with urllib.request.urlopen(request, timeout=45) as response:
-            result = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        error_body = error.read(1000).decode("utf-8", errors="replace")
-        raise RuntimeError(f"AI API вернул HTTP {error.code}: {error_body}") from error
-    return result.get("choices", [{}])[0].get("message", {}).get("content")
+        answer = response.text
+    except (AttributeError, ValueError) as error:
+        raise RuntimeError("Gemini не вернула текстовый ответ.") from error
+
+    if not isinstance(answer, str) or not answer.strip():
+        raise RuntimeError("Gemini вернула пустой ответ.")
+    return answer.strip()
 
 
 async def generate_companion_reply(system_prompt, text):
-    endpoint = os.getenv("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat")
-    model = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
-    request_body = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.75},
-        }
-    ).encode("utf-8")
-
-    def call_ollama():
-        request = urllib.request.Request(
-            endpoint,
-            data=request_body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=90) as response:
-                result = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            error_body = error.read(1000).decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"Ollama вернул HTTP {error.code}: {error_body}"
-            ) from error
-        except urllib.error.URLError as error:
-            raise RuntimeError(f"Не удалось подключиться к Ollama: {error}") from error
-        return result.get("message", {}).get("content", "")
-
-    return await asyncio.to_thread(call_ollama)
-
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": text},
+    ]
+    return await asyncio.to_thread(request_openai_compatible, messages)
 
 # ============================================================
 # PET TELEGRAM HANDLERS
@@ -4091,29 +4041,9 @@ async def handle_text(
             )
 
         answer = await generate_companion_reply(system_prompt, model_text)
-        if not answer:
-            answer = "Я сейчас немного задумалась. Скажи ещё раз?"
         await message.reply(answer)
-    except Exception as e:
-        print(f"Ошибка генерации ответа компаньона: {e}")
-        if companion is not None:
-            owner_id, pet, _ = companion
-            character_name = pet.get("name", "Компаньон")
-            is_owner = str(owner_id) == sender_id
-            if chat_profile and message_result == "punished":
-                fallback = f"{character_name}: Хватит флуда. Я злюсь и беру паузу. Дай мне передышку."
-            elif is_owner:
-                hunger = int(pet.get("hunger", 100))
-                fallback = f"{character_name}: Я рядом и слушаю тебя." + (
-                    " И я уже проголодался, покорми меня в Mini App."
-                    if hunger < 30
-                    else ""
-                )
-            else:
-                fallback = f"{character_name}: Пожалуйста, не отвлекай меня от моего владельца."
-        else:
-            fallback = "Сейчас не получается ответить. Попробуй чуть позже."
-        await message.reply(fallback)
+    except Exception as error:
+        print(f"Ошибка генерации ответа Gemini: {error}")
 
 
 # ============================================================
