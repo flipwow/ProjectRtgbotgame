@@ -189,6 +189,7 @@ PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 
 chat_sessions = {}
 game_rooms = {}
+message_cleanup_tasks = set()
 
 BOT_USERNAME = None
 BOT_ID = None
@@ -268,58 +269,20 @@ def update_score(game_type, user_id, points):
     save_scores(scores)
 
 
-# ============================================================
-# SHOP
-# ============================================================
+def update_chat_score(chat_id, user_id, points):
+    if chat_id is None or user_id is None or points <= 0:
+        return
 
-SHOP_ITEMS = {
-    "sale": {
-        "collar": {
-            "name": "💍 Ошейник из страз",
-            "price": 30,
-            "part": "body",
-        },
-        "cap_pink": {
-            "name": "🧢 Розовая кепка",
-            "price": 20,
-            "part": "head",
-        },
-        "cap_black": {
-            "name": "🧢 Черная кепка с черепом",
-            "price": 25,
-            "part": "head",
-        },
-        "glasses_pink": {
-            "name": "🕶 Розовые очки",
-            "price": 25,
-            "part": "head",
-        },
-        "glasses_matrix": {
-            "name": "🕶️ Солнечные очки Матрица",
-            "price": 40,
-            "part": "head",
-        },
-        "cool_glasses": {
-            "name": "🕶 Крутые пиксельные очки",
-            "price": 55,
-            "part": "head",
-        },
-    },
-    "luxury": {
-        "crown": {
-            "name": "👑 Золотая корона",
-            "price": 150,
-            "min_role": ["dura", "boss"],
-            "part": "head",
-        },
-        "leash": {
-            "name": "💎 Бриллиантовый поводок",
-            "price": 300,
-            "min_role": ["boss"],
-            "part": "body",
-        },
-    },
-}
+    with db_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO scores (chat_id, user_id, score_value)
+            VALUES (?, ?, ?)
+            ON CONFLICT(chat_id, user_id)
+            DO UPDATE SET score_value = score_value + excluded.score_value
+            """,
+            (str(chat_id), str(user_id), int(points)),
+        )
 
 
 # ============================================================
@@ -394,7 +357,7 @@ def load_inventory_data():
         return {
             "schema_version": 2,
             "users_pets": {},
-            "food_items": {},
+            "food_items": {item_id: dict(item) for item_id, item in SHOP_ITEMS.items()},
         }
 
     try:
@@ -402,25 +365,21 @@ def load_inventory_data():
             data = json.load(f)
 
         if not isinstance(data, dict):
-            return {
-                "schema_version": 2,
-                "users_pets": {},
-                "food_items": {},
-            }
+            data = {"schema_version": 2, "users_pets": {}, "food_items": {}}
 
         data.setdefault("schema_version", 2)
         data.setdefault("users_pets", {})
-        data.setdefault("food_items", {})
-
+        data["food_items"] = {
+            item_id: dict(item) for item_id, item in SHOP_ITEMS.items()
+        }
         return data
 
     except Exception as e:
         print(f"Ошибка загрузки inventory.json: {e}")
-
         return {
             "schema_version": 2,
             "users_pets": {},
-            "food_items": {},
+            "food_items": {item_id: dict(item) for item_id, item in SHOP_ITEMS.items()},
         }
 
 
@@ -755,8 +714,6 @@ def create_default_user(telegram_id=None):
         "status": "active",
         "rp": 0,
         "r_currency": 0,
-        "inventory": [],
-        "equipped": [],
         "started": False,
         "started_at": None,
         "pet_id": "barsichela",
@@ -805,8 +762,6 @@ def get_or_create_user(username, telegram_id=None):
         "status": "active",
         "rp": 0,
         "r_currency": 0,
-        "inventory": [],
-        "equipped": [],
         "started": False,
         "started_at": None,
         "pet_id": "barsichela",
@@ -931,109 +886,25 @@ def get_webapp_user(request):
 # ============================================================
 
 
-def get_full_shop_catalog(user_info):
+def build_food_catalog(food_inventory):
+    food_inventory = food_inventory if isinstance(food_inventory, dict) else {}
     catalog = []
-
-    inventory = user_info.get(
-        "inventory",
-        [],
-    )
-
-    user_role = user_info.get(
-        "role",
-        "noob",
-    )
-
-    for category_name, items in SHOP_ITEMS.items():
-
-        for item_id, item_data in items.items():
-
-            min_roles = item_data.get(
-                "min_role",
-                [],
-            )
-
-            allowed = not min_roles or user_role in min_roles
-
-            catalog.append(
-                {
-                    "id": item_id,
-                    "name": item_data["name"],
-                    "price": item_data["price"],
-                    "part": item_data.get(
-                        "part",
-                        "body",
-                    ),
-                    "category": category_name,
-                    "owned": item_id in inventory,
-                    "allowed": allowed,
-                    "min_role": min_roles,
-                }
-            )
-
+    for food_id, food in SHOP_ITEMS.items():
+        try:
+            count = max(0, int(food_inventory.get(food_id, 0) or 0))
+        except (TypeError, ValueError):
+            count = 0
+        catalog.append(
+            {
+                "id": food_id,
+                "name": food["name"],
+                "price": food["price"],
+                "hunger_restore": food["hunger_restore"],
+                "happiness_restore": food["happiness_restore"],
+                "count": count,
+            }
+        )
     return catalog
-
-
-def get_inventory_details(user_info):
-    result = []
-
-    inventory = user_info.get(
-        "inventory",
-        [],
-    )
-
-    equipped = user_info.get(
-        "equipped",
-        [],
-    )
-
-    for item_id in inventory:
-
-        for category_name, items in SHOP_ITEMS.items():
-
-            if item_id not in items:
-                continue
-
-            item = items[item_id]
-
-            result.append(
-                {
-                    "id": item_id,
-                    "name": item["name"],
-                    "price": item["price"],
-                    "part": item.get(
-                        "part",
-                        "body",
-                    ),
-                    "category": category_name,
-                    "equipped": item_id in equipped,
-                }
-            )
-
-            break
-
-    return result
-
-
-def get_item_name(item_id):
-    for items in SHOP_ITEMS.values():
-
-        if item_id in items:
-            return items[item_id]["name"]
-
-    return item_id
-
-
-def get_item_part(item_id):
-    for items in SHOP_ITEMS.values():
-
-        if item_id in items:
-            return items[item_id].get(
-                "part",
-                "body",
-            )
-
-    return "body"
 
 
 # ============================================================
@@ -1255,7 +1126,11 @@ def request_openai_compatible(messages):
         "",
     )
     user_text = next(
-        (item.get("content", "") for item in reversed(messages) if item.get("role") == "user"),
+        (
+            item.get("content", "")
+            for item in reversed(messages)
+            if item.get("role") == "user"
+        ),
         "",
     )
     if not isinstance(user_text, str) or not user_text.strip():
@@ -1285,6 +1160,7 @@ async def generate_companion_reply(system_prompt, text):
         {"role": "user", "content": text},
     ]
     return await asyncio.to_thread(request_openai_compatible, messages)
+
 
 # ============================================================
 # PET TELEGRAM HANDLERS
@@ -1773,8 +1649,24 @@ async def finish_duel(room_id, room, winner):
             ),
         )
         room["result_message_id"] = result_message.message_id
+        cleanup_task = asyncio.create_task(
+            delete_message_after_delay(chat_id, result_message.message_id)
+        )
+        message_cleanup_tasks.add(cleanup_task)
+        cleanup_task.add_done_callback(message_cleanup_tasks.discard)
     except Exception as error:
         print(f"Не удалось отправить результат дуэли: {error}")
+
+
+async def delete_message_after_delay(chat_id, message_id):
+    await asyncio.sleep(60)
+    try:
+        await bot.delete_message(
+            chat_id=int(chat_id),
+            message_id=int(message_id),
+        )
+    except Exception as error:
+        print(f"Не удалось удалить сообщение результата дуэли: {error}")
 
 
 async def send_duel_invitation(chat_id, room_id, player_names=None):
@@ -1921,6 +1813,11 @@ def get_chat_pet_profile(chat_id, user_id):
     }
 
 
+def get_active_chat_profile(chat_id, user_id):
+    profile = load_chat_profiles().get(chat_member_key(chat_id, user_id))
+    return profile if isinstance(profile, dict) else None
+
+
 async def read_json_object(request):
     try:
         payload = await request.json()
@@ -1944,13 +1841,14 @@ def get_chat_leaderboard(chat_id):
         member_id = str(member.get("user_id", key_user_id))
         chat_members[member_id] = member
 
-    for key, member in document.get("users", {}).items():
-        if not isinstance(member, dict):
-            continue
-        if member.get("chat_id") is None or str(member["chat_id"]) != str(chat_id):
-            continue
-        member_id = str(member.get("user_id") or member.get("telegram_id") or key)
-        chat_members.setdefault(member_id, member)
+    with db_connection() as connection:
+        score_rows = connection.execute(
+            "SELECT user_id, score_value FROM scores WHERE chat_id = ?",
+            (str(chat_id),),
+        ).fetchall()
+    scores_by_user = {
+        str(row["user_id"]): int(row["score_value"] or 0) for row in score_rows
+    }
 
     leaderboard = []
     for member_id, member in chat_members.items():
@@ -1965,11 +1863,13 @@ def get_chat_leaderboard(chat_id):
                 "convertible_rp": int(member.get("convertible_rp", 0) or 0),
                 "balance_r": int(member.get("balance_r", 0) or 0),
                 "status": member.get("status", "активен"),
+                "score_value": scores_by_user.get(member_id, 0),
             }
         )
 
     leaderboard.sort(
         key=lambda member: (
+            -member["score_value"],
             -member["convertible_rp"],
             member["display_name"].casefold(),
         )
@@ -1982,8 +1882,7 @@ async def api_chat_leaderboard(request):
     if error_response:
         return error_response
 
-    profile_key = chat_member_key(chat_id, telegram_user["id"])
-    if not isinstance(load_chat_profiles().get(profile_key), dict):
+    if not get_active_chat_profile(chat_id, telegram_user["id"]):
         return web.json_response(
             {"error": "Activate /pet activate in this chat first"}, status=404
         )
@@ -2043,8 +1942,50 @@ async def api_chat_profile(request):
             },
             "pet": pet,
             "pet_catalog": pet_catalog,
+            "food_catalog": build_food_catalog(pet.get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
+        }
+    )
+
+
+async def api_chat_member_pet(request):
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
+
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request, payload)
+    if error_response:
+        return error_response
+
+    sender_id = str(telegram_user["id"])
+    recipient_id = payload.get("target_user_id")
+    if recipient_id is None or isinstance(recipient_id, bool):
+        return web.json_response({"error": "target_user_id is required"}, status=400)
+    recipient_id = str(recipient_id)
+    if not recipient_id.isdigit():
+        return web.json_response({"error": "Invalid target_user_id"}, status=400)
+
+    sender = get_active_chat_profile(chat_id, sender_id)
+    recipient = get_active_chat_profile(chat_id, recipient_id)
+    if not sender or not recipient:
+        return web.json_response(
+            {"error": "Both users must activate in this chat"}, status=404
+        )
+
+    pet = get_chat_pet_profile(chat_id, recipient_id)
+    if not pet:
+        return web.json_response({"error": "Pet not found in this chat"}, status=404)
+
+    return web.json_response(
+        {
+            "member": {
+                "user_id": recipient_id,
+                "display_name": recipient.get("display_name")
+                or recipient.get("username")
+                or f"Игрок {recipient_id}",
+            },
+            "pet": pet,
         }
     )
 
@@ -2221,134 +2162,7 @@ async def api_profile(request):
     pet = ensure_pet_for_user(telegram_user["id"])
     inventory_data = load_inventory_data()
     food_inventory = pet.get("inventory", {})
-    food_catalog = [
-        {
-            "id": food_id,
-            "name": food.get("name", food_id),
-            "price": food.get("price", 0),
-            "hunger_restore": food.get("hunger_restore", 0),
-            "happiness_restore": food.get("happiness_restore", 0),
-            "count": food_inventory.get(food_id, 0),
-        }
-        for food_id, food in inventory_data["food_items"].items()
-    ]
-
-    all_users = load_users()
-
-    registry_list = []
-    usernames_by_telegram_id = {}
-
-    for uname, udata in all_users.items():
-
-        telegram_id = udata.get("telegram_id")
-
-        if telegram_id:
-            usernames_by_telegram_id[str(telegram_id)] = uname
-
-        if not udata.get("started"):
-            continue
-
-        u_role = udata.get(
-            "role",
-            "noob",
-        )
-
-        registry_list.append(
-            {
-                "username": uname,
-                "role_name": ROLES_HIERARCHY.get(
-                    u_role,
-                    {},
-                ).get(
-                    "name",
-                    u_role,
-                ),
-                "rp": udata.get(
-                    "rp",
-                    0,
-                ),
-                "currency": udata.get(
-                    "r_currency",
-                    0,
-                ),
-                "equipped_count": len(
-                    udata.get(
-                        "equipped",
-                        [],
-                    )
-                ),
-                "started_at": udata.get("started_at"),
-            }
-        )
-
-    scores = load_scores()
-    leaderboard_by_user = {}
-
-    for game_type, users_scores in scores.items():
-
-        if not isinstance(users_scores, dict):
-            continue
-
-        for telegram_id, mode_scores in users_scores.items():
-
-            if isinstance(mode_scores, dict):
-                normalized_scores = mode_scores
-            else:
-                normalized_scores = {"online": mode_scores}
-
-            user_key = str(telegram_id)
-            entry = leaderboard_by_user.setdefault(
-                user_key,
-                {
-                    "username": usernames_by_telegram_id.get(
-                        user_key,
-                        f"id_{user_key}",
-                    ),
-                    "total": 0,
-                    "modes": {},
-                },
-            )
-
-            for mode, points in normalized_scores.items():
-
-                if not isinstance(points, (int, float)):
-                    continue
-
-                score_key = f"{game_type}_{mode}"
-                entry["modes"][score_key] = entry["modes"].get(score_key, 0) + points
-                entry["total"] += points
-
-    leaderboard = sorted(
-        leaderboard_by_user.values(),
-        key=lambda entry: (-entry["total"], entry["username"]),
-    )
-
-    pet_catalog = load_pets_data()
-    pet_definition = pet_catalog.get(pet.get("pet_id", "barsichela"), {})
-    pet_data = {
-        "id": pet.get("pet_id", "barsichela"),
-        "name": pet.get("pet_name", "Барсичела"),
-        "type": pet.get("pet_type", "barsichela"),
-        "image": pet_definition.get("image", "/Barsichela.png"),
-        "level": pet.get("level", 1),
-        "max_level": pet_definition.get("max_level", 10),
-        "experience": pet.get("experience", 0),
-        "health": pet.get("health", 100),
-        "hunger": pet.get("hunger", 100),
-        "happiness": pet.get("happiness", 100),
-        "energy": pet.get("energy", 100),
-    }
-    pet_choices = [
-        {
-            "id": pet_id,
-            "name": definition.get("name", pet_id),
-            "type": definition.get("type", pet_id),
-            "image": definition.get("image", "/Barsichela.png"),
-            "rarity": definition.get("rarity", "Обычный"),
-        }
-        for pet_id, definition in pet_catalog.items()
-    ]
-
+    food_catalog = build_food_catalog(food_inventory)
     return web.json_response(
         {
             "user": {
@@ -2367,8 +2181,8 @@ async def api_profile(request):
                     "",
                 ),
             },
-            "pet": pet_data,
-            "pet_catalog": pet_choices,
+            "pet": pet,
+            "pet_catalog": pet_catalog,
             "food_catalog": food_catalog,
             "rp": user_info.get(
                 "rp",
@@ -2384,10 +2198,6 @@ async def api_profile(request):
             ),
             "inventory": get_inventory_details(user_info),
             "catalog": get_full_shop_catalog(user_info),
-            "equipped": user_info.get(
-                "equipped",
-                [],
-            ),
             "registry": registry_list,
             "leaderboard": leaderboard,
         }
@@ -2417,27 +2227,15 @@ async def api_pet(request):
 
 async def api_inventory(request):
     username, telegram_user = get_webapp_user(request)
-    if not username:
+    if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-    _, user_info = get_or_create_user(username, telegram_user["id"])
     pet = ensure_pet_for_user(telegram_user["id"])
-    inventory_data = load_inventory_data()
     food_inventory = pet.get("inventory", {})
-    food_catalog = [
-        {
-            "id": food_id,
-            "name": food.get("name", food_id),
-            "price": food.get("price", 0),
-            "hunger_restore": food.get("hunger_restore", 0),
-            "happiness_restore": food.get("happiness_restore", 0),
-            "count": food_inventory.get(food_id, 0),
-        }
-        for food_id, food in inventory_data["food_items"].items()
-    ]
+    food_catalog = build_food_catalog(food_inventory)
     return web.json_response(
         {
-            "items": get_inventory_details(user_info),
+            "items": food_catalog,
             "food_catalog": food_catalog,
             "food_inventory": food_inventory,
         }
@@ -2597,250 +2395,29 @@ async def api_pet_feed(request):
     )
 
 
-async def api_buy_food(request):
-
-    username, telegram_user = get_webapp_user(request)
-
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
-
-    food_id = request.match_info["food_id"]
-    inventory_data = load_inventory_data()
-    food = inventory_data["food_items"].get(food_id)
-
-    if not food:
-        return web.json_response(
-            {"error": "Food not found"},
-            status=404,
-        )
-
-    users = load_users()
-    user_info = users.get(username)
-
-    if not user_info:
-        return web.json_response(
-            {"error": "User not found"},
-            status=404,
-        )
-
-    price = food.get("price", 0)
-    currency = user_info.get("r_currency", 0)
-
-    if currency < price:
-        return web.json_response(
-            {"error": "Not enough currency"},
-            status=400,
-        )
-
-    pet = ensure_pet_for_user(telegram_user["id"])
-    inventory_data = load_inventory_data()
-    pet = inventory_data["users_pets"][str(telegram_user["id"])]
-    pet_inventory = pet.setdefault("inventory", {})
-    pet_inventory[food_id] = pet_inventory.get(food_id, 0) + 1
-    inventory_data["users_pets"][str(telegram_user["id"])] = pet
-
-    user_info["r_currency"] = currency - price
-    users[username] = user_info
-    save_inventory_data(inventory_data)
-    save_users(users)
-
-    return web.json_response(
-        {
-            "success": True,
-            "currency": user_info["r_currency"],
-            "pet": pet,
-            "food_catalog": [
-                {
-                    "id": item_id,
-                    "name": item.get("name", item_id),
-                    "price": item.get("price", 0),
-                    "hunger_restore": item.get("hunger_restore", 0),
-                    "happiness_restore": item.get("happiness_restore", 0),
-                    "count": pet_inventory.get(item_id, 0),
-                }
-                for item_id, item in inventory_data["food_items"].items()
-            ],
-        }
-    )
-
-
-async def api_toggle_item(request):
-
-    username, _ = get_webapp_user(request)
-
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
-
-    item_id = request.match_info["item_id"]
-
-    users = load_users()
-
-    if username not in users:
-        return web.json_response(
-            {"error": "User not found"},
-            status=404,
-        )
-
-    user_info = users[username]
-
-    inventory = user_info.setdefault(
-        "inventory",
-        [],
-    )
-
-    equipped = user_info.setdefault(
-        "equipped",
-        [],
-    )
-
-    if item_id not in inventory:
-        return web.json_response(
-            {"error": "Item not owned"},
-            status=403,
-        )
-
-    target_part = get_item_part(item_id)
-
-    if item_id in equipped:
-
-        equipped.remove(item_id)
-        action = "unequipped"
-
-    else:
-
-        equipped = [eq_id for eq_id in equipped if get_item_part(eq_id) != target_part]
-
-        equipped.append(item_id)
-
-        action = "equipped"
-
-    user_info["equipped"] = equipped
-
-    users[username] = user_info
-
-    save_users(users)
-
-    return web.json_response(
-        {
-            "success": True,
-            "action": action,
-            "equipped": equipped,
-            "inventory": get_inventory_details(user_info),
-        }
-    )
-
-
-async def api_buy_item(request):
-
-    username, _ = get_webapp_user(request)
-
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
-
-    item_id = request.match_info["item_id"]
-
-    users = load_users()
-
-    if username not in users:
-        return web.json_response(
-            {"error": "User not found"},
-            status=404,
-        )
-
-    user_info = users[username]
-
-    item = None
-
-    for items in SHOP_ITEMS.values():
-
-        if item_id in items:
-            item = items[item_id]
-            break
-
-    if not item:
-        return web.json_response(
-            {"error": "Item not found"},
-            status=404,
-        )
-
-    inventory = user_info.setdefault(
-        "inventory",
-        [],
-    )
-
-    if item_id in inventory:
-        return web.json_response(
-            {"error": "Already owned"},
-            status=400,
-        )
-
-    min_roles = item.get(
-        "min_role",
-        [],
-    )
-
-    if (
-        min_roles
-        and user_info.get(
-            "role",
-            "noob",
-        )
-        not in min_roles
-    ):
-        return web.json_response(
-            {"error": "Role not allowed"},
-            status=403,
-        )
-
-    currency = user_info.get(
-        "r_currency",
-        0,
-    )
-
-    if currency < item["price"]:
-        return web.json_response(
-            {"error": "Not enough currency"},
-            status=400,
-        )
-
-    user_info["r_currency"] = currency - item["price"]
-
-    inventory.append(item_id)
-
-    users[username] = user_info
-
-    save_users(users)
-
-    return web.json_response(
-        {
-            "success": True,
-            "currency": user_info["r_currency"],
-            "inventory": get_inventory_details(user_info),
-            "catalog": get_full_shop_catalog(user_info),
-        }
-    )
-
-
 async def api_create_game(request):
-
-    username, telegram_user = get_webapp_user(request)
-
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
+    payload = await read_json_object(request)
+    payload = payload or {}
+    if payload.get("chat_id") is not None:
+        chat_id, telegram_user, error_response = resolve_chat_api_context(
+            request, payload
         )
+        if error_response:
+            return error_response
+        if not get_active_chat_profile(chat_id, telegram_user["id"]):
+            return web.json_response(
+                {"error": "Activate /pet activate in this chat first"}, status=404
+            )
+    else:
+        username, telegram_user = get_webapp_user(request)
+        if not username:
+            return web.json_response({"error": "Unauthorized"}, status=401)
+        chat_id = None
 
-    room_id = create_game_room(challenger_id=telegram_user["id"])
+    room_id = create_game_room(
+        challenger_id=telegram_user["id"],
+        chat_id=chat_id,
+    )
 
     duel_url = get_duel_url(room_id)
 
@@ -3129,6 +2706,11 @@ async def websocket_game_handler(request):
                                         tg_id,
                                         10,
                                     )
+                                    update_chat_score(
+                                        room.get("chat_id"),
+                                        tg_id,
+                                        10,
+                                    )
 
                     await finish_duel(room_id, room, winner)
 
@@ -3298,6 +2880,11 @@ async def start_webapp_api():
         api_chat_gift,
     )
 
+    app.router.add_post(
+        "/api/chat/member/pet",
+        api_chat_member_pet,
+    )
+
     app.router.add_get(
         "/api/pet",
         api_pet,
@@ -3324,17 +2911,7 @@ async def start_webapp_api():
     )
 
     app.router.add_post(
-        "/api/equip/{item_id}",
-        api_toggle_item,
-    )
-
-    app.router.add_post(
-        "/api/buy/{item_id}",
-        api_buy_item,
-    )
-
-    app.router.add_post(
-        "/api/game/create",
+        "/api/create-game",
         api_create_game,
     )
 
@@ -4115,6 +3692,9 @@ async def main():
             await cleanup_task
         except asyncio.CancelledError:
             pass
+
+        if message_cleanup_tasks:
+            await asyncio.gather(*message_cleanup_tasks, return_exceptions=True)
 
         await api_runner.cleanup()
 

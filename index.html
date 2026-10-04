@@ -58,13 +58,6 @@
                         🐾
                     </div>
 
-                    <div
-                        class="equipped-list-preview"
-                        id="equippedPreview"
-                    >
-                        Питомец сыт и доволен ✨
-                    </div>
-
                     <div class="pet-stats" aria-label="Характеристики питомца">
                         <div class="pet-stat">
                             <div class="pet-stat-heading">
@@ -344,14 +337,6 @@
                     id="shopItemsGrid"
                 ></div>
 
-                <div class="inventory-section">
-                    <div class="inventory-heading">
-                        <h4>Холодильник</h4>
-                        <span>Запасы еды</span>
-                    </div>
-                    <div id="inventoryGrid" class="inventory-grid"></div>
-                </div>
-
             </div>
 
             <!-- Профиль -->
@@ -400,37 +385,6 @@
                         </button>
                     </div>
                     <p id="convert-preview" class="conversion-preview">Будет начислено 10 R$</p>
-                </section>
-
-                <section class="pet-profile-panel" aria-labelledby="profile-pet-name">
-                    <div class="panel-heading pet-panel-heading">
-                        <div>
-                            <span class="panel-eyebrow">ТВОЙ СПУТНИК</span>
-                            <h2 id="profile-pet-name">Барсичела</h2>
-                        </div>
-                        <div class="profile-pet-level">Ур. <strong id="profile-pet-level">1</strong></div>
-                    </div>
-                    <div class="profile-pet-content">
-                        <div id="profile-pet-image" class="profile-pet-image" aria-hidden="true">🐾</div>
-                        <div class="profile-pet-stats">
-                            <div class="profile-stat-row">
-                                <div><span>Здоровье</span><strong id="profile-pet-health-value">100 / 100</strong></div>
-                                <div class="profile-stat-track" role="progressbar" aria-label="Здоровье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
-                            </div>
-                            <div class="profile-stat-row">
-                                <div><span>Сытость</span><strong id="profile-pet-hunger-value">100 / 100</strong></div>
-                                <div class="profile-stat-track" role="progressbar" aria-label="Сытость питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
-                            </div>
-                            <div class="profile-stat-row">
-                                <div><span>Счастье</span><strong id="profile-pet-happiness-value">100 / 100</strong></div>
-                                <div class="profile-stat-track" role="progressbar" aria-label="Счастье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
-                            </div>
-                            <div class="profile-stat-row">
-                                <div><span>Энергия</span><strong id="profile-pet-energy-value">100 / 100</strong></div>
-                                <div class="profile-stat-track" role="progressbar" aria-label="Энергия питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="profile-pet-energy-bar" class="profile-stat-fill energy-fill"></span></div>
-                            </div>
-                        </div>
-                    </div>
                 </section>
 
                 <section class="members-section" aria-labelledby="members-title">
@@ -553,6 +507,57 @@
             <p id="gift-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
             <button id="gift-submit" class="primary-action" type="button" onclick="sendGift()">Отправить подарок</button>
         </div>
+    </div>
+
+    <div
+        id="memberPetModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="member-pet-owner"
+    >
+        <section class="pet-modal-content member-pet-content">
+            <div class="pet-modal-header">
+                <div>
+                    <span class="panel-eyebrow">ПИТОМЕЦ УЧАСТНИКА</span>
+                    <h3 id="member-pet-owner">Участник</h3>
+                </div>
+                <button
+                    class="close-modal-btn"
+                    type="button"
+                    aria-label="Закрыть"
+                    onclick="closeMemberPetModal()"
+                >
+                    ✕
+                </button>
+            </div>
+            <div class="member-pet-summary">
+                <img id="member-pet-image" src="/Barsichela.png" alt="Питомец">
+                <div>
+                    <strong id="member-pet-name">Питомец</strong>
+                    <span>Уровень <b id="member-pet-level">1</b></span>
+                </div>
+            </div>
+            <div class="profile-pet-stats">
+                <div class="profile-stat-row">
+                    <div><span>Здоровье</span><strong id="member-pet-health-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Здоровье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
+                </div>
+                <div class="profile-stat-row">
+                    <div><span>Сытость</span><strong id="member-pet-hunger-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Сытость питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
+                </div>
+                <div class="profile-stat-row">
+                    <div><span>Счастье</span><strong id="member-pet-happiness-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Счастье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
+                </div>
+                <div class="profile-stat-row">
+                    <div><span>Энергия</span><strong id="member-pet-energy-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Энергия питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-energy-bar" class="profile-stat-fill energy-fill"></span></div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Кормление -->

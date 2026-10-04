@@ -1235,23 +1235,17 @@ body {
 
 .profile-member-row {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) 28px;
-    align-items: center;
-    gap: 10px;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+    gap: 7px 10px;
     width: 100%;
-    min-height: 58px;
+    min-height: 76px;
     padding: 8px 2px;
     border: 0;
     border-bottom: 1px solid rgba(177, 215, 198, 0.1);
     background: transparent;
     color: var(--text-primary);
     text-align: left;
-    cursor: pointer;
-}
-
-.profile-member-row:disabled {
-    cursor: default;
-    opacity: 0.55;
 }
 
 .member-avatar {
@@ -1265,6 +1259,8 @@ body {
     color: #9ae7c9;
     font-size: 13px;
     font-weight: 800;
+    grid-row: span 2;
+    margin-top: 2px;
 }
 
 .member-details {
@@ -1286,15 +1282,42 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-.member-gift-icon {
-    display: grid;
-    width: 27px;
-    height: 27px;
-    place-items: center;
+.member-actions {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 2;
+    gap: 6px;
+}
+
+.member-action-button {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 5px 8px;
+    border: 1px solid var(--card-border);
     border-radius: 8px;
-    background: rgba(242, 161, 139, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 9px;
+    cursor: pointer;
+}
+
+.member-action-button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.member-gift-action {
+    border-color: rgba(242, 161, 139, 0.22);
     color: #f2a18b;
-    font-size: 18px;
+}
+
+.member-pet-action {
+    border-color: rgba(120, 218, 186, 0.22);
+    color: #9ae7c9;
 }
 
 .list-state {
@@ -1335,6 +1358,49 @@ body {
 
 .gift-amount-field input {
     height: 48px;
+}
+
+.member-pet-content {
+    display: grid;
+    gap: 16px;
+}
+
+.member-pet-content .pet-modal-header {
+    margin-bottom: 0;
+}
+
+.member-pet-summary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.member-pet-summary img {
+    width: 84px;
+    height: 84px;
+    flex: 0 0 84px;
+    object-fit: contain;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    background: rgba(120, 218, 186, 0.07);
+}
+
+.member-pet-summary > div {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.member-pet-summary strong {
+    overflow-wrap: anywhere;
+    color: var(--text-primary);
+    font-size: 15px;
+}
+
+.member-pet-summary span {
+    color: var(--text-secondary);
+    font-size: 11px;
 }
 
 @media (max-width: 360px) {

@@ -2,9 +2,6 @@ const tg = window.Telegram?.WebApp;
 
 let userData = {
     currency: 0,
-    inventory: [],
-    catalog: [],
-    equipped: [],
     registry: [],
     leaderboard: [],
     foodCatalog: [],
@@ -283,9 +280,6 @@ async function fetchUserData() {
         }
 
         applyChatProfile(data);
-        userData.inventory = data.inventory || [];
-        userData.catalog = data.catalog || [];
-        userData.equipped = data.equipped || [];
         userData.foodCatalog = data.food_catalog || [];
         userData.petCatalog = data.pet_catalog || [];
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
@@ -295,7 +289,7 @@ async function fetchUserData() {
 
         updatePetView();
         renderShop();
-        renderInventory();
+        renderFoodInventory();
         renderChatRegistry();
 
     } catch (error) {
@@ -449,7 +443,7 @@ function updateConvertPreview() {
 
 
 async function postChatAction(path, payload) {
-    const response = await fetch(path, {
+    const response = await fetchWithTimeout(path, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -541,6 +535,57 @@ async function sendGift() {
 }
 
 
+async function openMemberPet(member) {
+    if (!member || member.user_id == null || !chatContext.chatId) return;
+
+    try {
+        const data = await postChatAction('/api/chat/member/pet', {
+            target_user_id: member.user_id
+        });
+        renderMemberPet(data.member, data.pet);
+        const modal = document.getElementById('memberPetModal');
+        if (modal) modal.style.display = 'flex';
+    } catch (error) {
+        showProfileFeedback(error.message || 'Не удалось открыть питомца.', 'error');
+    }
+}
+
+
+function closeMemberPetModal() {
+    const modal = document.getElementById('memberPetModal');
+    if (modal) modal.style.display = 'none';
+}
+
+
+function renderMemberPet(member, pet) {
+    const name = document.getElementById('member-pet-owner');
+    const petName = document.getElementById('member-pet-name');
+    const level = document.getElementById('member-pet-level');
+    const image = document.getElementById('member-pet-image');
+    if (name) name.textContent = member?.display_name || 'Участник';
+    if (petName) petName.textContent = pet.name || 'Питомец';
+    if (level) level.textContent = pet.level ?? 1;
+    if (image) {
+        image.src = pet.image || '/Barsichela.png';
+        image.alt = pet.name || 'Питомец';
+        image.onerror = () => {
+            image.replaceWith(document.createTextNode('🐾'));
+        };
+    }
+
+    ['health', 'hunger', 'happiness', 'energy'].forEach(key => {
+        const value = Math.max(0, Math.min(100, Number(pet[key] ?? 100)));
+        const valueElement = document.getElementById(`member-pet-${key}-value`);
+        const bar = document.getElementById(`member-pet-${key}-bar`);
+        if (valueElement) valueElement.textContent = `${value} / 100`;
+        if (bar) {
+            bar.style.width = `${value}%`;
+            bar.parentElement.setAttribute('aria-valuenow', String(value));
+        }
+    });
+}
+
+
 function normalizePetData(pet) {
     if (!pet) return null;
 
@@ -626,10 +671,8 @@ function renderChatRegistry() {
         const name = member.display_name || member.username || `Игрок ${userId}`;
         const balance = Number(member.balance_r ?? member.currency ?? 0);
         const rp = Number(member.relationship_rp ?? member.rp ?? 0);
-        const button = document.createElement('button');
-        button.className = 'profile-member-row';
-        button.type = 'button';
-        button.disabled = userId == null;
+        const row = document.createElement('article');
+        row.className = 'profile-member-row';
 
         const avatar = document.createElement('span');
         avatar.className = 'member-avatar';
@@ -644,14 +687,26 @@ function renderChatRegistry() {
         stats.textContent = `${rp} RP · ${balance} R$`;
         details.append(displayName, stats);
 
-        const giftIcon = document.createElement('span');
-        giftIcon.className = 'member-gift-icon';
-        giftIcon.setAttribute('aria-hidden', 'true');
-        giftIcon.textContent = '＋';
+        const actions = document.createElement('div');
+        actions.className = 'member-actions';
 
-        button.append(avatar, details, giftIcon);
-        button.addEventListener('click', () => openGiftModal(member));
-        fragment.appendChild(button);
+        const giftButton = document.createElement('button');
+        giftButton.className = 'member-action-button member-gift-action';
+        giftButton.type = 'button';
+        giftButton.disabled = userId == null;
+        giftButton.textContent = '🎁 Подарить R$';
+        giftButton.addEventListener('click', () => openGiftModal(member));
+
+        const petButton = document.createElement('button');
+        petButton.className = 'member-action-button member-pet-action';
+        petButton.type = 'button';
+        petButton.disabled = userId == null;
+        petButton.textContent = '🐾 Посмотреть питомца';
+        petButton.addEventListener('click', () => openMemberPet(member));
+
+        actions.append(giftButton, petButton);
+        row.append(avatar, details, actions);
+        fragment.appendChild(row);
     });
     container.replaceChildren(fragment);
 }
@@ -687,11 +742,11 @@ function renderLeaderboard() {
         name.textContent = member.display_name
             || (member.username ? `@${member.username}` : `Игрок ${member.user_id || ''}`);
         const stats = document.createElement('p');
-        stats.textContent = `${Number(member.convertible_rp || 0)} RP · ${Number(member.balance_r || 0)} R$`;
+        stats.textContent = `${Number(member.score_value || 0)} очков побед · ${Number(member.convertible_rp || 0)} RP · ${Number(member.balance_r || 0)} R$`;
 
         const points = document.createElement('strong');
         points.className = 'leaderboard-total';
-        points.textContent = `${Number(member.convertible_rp || 0)} RP`;
+        points.textContent = `${Number(member.score_value || 0)} очк.`;
 
         user.append(name, stats);
         row.append(rank, user, points);
@@ -796,28 +851,15 @@ function renderPetChoices() {
 
 
 function updatePetView() {
-    const petDisplay =
-        document.getElementById('petDisplay');
+    const petDisplay = document.getElementById('petDisplay');
+    if (!petDisplay) return;
 
-    const equippedPreview =
-        document.getElementById('equippedPreview');
-
-    if (!petDisplay || !equippedPreview) {
-        return;
-    }
-
-    const equippedItems =
-        userData.inventory.filter(item =>
-            userData.equipped.includes(item.id)
-        );
-
-    const activePet =
-        userData.petCatalog.find(
-            pet => pet.id === currentPetId
-        ) || userData.petCatalog[0] || userData.pet || {
-            name: 'Питомец',
-            image: '/Barsichela.png'
-        };
+    const activePet = userData.petCatalog.find(
+        pet => pet.id === currentPetId
+    ) || userData.petCatalog[0] || userData.pet || {
+        name: 'Питомец',
+        image: '/Barsichela.png'
+    };
     const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
     const level = Math.max(1, Number(userData.pet?.level || 1));
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
@@ -858,50 +900,14 @@ function updatePetView() {
         element.setAttribute('aria-valuenow', String(progress.value));
     });
 
-    const petHtml = `
+    petDisplay.innerHTML = `
         <img
             src="${escapeHtml(userData.pet?.image || activePet.image)}"
             alt="${escapeHtml(userData.pet?.name || activePet.name)}"
             class="active-pet-image"
-            style="
-                width: 100px;
-                height: 100px;
-                object-fit: contain;
-            "
+            style="width: 100px; height: 100px; object-fit: contain;"
         >
     `;
-
-    if (equippedItems.length === 0) {
-        petDisplay.innerHTML = petHtml;
-        equippedPreview.textContent = 'Питомец сыт и доволен ✨';
-    } else {
-        petDisplay.innerHTML = `
-            <div
-                style="
-                    position: relative;
-                    display: inline-block;
-                "
-            >
-                ${petHtml}
-
-                <span
-                    style="
-                        font-size: 22px;
-                        position: absolute;
-                        top: -8px;
-                        right: 18px;
-                    "
-                >
-                    ✨
-                </span>
-            </div>
-        `;
-
-        equippedPreview.textContent =
-            equippedItems
-                .map(item => item.name)
-                .join(' + ');
-    }
 
     petDisplay.querySelectorAll('img').forEach(image => {
         image.onerror = () => image.replaceWith(document.createTextNode('🐾'));
@@ -975,7 +981,7 @@ function renderShop() {
                 const profileCurrency = document.getElementById('profile-currency');
                 if (profileCurrency) profileCurrency.textContent = userData.currency;
                 renderShop();
-                renderInventory();
+                renderFoodInventory();
                 updatePetView();
             } catch (error) {
                 console.error('Ошибка при покупке еды:', error);
@@ -987,36 +993,28 @@ function renderShop() {
 }
 
 
-function renderInventory() {
+function renderFoodInventory() {
     const grid = document.getElementById('inventoryGrid');
     if (!grid) return;
 
-    const ownedFood = userData.foodCatalog
+    const foodItems = userData.foodCatalog
         .filter(food => food.count > 0)
         .map(food => ({
             icon: food.name.split(' ')[0],
-            name: food.name.replace(/^\S+\s*/, ''),
-            status: `×${food.count}`,
-            equipped: false
+            name: food.name.replace(/^\\S+\\s*/, ''),
+            count: `×${food.count}`
         }));
-    const ownedItems = userData.inventory.map(item => ({
-        icon: item.name.split(' ')[0],
-        name: item.name.replace(/^\S+\s*/, ''),
-        status: item.equipped ? 'Надето' : 'В коллекции',
-        equipped: item.equipped
-    }));
-    const inventoryItems = [...ownedItems, ...ownedFood];
 
-    if (inventoryItems.length === 0) {
-        grid.innerHTML = '<p class="inventory-empty">Пока нет предметов</p>';
+    if (foodItems.length === 0) {
+        grid.innerHTML = '<p class="inventory-empty">Холодильник пока пуст</p>';
         return;
     }
 
-    grid.innerHTML = inventoryItems.map(item => `
+    grid.innerHTML = foodItems.map(food => `
         <article class="inventory-item">
-            <span class="inventory-item-icon">${escapeHtml(item.icon)}</span>
-            <span class="inventory-item-name">${escapeHtml(item.name)}</span>
-            <strong class="inventory-item-count ${item.equipped ? 'is-equipped' : ''}">${escapeHtml(item.status)}</strong>
+            <span class="inventory-item-icon">${escapeHtml(food.icon)}</span>
+            <span class="inventory-item-name">${escapeHtml(food.name)}</span>
+            <strong class="inventory-item-count">${escapeHtml(food.count)}</strong>
         </article>
     `).join('');
 }
@@ -1636,7 +1634,7 @@ async function feedPet(foodId) {
         }));
         renderFeedItems();
         renderShop();
-        renderInventory();
+        renderFoodInventory();
         updatePetView();
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
