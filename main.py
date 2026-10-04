@@ -9,6 +9,8 @@ import re
 import tempfile
 import time
 import uuid
+import sqlite3
+from contextlib import contextmanager
 import urllib.error
 import urllib.request
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -28,6 +30,107 @@ from aiogram.types import (
 )
 
 from google import genai
+
+# Имя файла базы данных
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+
+
+@contextmanager
+def db_connection():
+    connection = sqlite3.connect(DB_PATH, timeout=15)
+    connection.row_factory = sqlite3.Row
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def _encode_sql_json(value):
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _decode_sql_json(value):
+    try:
+        return json.loads(value or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return {}
+
+
+def init_db():
+    with db_connection() as connection:
+        connection.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                chat_id TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL DEFAULT '',
+                username TEXT NOT NULL DEFAULT '',
+                relationship_rp INTEGER NOT NULL DEFAULT 0,
+                convertible_rp INTEGER NOT NULL DEFAULT 0,
+                balance_r REAL NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                last_message_time REAL NOT NULL DEFAULT 0,
+                record_type TEXT NOT NULL DEFAULT 'user',
+                data_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (chat_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS pets (
+                chat_id TEXT,
+                user_id TEXT,
+                name TEXT DEFAULT 'Питомец',
+                health INTEGER DEFAULT 100,
+                hunger INTEGER DEFAULT 100,
+                happiness INTEGER DEFAULT 100,
+                energy INTEGER DEFAULT 100,
+                PRIMARY KEY (chat_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS scores (
+                chat_id TEXT,
+                user_id TEXT,
+                score_value INTEGER DEFAULT 0,
+                PRIMARY KEY (chat_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS inventory (
+                chat_id TEXT,
+                user_id TEXT,
+                item_id TEXT,
+                quantity INTEGER DEFAULT 0,
+                record_type TEXT NOT NULL DEFAULT 'item',
+                data_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (chat_id, user_id, item_id)
+            );
+            """)
+
+        migrations = {
+            "users": {
+                "record_type": "TEXT NOT NULL DEFAULT 'user'",
+                "data_json": "TEXT NOT NULL DEFAULT '{}'",
+            },
+            "inventory": {
+                "record_type": "TEXT NOT NULL DEFAULT 'item'",
+                "data_json": "TEXT NOT NULL DEFAULT '{}'",
+            },
+        }
+        for table_name, columns in migrations.items():
+            existing_columns = {
+                row["name"]
+                for row in connection.execute(f"PRAGMA table_info({table_name})")
+            }
+            for column_name, column_definition in columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(
+                        f"ALTER TABLE {table_name} "
+                        f"ADD COLUMN {column_name} {column_definition}"
+                    )
+
+
+# Запускаем инициализацию при старте
+init_db()
 
 # ============================================================
 # ENV
@@ -461,71 +564,167 @@ def load_users_document():
         "chat_profiles": {},
         "transactions": [],
     }
-    if not os.path.exists(USERS_FILE):
-        return default_document
+    with db_connection() as connection:
+        rows = connection.execute("""
+            SELECT chat_id, user_id, username, relationship_rp,
+                   convertible_rp, balance_r, status, last_message_time,
+                   record_type, data_json
+            FROM users
+            WHERE record_type IN ('user', 'chat_profile')
+            """).fetchall()
+        metadata_rows = connection.execute("""
+            SELECT item_id, data_json, record_type
+            FROM inventory
+            WHERE record_type IN ('users_metadata', 'users_transaction')
+            """).fetchall()
 
-    try:
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return default_document
+    for row in rows:
+        value = _decode_sql_json(row["data_json"])
+        if not isinstance(value, dict):
+            value = {}
+        if not value:
+            if row["record_type"] == "user":
+                value = create_default_user(row["user_id"])
+                value["status"] = row["status"] or "active"
+                value["rp"] = row["relationship_rp"] or 0
+                value["r_currency"] = row["balance_r"] or 0
+            else:
+                value = {
+                    "chat_id": row["chat_id"],
+                    "user_id": row["user_id"],
+                    "username": row["username"],
+                    "relationship_rp": row["relationship_rp"] or 0,
+                    "convertible_rp": row["convertible_rp"] or 0,
+                    "balance_r": row["balance_r"] or 0,
+                    "status": row["status"] or "активен",
+                    "last_message_time": row["last_message_time"] or 0,
+                }
 
-        if isinstance(data.get("users"), dict):
-            document = data
+        if row["record_type"] == "user":
+            document_key = row["user_id"]
+            default_document["users"][document_key] = value
         else:
-            document = {
-                "schema_version": data.get("schema_version", 2),
-                "users": {
-                    key: value
-                    for key, value in data.items()
-                    if key not in {"schema_version", "chat_profiles", "transactions"}
-                    and isinstance(value, dict)
-                },
-                "chat_profiles": data.get("chat_profiles", {}),
-                "transactions": data.get("transactions", []),
-            }
+            document_key = chat_member_key(row["chat_id"], row["user_id"])
+            default_document["chat_profiles"][document_key] = value
 
-        document.setdefault("schema_version", 2)
-        if not isinstance(document.get("chat_profiles"), dict):
-            document["chat_profiles"] = {}
-        if not isinstance(document.get("transactions"), list):
-            document["transactions"] = []
-        return document
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"Ошибка загрузки users.json: {e}")
-        return default_document
+    for row in metadata_rows:
+        value = _decode_sql_json(row["data_json"])
+        if not isinstance(value, dict):
+            value = {}
+        if row["record_type"] == "users_metadata":
+            if row["item_id"] == "schema_version":
+                default_document["schema_version"] = value.get("value", 2)
+            elif row["item_id"] == "transactions":
+                default_document["transactions"] = value.get("value", [])
+        elif row["record_type"] == "users_transaction":
+            default_document["transactions"].append(value)
+
+    return default_document
 
 
 def save_users_document(document):
-    temporary_path = None
     try:
-        document["schema_version"] = 2
-        document.setdefault("users", {})
-        document.setdefault("chat_profiles", {})
-        document.setdefault("transactions", [])
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=BASE_DIR,
-            prefix=".users-",
-            suffix=".tmp",
-            delete=False,
-        ) as f:
-            temporary_path = f.name
-            json.dump(document, f, ensure_ascii=False, indent=4)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temporary_path, USERS_FILE)
+        users = document.get("users", {})
+        profiles = document.get("chat_profiles", {})
+        transactions = document.get("transactions", [])
+
+        with db_connection() as connection:
+            connection.execute(
+                "DELETE FROM users WHERE record_type IN ('user', 'chat_profile')"
+            )
+            connection.execute(
+                "DELETE FROM inventory WHERE record_type IN "
+                "('users_metadata', 'users_transaction')"
+            )
+            connection.execute(
+                """
+                INSERT INTO inventory (
+                    chat_id, user_id, item_id, quantity, record_type, data_json
+                ) VALUES ('', '__users__', 'schema_version', 0, 'users_metadata', ?)
+                """,
+                (_encode_sql_json({"value": document.get("schema_version", 2)}),),
+            )
+
+            for username, user in users.items():
+                if not isinstance(user, dict):
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO users (
+                        chat_id, user_id, username, relationship_rp,
+                        convertible_rp, balance_r, status, last_message_time,
+                        record_type, data_json
+                    ) VALUES ('', ?, ?, ?, ?, ?, ?, ?, 'user', ?)
+                    """,
+                    (
+                        str(username),
+                        str(username),
+                        int(user.get("relationship_rp", 0) or 0),
+                        int(user.get("convertible_rp", 0) or 0),
+                        float(user.get("r_currency", user.get("balance_r", 0)) or 0),
+                        str(user.get("status", "active")),
+                        float(user.get("last_message_time", 0) or 0),
+                        _encode_sql_json(user),
+                    ),
+                )
+
+            for profile_key, profile in profiles.items():
+                if not isinstance(profile, dict):
+                    continue
+                raw_chat_id, separator, raw_user_id = str(profile_key).partition(":")
+                chat_id = (
+                    str(profile.get("chat_id", raw_chat_id))
+                    if separator
+                    else str(profile.get("chat_id", ""))
+                )
+                user_id = (
+                    str(profile.get("user_id", raw_user_id))
+                    if separator
+                    else str(profile.get("user_id", profile_key))
+                )
+                connection.execute(
+                    """
+                    INSERT INTO users (
+                        chat_id, user_id, username, relationship_rp,
+                        convertible_rp, balance_r, status, last_message_time,
+                        record_type, data_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'chat_profile', ?)
+                    """,
+                    (
+                        chat_id,
+                        user_id,
+                        str(profile.get("username", "")),
+                        int(profile.get("relationship_rp", 0) or 0),
+                        int(profile.get("convertible_rp", 0) or 0),
+                        float(profile.get("balance_r", 0) or 0),
+                        str(profile.get("status", "активен")),
+                        float(profile.get("last_message_time", 0) or 0),
+                        _encode_sql_json(profile),
+                    ),
+                )
+
+            for index, transaction in enumerate(transactions):
+                transaction_id = str(
+                    transaction.get("id", f"transaction-{index}")
+                    if isinstance(transaction, dict)
+                    else f"transaction-{index}"
+                )
+                connection.execute(
+                    """
+                    INSERT INTO inventory (
+                        chat_id, user_id, item_id, quantity, record_type, data_json
+                    ) VALUES ('', '__users__', ?, 0, 'users_transaction', ?)
+                    """,
+                    (transaction_id, _encode_sql_json(transaction)),
+                )
         return True
-    except OSError as e:
-        print(f"Ошибка сохранения users.json: {e}")
-        if temporary_path and os.path.exists(temporary_path):
-            os.remove(temporary_path)
+    except (sqlite3.Error, TypeError, ValueError) as error:
+        print(f"Ошибка сохранения users в SQLite: {error}")
         return False
 
 
 def load_users():
-    return load_users_document().get("users", {})
+    return load_users_document()["users"]
 
 
 def save_users(users):
