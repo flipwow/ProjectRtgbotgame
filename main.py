@@ -1340,7 +1340,7 @@ async def pet_status_command(
                 "spam_strikes_at": 0,
                 "offended_until": 0,
             }
-            profiles[profile_key] = profile
+                        profiles[profile_key] = profile
             if not save_chat_profiles(profiles):
                 await message.answer("Не удалось сохранить профиль в базе данных.")
                 return
@@ -1350,9 +1350,25 @@ async def pet_status_command(
             await message.answer("Не удалось создать запись питомца в базе данных.")
             return
 
+        if message.chat.type == "private":
+            profile_button = InlineKeyboardButton(
+                text="👤 Открыть профиль",
+                web_app=WebAppInfo(
+                    url=(
+                        f"{WEBAPP_ORIGIN}?"
+                        f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
+                    )
+                ),
+            )
+        else:
+            profile_button = InlineKeyboardButton(
+                text="👤 Открыть профиль",
+                url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
+            )
         await message.answer(
             f"🐾 {message.from_user.full_name}, профиль активирован в этом чате!\n"
-            f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$"
+            f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[profile_button]]),
         )
         return
 
@@ -3306,7 +3322,6 @@ def get_main_hub_keyboard(
 ):
 
     if chat_type == "private":
-
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             web_app=WebAppInfo(
@@ -3316,9 +3331,7 @@ def get_main_hub_keyboard(
                 )
             ),
         )
-
     else:
-
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
@@ -3337,6 +3350,33 @@ def get_main_hub_keyboard(
                 ),
             ],
             [game_button],
+        ]
+    )
+
+
+
+
+def get_start_keyboard(chat_type="private", chat_id=None, user_id=None):
+    if chat_type == "private":
+        app_button = InlineKeyboardButton(
+            text="🎮 Запустить Mini App",
+            web_app=WebAppInfo(
+                url=(
+                    f"{WEBAPP_ORIGIN}?"
+                    f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
+                )
+            ),
+        )
+    else:
+        app_button = InlineKeyboardButton(
+            text="🎮 Запустить Mini App",
+            url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
+        )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [app_button],
+            [InlineKeyboardButton(text="📖 Правила", callback_data="start_rules")],
         ]
     )
 
@@ -3623,6 +3663,20 @@ async def cmd_balance(message: Message):
     )
 
 
+@router.callback_query(F.data == "start_rules")
+async def start_rules_callback(callback: CallbackQuery):
+    rules = (
+        "📖 <b>Как играть</b>\n\n"
+        "Заботьтесь о питомце, покупайте ему еду за R$ и играйте в крестики-нолики. "
+        "За победу в онлайн-дуэли начисляется 30–60 RP; ничья не награждается.\n\n"
+        "RP можно обменять на R$ по курсу 100 RP = 10 R$. В дуэли ходите только в свой ход. "
+        "Играйте честно и уважайте других участников."
+    )
+    if callback.message:
+        await callback.message.answer(rules, parse_mode="HTML")
+    await callback.answer()
+
+
 @router.message(Command("menu", "start"))
 async def cmd_menu(
     message: Message,
@@ -3642,12 +3696,27 @@ async def cmd_menu(
         users[username] = user_info
         save_users(users)
 
+    is_start = command_name == "/start"
     await message.answer(
-        "✨ **Привет... Это я, " "RitushkaVIPai 👑**\n\n" "Выбирай раздел:",
-        reply_markup=get_main_hub_keyboard(
-            message.chat.type,
-            message.chat.id,
-            message.from_user.id,
+        "✨ **Привет... Это я, "
+        "RitushkaVIPai 👑**\n\n"
+        + (
+            "Открой Mini App или посмотри правила игры:"
+            if is_start
+            else "Выбирай раздел:"
+        ),
+        reply_markup=(
+            get_start_keyboard(
+                message.chat.type,
+                message.chat.id,
+                message.from_user.id,
+            )
+            if is_start
+            else get_main_hub_keyboard(
+                message.chat.type,
+                message.chat.id,
+                message.from_user.id,
+            )
         ),
         parse_mode="Markdown",
     )

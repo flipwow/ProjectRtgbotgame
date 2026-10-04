@@ -100,17 +100,8 @@
                                 <span>Счастье</span>
                                 <span id="pet-happiness-value">100 / 100</span>
                             </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
+                                                        <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
                                 <div id="pet-happiness-bar" class="pet-stat-fill happiness-fill"></div>
-                            </div>
-                        </div>
-                        <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Энергия</span>
-                                <span id="pet-energy-value">100 / 100</span>
-                            </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Энергия питомца">
-                                <div id="pet-energy-bar" class="pet-stat-fill energy-fill"></div>
                             </div>
                         </div>
                     </div>
@@ -479,7 +470,7 @@
             <label class="settings-field" for="theme-select">
                 <span>Тема</span>
                 <select id="theme-select" onchange="setAppTheme(this.value)">
-                    <option value="current">Текущая</option>
+                    <option value="current">Исходная</option>
                     <option value="light">Светлая</option>
                     <option value="dark">Тёмная</option>
                 </select>
@@ -605,12 +596,8 @@
                     <div class="profile-stat-track" role="progressbar" aria-label="Сытость питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
                 </div>
                 <div class="profile-stat-row">
-                    <div><span>Счастье</span><strong id="member-pet-happiness-value">100 / 100</strong></div>
+                                        <div><span>Счастье</span><strong id="member-pet-happiness-value">100 / 100</strong></div>
                     <div class="profile-stat-track" role="progressbar" aria-label="Счастье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
-                </div>
-                <div class="profile-stat-row">
-                    <div><span>Энергия</span><strong id="member-pet-energy-value">100 / 100</strong></div>
-                    <div class="profile-stat-track" role="progressbar" aria-label="Энергия питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-energy-bar" class="profile-stat-fill energy-fill"></span></div>
                 </div>
             </div>
         </section>

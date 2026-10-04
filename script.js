@@ -41,7 +41,7 @@ const englishText = {
     'ПРОФИЛЬ ЧАТА': 'CHAT PROFILE', 'Telegram Mini App': 'Telegram Mini App', 'Загрузка': 'Loading', 'Баланс': 'Balance', 'Отношения': 'Relationship', 'Доступно к обмену': 'Available to exchange',
     'Обмен RP на R$': 'Exchange RP for R$', 'Курс: 100 RP = 10 R$': 'Rate: 100 RP = 10 R$', 'Сумма RP': 'RP amount', 'Обменять RP на R$': 'Exchange RP for R$',
     'СООБЩЕСТВО': 'COMMUNITY', 'Участники чата': 'Chat members', '⚙️ Настройки': '⚙️ Settings', 'Настройки': 'Settings', 'Язык / Language': 'Language', 'Язык: Русский / English': 'Language: Russian / English',
-    'Тема': 'Theme', 'Текущая': 'Current', 'Светлая': 'Light', 'Тёмная': 'Dark', '📖 Правила': '📖 Rules', 'Правила': 'Rules', 'Готово': 'Done',
+    'Тема': 'Theme', 'Исходная': 'Original', 'Светлая': 'Light', 'Тёмная': 'Dark', '📖 Правила': '📖 Rules', 'Правила': 'Rules', 'Готово': 'Done',
     'Основные команды бота': 'Main bot commands', '/start</code> — запустить бота и открыть приложение.': '/start</code> — start the bot and open the app.',
     '/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.': '/duel</code> — create an online tic-tac-toe duel and post the challenge in chat.',
     '/profile</code> — открыть профиль чата; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.': '/profile</code> — open chat profile; <code>/balance</code> — check your balance; <code>/pet</code> — view your pet.',
@@ -65,7 +65,7 @@ const englishText = {
     'Другие участники пока не активировали бота в этом чате.': 'Other members have not activated the bot in this chat yet.', 'В этом чате пока нет участников рейтинга.': 'There are no ranked members in this chat yet.',
     'Недостаточно R$ для покупки.': 'Not enough R$ to buy this.', 'Магазин еды пока пуст': 'The food shop is empty', 'Холодильник пока пуст': 'The fridge is empty',
     'Покормить Барсичелу': 'Feed Barsichela', 'Отправить подарок': 'Send gift', 'Сумма перевода': 'Transfer amount', 'Ожидание соперника...': 'Waiting for opponent...',
-    'Ходит: X (Крестики)': 'Turn: X (Crosses)', 'Язык / Language': 'Language', 'Русский': 'Russian', 'Текущая': 'Current', 'Светлая': 'Light', 'Тёмная': 'Dark',
+    'Ходит: X (Крестики)': 'Turn: X (Crosses)', 'Язык / Language': 'Language', 'Русский': 'Russian', 'Исходная': 'Original', 'Светлая': 'Light', 'Тёмная': 'Dark',
     'Основные команды бота': 'Main bot commands', ' — запустить бота и открыть приложение.': ' — start the bot and open the app.',
     ' — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.': ' — create an online tic-tac-toe duel and send a challenge to the chat.',
     ' — открыть профиль чата; ': ' — open the chat profile; ', ' — проверить баланс; ': ' — check your balance; ', ' — посмотреть питомца.': ' — view your pet.',
@@ -452,21 +452,28 @@ async function fetchUserData() {
             renderChatRegistry();
             return;
         }
-        showProfileFeedback('');
+                showProfileFeedback('');
 
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
         };
-        const response = await fetchWithTimeout(
-            `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
-            { headers },
-            API_REQUEST_TIMEOUT_MS
-        );
-        const data = await response.json().catch(() => ({}));
+        let response;
+        let data;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+            response = await fetchWithTimeout(
+                `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+                { headers },
+                API_REQUEST_TIMEOUT_MS
+            );
+            data = await response.json().catch(() => ({}));
+            if (response.ok || response.status !== 404 || attempt === 3) break;
+            await delay(500);
+        }
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
+        if (data.chat?.id) chatContext.chatId = String(data.chat.id);
         applyChatProfile(data);
         userData.foodCatalog = data.food_catalog || [];
         userData.petCatalog = data.pet_catalog || [];
@@ -587,11 +594,10 @@ function renderProfilePet(pet) {
         petImage.replaceChildren(image);
     }
 
-    const stats = [
-        ['health', 'Здоровье'],
-        ['hunger', 'Сытость'],
-        ['happiness', 'Счастье'],
-        ['energy', 'Энергия']
+        const stats = [
+            ['health', 'Здоровье'],
+            ['hunger', 'Сытость'],
+        ['happiness', 'Счастье']
     ];
     stats.forEach(([key]) => {
         const value = Math.max(0, Math.min(100, Number(pet[key] ?? 100)));
@@ -1121,24 +1127,20 @@ function updatePetView() {
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
     const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
-    const energy = Math.max(0, Math.min(100, Number(userData.pet?.energy ?? 100)));
-
     const petName = document.getElementById('pet-name');
     if (petName) petName.textContent = userData.pet?.name || activePet.name;
 
-    const statValues = {
-        'pet-level-value': `${level} / ${maxLevel}`,
-        'pet-health-value': `${health} / 100`,
-        'pet-hunger-value': `${hunger} / 100`,
-        'pet-happiness-value': `${happiness} / 100`,
-        'pet-energy-value': `${energy} / 100`
+        const statValues = {
+            'pet-level-value': `${level} / ${maxLevel}`,
+            'pet-health-value': `${health} / 100`,
+            'pet-hunger-value': `${hunger} / 100`,
+        'pet-happiness-value': `${happiness} / 100`
     };
     const statProgress = {
         'pet-level-bar': { value: level, max: maxLevel, width: Math.min(level / maxLevel * 100, 100) },
         'pet-health-bar': { value: health, max: 100, width: health },
         'pet-hunger-bar': { value: hunger, max: 100, width: hunger },
-        'pet-happiness-bar': { value: happiness, max: 100, width: happiness },
-        'pet-energy-bar': { value: energy, max: 100, width: energy }
+        'pet-happiness-bar': { value: happiness, max: 100, width: happiness }
     };
 
     Object.entries(statValues).forEach(([id, value]) => {

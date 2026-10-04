@@ -277,8 +277,8 @@ body {
 
 .active-pet-image {
     display: block;
-    width: 100px;
-    height: 100px;
+    width: 116px;
+    height: 116px;
     object-fit: contain;
 }
 
@@ -971,9 +971,9 @@ body {
         font-size: 44px;
     }
 
-    .active-pet-image {
-        width: 84px;
-        height: 84px;
+                .active-pet-image {
+        width: 96px;
+        height: 96px;
     }
 
     .pet-choices-grid {
