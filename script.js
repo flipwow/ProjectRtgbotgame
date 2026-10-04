@@ -121,18 +121,17 @@ async function fetchUserData() {
         userData.inventory = data.inventory || [];
         userData.catalog = data.catalog || [];
         userData.equipped = data.equipped || [];
-        userData.leaderboard = data.leaderboard || [];
         userData.foodCatalog = data.food_catalog || [];
         userData.petCatalog = data.pet_catalog || [];
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
         currentPetId = userData.pet?.id || 'barsichela';
+        await fetchLeaderboard();
         renderProfile();
 
         updatePetView();
         renderShop();
         renderInventory();
         renderChatRegistry();
-        renderLeaderboard();
 
     } catch (error) {
         console.error(
@@ -150,10 +149,43 @@ function applyChatProfile(data) {
     userData.chatProfile = profile;
     userData.chat = data.chat || null;
     userData.user = data.user || profile.user || null;
-    userData.registry = data.members || data.participants || [];
+    userData.registry = Array.isArray(data.members)
+        ? data.members
+        : Array.isArray(data.participants)
+            ? data.participants
+            : [];
     userData.currency = Number(profile.balance_r ?? data.balance_r ?? 0);
     userData.rp = Number(profile.relationship_rp ?? data.relationship_rp ?? 0);
     userData.convertibleRp = Number(profile.convertible_rp ?? data.convertible_rp ?? 0);
+}
+
+
+async function fetchLeaderboard() {
+    if (!chatContext.chatId) {
+        userData.leaderboard = [];
+        renderLeaderboard();
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/chat/leaderboard?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+            {
+                headers: {
+                    'X-Telegram-Init-Data': tg?.initData || ''
+                }
+            }
+        );
+        const data = await response.json().catch(() => []);
+        if (!response.ok) {
+            throw new Error(Array.isArray(data) ? `HTTP ${response.status}` : data.error || `HTTP ${response.status}`);
+        }
+        userData.leaderboard = Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Не удалось загрузить лидерборд:', error);
+        userData.leaderboard = [];
+    }
+    renderLeaderboard();
 }
 
 
@@ -412,7 +444,7 @@ function renderChatRegistry() {
     const count = document.getElementById('members-count');
     if (!container) return;
 
-    const members = (userData.registry || []).filter(member =>
+    const members = (Array.isArray(userData.registry) ? userData.registry : []).filter(member =>
         String(member.user_id ?? member.id) !== String(chatContext.userId)
     );
     if (count) count.textContent = members.length;
@@ -422,7 +454,7 @@ function renderChatRegistry() {
         return;
     }
 
-    container.replaceChildren();
+    const fragment = document.createDocumentFragment();
     members.forEach(member => {
         const userId = member.user_id ?? member.id;
         const name = member.display_name || member.username || `Игрок ${userId}`;
@@ -432,56 +464,74 @@ function renderChatRegistry() {
         button.className = 'profile-member-row';
         button.type = 'button';
         button.disabled = userId == null;
-        button.innerHTML = `
-            <span class="member-avatar" aria-hidden="true">${escapeHtml(name.slice(0, 1).toUpperCase())}</span>
-            <span class="member-details">
-                <strong>${escapeHtml(name)}</strong>
-                <small>${rp} RP <span aria-hidden="true">·</span> ${balance} R$</small>
-            </span>
-            <span class="member-gift-icon" aria-hidden="true">＋</span>
-        `;
+
+        const avatar = document.createElement('span');
+        avatar.className = 'member-avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = name.slice(0, 1).toUpperCase();
+
+        const details = document.createElement('span');
+        details.className = 'member-details';
+        const displayName = document.createElement('strong');
+        displayName.textContent = name;
+        const stats = document.createElement('small');
+        stats.textContent = `${rp} RP · ${balance} R$`;
+        details.append(displayName, stats);
+
+        const giftIcon = document.createElement('span');
+        giftIcon.className = 'member-gift-icon';
+        giftIcon.setAttribute('aria-hidden', 'true');
+        giftIcon.textContent = '＋';
+
+        button.append(avatar, details, giftIcon);
         button.addEventListener('click', () => openGiftModal(member));
-        container.appendChild(button);
+        fragment.appendChild(button);
     });
+    container.replaceChildren(fragment);
 }
 
 
 function renderLeaderboard() {
     const container = document.getElementById('leaderboardList');
-
     if (!container) return;
 
-    if (!userData.leaderboard || userData.leaderboard.length === 0) {
-        container.innerHTML = `
-            <p class="leaderboard-empty">
-                Пока нет набранных игровых очков
-            </p>
-        `;
+    const leaderboard = Array.isArray(userData.leaderboard)
+        ? userData.leaderboard
+        : [];
+    if (leaderboard.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'leaderboard-empty';
+        empty.textContent = 'В этом чате пока нет участников рейтинга.';
+        container.replaceChildren(empty);
         return;
     }
 
-    const modeNames = {
-        tictactoe_online: 'Крестики-нолики · онлайн'
-    };
+    const fragment = document.createDocumentFragment();
+    leaderboard.forEach((member, index) => {
+        const row = document.createElement('article');
+        row.className = 'leaderboard-row';
 
-    container.innerHTML = userData.leaderboard.map((member, index) => {
-        const modeScores = Object.entries(member.modes || {})
-            .map(([mode, points]) => `
-                <p>${escapeHtml(modeNames[mode] || mode)}: ${points} очков</p>
-            `)
-            .join('');
+        const rank = document.createElement('span');
+        rank.className = 'leaderboard-rank';
+        rank.textContent = String(index + 1);
 
-        return `
-            <article class="leaderboard-row">
-                <span class="leaderboard-rank">${index + 1}</span>
-                <div class="leaderboard-user">
-                    <h4>@${escapeHtml(member.username)}</h4>
-                    ${modeScores}
-                </div>
-                <strong class="leaderboard-total">${member.total} очков</strong>
-            </article>
-        `;
-    }).join('');
+        const user = document.createElement('div');
+        user.className = 'leaderboard-user';
+        const name = document.createElement('h4');
+        name.textContent = member.display_name
+            || (member.username ? `@${member.username}` : `Игрок ${member.user_id || ''}`);
+        const stats = document.createElement('p');
+        stats.textContent = `${Number(member.convertible_rp || 0)} RP · ${Number(member.balance_r || 0)} R$`;
+
+        const points = document.createElement('strong');
+        points.className = 'leaderboard-total';
+        points.textContent = `${Number(member.convertible_rp || 0)} RP`;
+
+        user.append(name, stats);
+        row.append(rank, user, points);
+        fragment.appendChild(row);
+    });
+    container.replaceChildren(fragment);
 }
 
 
@@ -1182,6 +1232,15 @@ function connectToRoom(roomId) {
 
             const statusEl =
                 document.getElementById('ttt-status');
+
+            if (data.type === 'error') {
+                tttGameOver = true;
+                if (statusEl) {
+                    statusEl.textContent = data.message || 'Не удалось подключиться к дуэли.';
+                }
+                updateTttUI();
+                return;
+            }
 
             if (data.type === 'joined') {
                 mySymbol = data.symbol;

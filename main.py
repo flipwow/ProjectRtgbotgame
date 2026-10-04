@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import random
+import re
 import tempfile
 import time
 import uuid
@@ -48,10 +49,6 @@ AI_API_URL = os.getenv(
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN не найден в переменных окружения.")
 
-if not (GEMINI_API_KEY or HF_TOKEN or OPENROUTER_API_KEY):
-    raise RuntimeError("Укажи HF_TOKEN, OPENROUTER_API_KEY или GEMINI_API_KEY в .env.")
-
-
 # ============================================================
 # BOT
 # ============================================================
@@ -90,6 +87,7 @@ chat_sessions = {}
 game_rooms = {}
 
 BOT_USERNAME = None
+BOT_ID = None
 
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8080
@@ -1103,11 +1101,40 @@ def request_openai_compatible(messages):
 
 
 async def generate_companion_reply(system_prompt, text):
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": text},
-    ]
-    return await asyncio.to_thread(request_openai_compatible, messages)
+    endpoint = os.getenv("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat")
+    model = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
+    request_body = json.dumps(
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.75},
+        }
+    ).encode("utf-8")
+
+    def call_ollama():
+        request = urllib.request.Request(
+            endpoint,
+            data=request_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=90) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            error_body = error.read(1000).decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"Ollama вернул HTTP {error.code}: {error_body}"
+            ) from error
+        except urllib.error.URLError as error:
+            raise RuntimeError(f"Не удалось подключиться к Ollama: {error}") from error
+        return result.get("message", {}).get("content", "")
+
+    return await asyncio.to_thread(call_ollama)
 
 
 # ============================================================
@@ -1493,6 +1520,8 @@ async def process_eating(
 
 def create_game_room(
     challenger_id=None,
+    chat_id=None,
+    allowed_player_ids=None,
 ):
     room_id = str(uuid.uuid4()).replace("-", "")[:8]
 
@@ -1503,6 +1532,17 @@ def create_game_room(
         "status": "waiting",
         "winner": None,
         "challenger_id": challenger_id,
+        "chat_id": str(chat_id) if chat_id is not None else None,
+        "challenge_message_id": None,
+        "allowed_player_ids": (
+            {str(player_id) for player_id in allowed_player_ids}
+            if allowed_player_ids is not None
+            else None
+        ),
+        "participant_ids": [],
+        "player_names": {},
+        "result_notified": False,
+        "rematch_started": False,
         "created_at": time.time(),
     }
 
@@ -1531,6 +1571,142 @@ def check_winner(board):
         return "draw"
 
     return None
+
+
+async def finish_duel(room_id, room, winner):
+    if room.get("result_notified"):
+        return
+    room["result_notified"] = True
+
+    chat_id = room.get("chat_id")
+    challenge_message_id = room.get("challenge_message_id")
+    if chat_id is None:
+        return
+
+    if challenge_message_id is not None:
+        try:
+            await bot.delete_message(
+                chat_id=int(chat_id),
+                message_id=int(challenge_message_id),
+            )
+        except Exception as error:
+            print(f"Не удалось удалить сообщение вызова дуэли: {error}")
+
+    if winner == "draw":
+        result_text = "🤝 Дуэль завершилась вничью!"
+    else:
+        winning_user_id = next(
+            (
+                user_id
+                for socket, user_id in room.get("player_telegram_ids", {}).items()
+                if room.get("players", {}).get(socket, {}).get("symbol") == winner
+            ),
+            None,
+        )
+        winning_name = room.get("player_names", {}).get(
+            str(winning_user_id), f"Игрок {winning_user_id or winner}"
+        )
+        result_text = f"🏆 Победитель дуэли: {winning_name}!"
+
+    try:
+        result_message = await bot.send_message(
+            chat_id=int(chat_id),
+            text=f"{result_text}\n\nХотите сыграть ещё раз?",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🔁 Реванш",
+                            callback_data=f"rematch:{room_id}",
+                        )
+                    ]
+                ]
+            ),
+        )
+        room["result_message_id"] = result_message.message_id
+    except Exception as error:
+        print(f"Не удалось отправить результат дуэли: {error}")
+
+
+async def send_duel_invitation(chat_id, room_id, player_names=None):
+    duel_url = get_duel_url(room_id)
+    if not duel_url:
+        return None
+
+    names = list((player_names or {}).values())
+    players_text = f" между {names[0]} и {names[1]}" if len(names) == 2 else ""
+    return await bot.send_message(
+        chat_id=int(chat_id),
+        text=f"⚔️ Реванш{players_text}! Нажмите кнопку ниже, чтобы открыть игру.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="⚔️ Принять вызов",
+                        url=duel_url,
+                    )
+                ]
+            ]
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("rematch:"))
+async def rematch_callback(callback: CallbackQuery):
+    if not callback.message:
+        await callback.answer("Сообщение с результатом недоступно.", show_alert=True)
+        return
+
+    room_id = callback.data.split(":", 1)[1]
+    previous_room = game_rooms.get(room_id)
+    if not previous_room or previous_room.get("status") != "finished":
+        await callback.answer("Эта дуэль уже недоступна.", show_alert=True)
+        return
+
+    participant_ids = {
+        str(user_id) for user_id in previous_room.get("participant_ids", [])
+    }
+    if len(participant_ids) != 2 or str(callback.from_user.id) not in participant_ids:
+        await callback.answer(
+            "Реванш доступен только игрокам этой дуэли.", show_alert=True
+        )
+        return
+    if previous_room.get("rematch_started"):
+        await callback.answer("Реванш уже создан.", show_alert=True)
+        return
+
+    previous_room["rematch_started"] = True
+    try:
+        await bot.delete_message(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.message_id,
+        )
+    except Exception as error:
+        print(f"Не удалось удалить сообщение результата дуэли: {error}")
+
+    new_room_id = create_game_room(
+        challenger_id=callback.from_user.id,
+        chat_id=callback.message.chat.id,
+        allowed_player_ids=participant_ids,
+    )
+    new_room = game_rooms[new_room_id]
+    new_room["player_names"] = dict(previous_room.get("player_names", {}))
+    try:
+        invitation = await send_duel_invitation(
+            callback.message.chat.id,
+            new_room_id,
+            new_room["player_names"],
+        )
+        if invitation:
+            new_room["challenge_message_id"] = invitation.message_id
+        else:
+            await bot.send_message(
+                callback.message.chat.id,
+                "Не удалось создать ссылку на реванш.",
+            )
+    except Exception as error:
+        print(f"Не удалось создать приглашение на реванш: {error}")
+    await callback.answer("Реванш создан.")
 
 
 # ============================================================
@@ -1600,6 +1776,68 @@ async def read_json_object(request):
     return payload if isinstance(payload, dict) else None
 
 
+def get_chat_leaderboard(chat_id):
+    document = load_users_document()
+    chat_members = {}
+
+    for key, member in document.get("chat_profiles", {}).items():
+        if not isinstance(member, dict) or ":" not in str(key):
+            continue
+        key_chat_id, key_user_id = str(key).split(":", 1)
+        if key_chat_id != str(chat_id):
+            continue
+        if member.get("chat_id") is not None and str(member["chat_id"]) != str(chat_id):
+            continue
+        member_id = str(member.get("user_id", key_user_id))
+        chat_members[member_id] = member
+
+    for key, member in document.get("users", {}).items():
+        if not isinstance(member, dict):
+            continue
+        if member.get("chat_id") is None or str(member["chat_id"]) != str(chat_id):
+            continue
+        member_id = str(member.get("user_id") or member.get("telegram_id") or key)
+        chat_members.setdefault(member_id, member)
+
+    leaderboard = []
+    for member_id, member in chat_members.items():
+        leaderboard.append(
+            {
+                "user_id": member_id,
+                "username": member.get("username", ""),
+                "display_name": member.get("display_name")
+                or member.get("username")
+                or f"Игрок {member_id}",
+                "relationship_rp": int(member.get("relationship_rp", 0) or 0),
+                "convertible_rp": int(member.get("convertible_rp", 0) or 0),
+                "balance_r": int(member.get("balance_r", 0) or 0),
+                "status": member.get("status", "активен"),
+            }
+        )
+
+    leaderboard.sort(
+        key=lambda member: (
+            -member["convertible_rp"],
+            member["display_name"].casefold(),
+        )
+    )
+    return leaderboard
+
+
+async def api_chat_leaderboard(request):
+    chat_id, telegram_user, error_response = resolve_chat_api_context(request)
+    if error_response:
+        return error_response
+
+    profile_key = chat_member_key(chat_id, telegram_user["id"])
+    if not isinstance(load_chat_profiles().get(profile_key), dict):
+        return web.json_response(
+            {"error": "Activate /pet activate in this chat first"}, status=404
+        )
+
+    return web.json_response(get_chat_leaderboard(chat_id))
+
+
 async def api_chat_profile(request):
     chat_id, telegram_user, error_response = resolve_chat_api_context(request)
     if error_response:
@@ -1614,27 +1852,8 @@ async def api_chat_profile(request):
             {"error": "Activate /pet activate in this chat first"}, status=404
         )
 
-    member_profiles = []
-    for key, member in profiles.items():
-        if (
-            not key.startswith(f"{chat_id}:")
-            or key == profile_key
-            or not isinstance(member, dict)
-        ):
-            continue
-        member_id = key.split(":", 1)[1]
-        member_profiles.append(
-            {
-                "user_id": member_id,
-                "username": member.get("username", ""),
-                "display_name": member.get("display_name")
-                or member.get("username")
-                or f"Игрок {member_id}",
-                "relationship_rp": member.get("relationship_rp", 0),
-                "balance_r": member.get("balance_r", 0),
-                "status": member.get("status", "активен"),
-            }
-        )
+    leaderboard = get_chat_leaderboard(chat_id)
+    member_profiles = [member for member in leaderboard if member["user_id"] != user_id]
     member_profiles.sort(key=lambda member: member["display_name"].casefold())
 
     pets_data = load_pets_data()
@@ -1672,6 +1891,7 @@ async def api_chat_profile(request):
             "pet": pet,
             "pet_catalog": pet_catalog,
             "members": member_profiles,
+            "leaderboard": leaderboard,
         }
     )
 
@@ -2602,6 +2822,29 @@ async def websocket_game_handler(request):
         return ws
 
     room = game_rooms[room_id]
+    telegram_user_id = str(telegram_user["id"])
+    allowed_player_ids = room.get("allowed_player_ids")
+    if allowed_player_ids is not None and telegram_user_id not in allowed_player_ids:
+        await ws.send_json(
+            {
+                "type": "error",
+                "message": "Эта комната предназначена для игроков предыдущей дуэли",
+            }
+        )
+        await ws.close()
+        return ws
+
+    if (
+        allowed_player_ids is None
+        and not room["participant_ids"]
+        and room.get("challenger_id") is not None
+        and str(room.get("challenger_id")) != telegram_user_id
+    ):
+        await ws.send_json(
+            {"type": "error", "message": "Сначала вызвавший игрок должен войти в дуэль"}
+        )
+        await ws.close()
+        return ws
 
     if len(room["players"]) >= 2:
 
@@ -2616,10 +2859,23 @@ async def websocket_game_handler(request):
 
         return ws
 
+    if telegram_user_id in room["participant_ids"]:
+        await ws.send_json(
+            {"type": "error", "message": "Вы уже подключены к этой дуэли"}
+        )
+        await ws.close()
+        return ws
+
     symbol = "X" if len(room["players"]) == 0 else "O"
 
     room["players"][ws] = {"symbol": symbol}
-    room.setdefault("player_telegram_ids", {})[ws] = str(telegram_user["id"])
+    room.setdefault("player_telegram_ids", {})[ws] = telegram_user_id
+    room["participant_ids"].append(telegram_user_id)
+    room["player_names"][telegram_user_id] = (
+        telegram_user.get("first_name")
+        or telegram_user.get("username")
+        or f"Игрок {telegram_user_id}"
+    )
 
     if len(room["players"]) == 2:
         room["status"] = "playing"
@@ -2721,6 +2977,8 @@ async def websocket_game_handler(request):
                                         10,
                                     )
 
+                    await finish_duel(room_id, room, winner)
+
                 else:
 
                     room["current"] = "O" if room["current"] == "X" else "X"
@@ -2751,13 +3009,12 @@ async def websocket_game_handler(request):
         if ws in room["players"]:
             del room["players"][ws]
 
-        room.get("player_telegram_ids", {}).pop(ws, None)
+        if room["status"] != "finished":
+            user_id = room.get("player_telegram_ids", {}).pop(ws, None)
+            if user_id in room.get("participant_ids", []):
+                room["participant_ids"].remove(user_id)
 
-        # Удаляем пустую завершённую/заброшенную комнату.
-        if not room["players"] and room["status"] in (
-            "finished",
-            "waiting",
-        ):
+        if not room["players"] and room["status"] == "waiting":
             game_rooms.pop(
                 room_id,
                 None,
@@ -2851,6 +3108,11 @@ async def start_webapp_api():
     app.router.add_get(
         "/api/chat/profile",
         api_chat_profile,
+    )
+
+    app.router.add_get(
+        "/api/chat/leaderboard",
+        api_chat_leaderboard,
     )
 
     app.router.add_post(
@@ -3305,7 +3567,7 @@ async def cmd_duel(
 
     user = message.from_user
 
-    room_id = create_game_room(challenger_id=user.id)
+    room_id = create_game_room(challenger_id=user.id, chat_id=message.chat.id)
 
     duel_url = get_duel_url(room_id)
 
@@ -3326,13 +3588,14 @@ async def cmd_duel(
         ]
     )
 
-    await message.answer(
+    invitation = await message.answer(
         f"⚔️ **{user.first_name} "
         f"вызывает на дуэль!**\n\n"
         "Нажми кнопку ниже, чтобы открыть игру.",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
+    game_rooms[room_id]["challenge_message_id"] = invitation.message_id
 
 
 @router.message(Command("lvlup"))
@@ -3531,7 +3794,6 @@ async def cmd_reset(
 async def handle_text(
     message: Message,
 ):
-    global BOT_USERNAME
     text = message.text or ""
     user = message.from_user
     if user is None or user.is_bot:
@@ -3543,17 +3805,6 @@ async def handle_text(
     chat_id = str(message.chat.id)
     sender_id = str(user.id)
     profile_key = chat_member_key(message.chat.id, user.id)
-    chat_profiles = load_chat_profiles()
-    chat_profile = chat_profiles.get(profile_key)
-
-    if chat_profile:
-        message_result = process_chat_message(chat_profile, text)
-        chat_profiles[profile_key] = chat_profile
-        save_chat_profiles(chat_profiles)
-
-        if message_result == "blocked":
-            return
-
     companion = find_chat_companion(chat_id, sender_id, text)
     if companion is None and message.chat.type == "private":
         legacy_pet = get_pet_for_user(user.id)
@@ -3561,23 +3812,51 @@ async def handle_text(
             pet_id = legacy_pet.get("pet_id", "barsichela")
             companion = (sender_id, legacy_pet, load_pets_data().get(pet_id, {}))
 
-    if companion is None:
-        # Keep explicit bot mentions/replies usable even before a pet is activated.
-        is_directed_to_bot = bool(
-            (BOT_USERNAME and f"@{BOT_USERNAME}".casefold() in text.casefold())
-            or (
-                message.reply_to_message
-                and message.reply_to_message.from_user
-                and message.reply_to_message.from_user.id == (await bot.me()).id
-            )
+    is_private = message.chat.type == "private"
+    bot_mentioned = bool(
+        BOT_USERNAME
+        and re.search(
+            rf"(?<!\w)@{re.escape(BOT_USERNAME)}\b",
+            text,
+            flags=re.IGNORECASE,
         )
-        if not is_directed_to_bot or message.chat.type != "private":
+    )
+    is_reply_to_bot = bool(
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and BOT_ID is not None
+        and message.reply_to_message.from_user.id == BOT_ID
+    )
+    pet_name_mentioned = bool(
+        companion
+        and companion[1].get("name")
+        and str(companion[1]["name"]).casefold() in text.casefold()
+    )
+    if not (is_private or bot_mentioned or is_reply_to_bot or pet_name_mentioned):
+        return
+
+    chat_profiles = load_chat_profiles()
+    chat_profile = chat_profiles.get(profile_key)
+    message_result = None
+    if isinstance(chat_profile, dict):
+        message_result = process_chat_message(chat_profile, text)
+        chat_profiles[profile_key] = chat_profile
+        save_chat_profiles(chat_profiles)
+        if message_result == "blocked":
             return
 
     try:
-        model_text = text
         if BOT_USERNAME:
-            model_text = model_text.replace(f"@{BOT_USERNAME}", "").strip()
+            model_text = re.sub(
+                rf"(?<!\w)@{re.escape(BOT_USERNAME)}\b",
+                "",
+                text,
+                flags=re.IGNORECASE,
+            ).strip()
+        else:
+            model_text = text.strip()
+        if not model_text:
+            model_text = "Ответь на обращение."
 
         if companion is not None:
             system_prompt = build_companion_system_prompt(
@@ -3666,11 +3945,12 @@ async def game_room_cleanup_loop():
 
 async def main():
 
-    global BOT_USERNAME
+    global BOT_USERNAME, BOT_ID
 
     me = await bot.me()
 
     BOT_USERNAME = me.username or ""
+    BOT_ID = me.id
 
     print(f"Бот @{BOT_USERNAME} запущен! 👑")
 
