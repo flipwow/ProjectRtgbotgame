@@ -97,6 +97,144 @@ function resolveChatContext() {
 }
 
 
+const API_REQUEST_TIMEOUT_MS = 120000;
+const PING_REQUEST_TIMEOUT_MS = 4500;
+const PING_RETRY_INTERVAL_MS = 5000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_REQUEST_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function showRenderWakeupLoader() {
+    let loader = document.getElementById('renderWakeupLoader');
+
+    if (loader) {
+        loader.hidden = false;
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'renderWakeupLoaderStyle';
+    style.textContent = `
+        #renderWakeupLoader {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: grid;
+            place-items: center;
+            padding: 28px;
+            background: linear-gradient(145deg, #fff7fb, #f2eaff);
+            color: #382447;
+            text-align: center;
+            font-family: system-ui, sans-serif;
+        }
+        #renderWakeupLoader[hidden] { display: none; }
+        #renderWakeupLoader .render-wakeup-card {
+            width: min(100%, 360px);
+            padding: 32px 24px;
+            border: 1px solid rgba(132, 76, 156, .14);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, .92);
+            box-shadow: 0 18px 60px rgba(82, 43, 103, .14);
+        }
+        #renderWakeupLoader .render-wakeup-paw {
+            margin-bottom: 14px;
+            font-size: 48px;
+            animation: render-wakeup-bounce 1.2s ease-in-out infinite;
+        }
+        #renderWakeupLoader .render-wakeup-spinner {
+            width: 34px;
+            height: 34px;
+            margin: 20px auto 0;
+            border: 4px solid #ead9f2;
+            border-top-color: #a34ec4;
+            border-radius: 50%;
+            animation: render-wakeup-spin .8s linear infinite;
+        }
+        #renderWakeupLoader p { margin: 0; line-height: 1.55; }
+        @keyframes render-wakeup-spin { to { transform: rotate(360deg); } }
+        @keyframes render-wakeup-bounce { 50% { transform: translateY(-6px); } }
+    `;
+    document.head.appendChild(style);
+
+    loader = document.createElement('div');
+    loader.id = 'renderWakeupLoader';
+    loader.hidden = true;
+    loader.setAttribute('role', 'status');
+    loader.setAttribute('aria-live', 'polite');
+
+    const card = document.createElement('div');
+    card.className = 'render-wakeup-card';
+
+    const paw = document.createElement('div');
+    paw.className = 'render-wakeup-paw';
+    paw.setAttribute('aria-hidden', 'true');
+    paw.textContent = '🐾';
+
+    const message = document.createElement('p');
+    message.textContent =
+        'Синхронизация с питомцем... Наш сервер на Render просыпается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾';
+
+    const spinner = document.createElement('div');
+    spinner.className = 'render-wakeup-spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+
+    card.append(paw, message, spinner);
+    loader.appendChild(card);
+    document.body.appendChild(loader);
+    loader.hidden = false;
+}
+
+function hideRenderWakeupLoader() {
+    const loader = document.getElementById('renderWakeupLoader');
+    if (loader) loader.hidden = true;
+}
+
+function delay(milliseconds) {
+    return new Promise(resolve => window.setTimeout(resolve, milliseconds));
+}
+
+async function waitForServerWakeup() {
+    while (true) {
+        const attemptStartedAt = Date.now();
+        const showLoaderTimer = window.setTimeout(showRenderWakeupLoader, 1200);
+        let serverIsReady = false;
+
+        try {
+            const response = await fetchWithTimeout(
+                `/api/ping?ts=${Date.now()}`,
+                { cache: 'no-store' },
+                PING_REQUEST_TIMEOUT_MS
+            );
+            const data = await response.json().catch(() => ({}));
+            serverIsReady = response.ok && data.status === 'ok';
+        } catch (error) {
+            console.info('Render ещё не готов; повторная проверка будет через несколько секунд.');
+        } finally {
+            window.clearTimeout(showLoaderTimer);
+        }
+
+        if (serverIsReady) {
+            hideRenderWakeupLoader();
+            return;
+        }
+
+        showRenderWakeupLoader();
+        const elapsed = Date.now() - attemptStartedAt;
+        await delay(Math.max(0, PING_RETRY_INTERVAL_MS - elapsed));
+    }
+}
+
 async function fetchUserData() {
     try {
         if (!chatContext.chatId || !chatContext.userId) {
@@ -108,9 +246,10 @@ async function fetchUserData() {
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
         };
-        const response = await fetch(
+        const response = await fetchWithTimeout(
             `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
-            { headers }
+            { headers },
+            API_REQUEST_TIMEOUT_MS
         );
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -168,13 +307,14 @@ async function fetchLeaderboard() {
     }
 
     try {
-        const response = await fetch(
+        const response = await fetchWithTimeout(
             `/api/chat/leaderboard?chat_id=${encodeURIComponent(chatContext.chatId)}`,
             {
                 headers: {
                     'X-Telegram-Init-Data': tg?.initData || ''
                 }
-            }
+            },
+            API_REQUEST_TIMEOUT_MS
         );
         const data = await response.json().catch(() => []);
         if (!response.ok) {
@@ -1490,7 +1630,11 @@ document.addEventListener(
         document.getElementById('convert-rp-amount')
             ?.addEventListener('input', updateConvertPreview);
         updateConvertPreview();
-        fetchUserData();
         checkDuelParams();
+
+        void (async () => {
+            await waitForServerWakeup();
+            await fetchUserData();
+        })();
     }
 );
