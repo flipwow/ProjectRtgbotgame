@@ -1,3 +1,17 @@
+// === ВСТАВИТЬ СТРОГО НА ПЕРВУЮ СТРОКУ SCRIPT.JS ===
+(() => {
+    const RENDER_URL = 'https://onrender.com';
+    const originalFetch = window.fetch;
+    
+    window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.startsWith('/api/')) {
+            const cleanPath = input.replace(/^\/+/, '');
+            input = `${RENDER_URL}/${cleanPath}`;
+        }
+        return originalFetch(input, init);
+    };
+})();
+// ===================================================
 const tg = window.Telegram?.WebApp;
 
 let userData = {
