@@ -31,6 +31,13 @@ from aiogram.types import (
 
 import google.generativeai as genai
 
+SHOP_ITEMS = {
+    "meat": {"name": "🥩 Сочный стейк", "price": 15},
+    "milk": {"name": "🥛 Молодёжное молоко", "price": 5},
+    "toy": {"name": "🥎 Мячик для игр", "price": 10},
+    "medicine": {"name": "💊 Витамины", "price": 25},
+}
+
 # Имя файла базы данных
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
 
@@ -899,8 +906,8 @@ def build_food_catalog(food_inventory):
                 "id": food_id,
                 "name": food["name"],
                 "price": food["price"],
-                "hunger_restore": food["hunger_restore"],
-                "happiness_restore": food["happiness_restore"],
+                "hunger_restore": food.get("hunger_restore", 0),
+                "happiness_restore": food.get("happiness_restore", 0),
                 "count": count,
             }
         )
@@ -1877,6 +1884,31 @@ def get_chat_leaderboard(chat_id):
     return leaderboard
 
 
+def load_global_leaderboard(limit=100):
+    with db_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM users
+            WHERE chat_id = '' AND record_type = 'user'
+            ORDER BY convertible_rp DESC, relationship_rp DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [
+        {
+            "user_id": row["user_id"],
+            "username": row["username"],
+            "convertible_rp": row["convertible_rp"],
+            "relationship_rp": row["relationship_rp"],
+            "balance_r": row["balance_r"],
+            "status": row["status"],
+        }
+        for row in rows
+    ]
+
+
 async def api_chat_leaderboard(request):
     chat_id, telegram_user, error_response = resolve_chat_api_context(request)
     if error_response:
@@ -1945,6 +1977,105 @@ async def api_chat_profile(request):
             "food_catalog": build_food_catalog(pet.get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
+        }
+    )
+
+
+async def api_leaderboard(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    return web.json_response(load_global_leaderboard())
+
+
+async def api_profile(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    _, user_info = get_or_create_user(username, telegram_user["id"])
+    role = user_info.get("role", "noob")
+    telegram_id = str(telegram_user["id"])
+
+    # Загружаем экземпляр питомца и инвентарь непосредственно из SQLite.
+    with db_connection() as connection:
+        pet_row = connection.execute(
+            """
+            SELECT * FROM pets
+            WHERE chat_id = '' AND user_id IN (?, ?)
+            LIMIT 1
+            """,
+            (telegram_id, username),
+        ).fetchone()
+        inventory_rows = connection.execute(
+            """
+            SELECT * FROM inventory
+            WHERE chat_id = ''
+              AND user_id IN (?, ?)
+              AND record_type = 'item'
+            """,
+            (username, telegram_id),
+        ).fetchall()
+
+    pet = ensure_pet_for_user(telegram_id)
+    if pet_row is not None:
+        pet.update(
+            {
+                "pet_name": pet_row["name"],
+                "health": pet_row["health"],
+                "hunger": pet_row["hunger"],
+                "happiness": pet_row["happiness"],
+                "energy": pet_row["energy"],
+            }
+        )
+
+    food_inventory = {}
+    inventory_details = []
+    for row in inventory_rows:
+        item_id = row["item_id"]
+        quantity = max(0, int(row["quantity"] or 0))
+        food_inventory[item_id] = food_inventory.get(item_id, 0) + quantity
+        inventory_details.append(
+            {
+                "id": item_id,
+                "quantity": quantity,
+                "data": _decode_sql_json(row["data_json"]),
+            }
+        )
+
+    pets_data = load_pets_data()
+    pet_catalog = [
+        {
+            "id": pet_id,
+            "name": definition.get("name", pet_id),
+            "type": definition.get("type", pet_id),
+            "image": definition.get("image", "/Barsichela.png"),
+            "rarity": definition.get("rarity", "Обычный"),
+        }
+        for pet_id, definition in pets_data.items()
+        if pet_id != "users_pets" and isinstance(definition, dict)
+    ]
+    food_catalog = build_food_catalog(food_inventory)
+
+    return web.json_response(
+        {
+            "user": {
+                "id": telegram_user["id"],
+                "username": username,
+                "first_name": telegram_user.get("first_name", ""),
+                "last_name": telegram_user.get("last_name", ""),
+                "photo_url": telegram_user.get("photo_url", ""),
+            },
+            "pet": pet,
+            "pet_catalog": pet_catalog,
+            "food_catalog": food_catalog,
+            "rp": user_info.get("rp", 0),
+            "max_rp": RP_CEILINGS.get(role, 200),
+            "currency": user_info.get("r_currency", 0),
+            "inventory": inventory_details,
+            "catalog": food_catalog,
+            "leaderboard": load_global_leaderboard(),
         }
     )
 
@@ -2139,71 +2270,6 @@ async def api_chat_gift(request):
     )
 
 
-async def api_profile(request):
-
-    username, telegram_user = get_webapp_user(request)
-
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
-
-    _, user_info = get_or_create_user(
-        username,
-        telegram_user["id"],
-    )
-
-    role = user_info.get(
-        "role",
-        "noob",
-    )
-
-    pet = ensure_pet_for_user(telegram_user["id"])
-    inventory_data = load_inventory_data()
-    food_inventory = pet.get("inventory", {})
-    food_catalog = build_food_catalog(food_inventory)
-    return web.json_response(
-        {
-            "user": {
-                "id": telegram_user["id"],
-                "username": username,
-                "first_name": telegram_user.get(
-                    "first_name",
-                    "",
-                ),
-                "last_name": telegram_user.get(
-                    "last_name",
-                    "",
-                ),
-                "photo_url": telegram_user.get(
-                    "photo_url",
-                    "",
-                ),
-            },
-            "pet": pet,
-            "pet_catalog": pet_catalog,
-            "food_catalog": food_catalog,
-            "rp": user_info.get(
-                "rp",
-                0,
-            ),
-            "max_rp": RP_CEILINGS.get(
-                role,
-                200,
-            ),
-            "currency": user_info.get(
-                "r_currency",
-                0,
-            ),
-            "inventory": get_inventory_details(user_info),
-            "catalog": get_full_shop_catalog(user_info),
-            "registry": registry_list,
-            "leaderboard": leaderboard,
-        }
-    )
-
-
 async def api_pet(request):
 
     username, telegram_user = get_webapp_user(request)
@@ -2303,7 +2369,6 @@ async def api_save_profile(request):
 
 
 async def api_pet_feed(request):
-
     username, telegram_user = get_webapp_user(request)
 
     if not username:
@@ -2393,6 +2458,98 @@ async def api_pet_feed(request):
             "pet": pet,
         }
     )
+
+
+async def api_buy_food(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    food_id = request.match_info.get("food_id")
+    if not food_id:
+        payload = await read_json_object(request)
+        food_id = payload.get("food_id") if payload else None
+
+    if not isinstance(food_id, str) or not food_id:
+        return web.json_response({"error": "food_id is required"}, status=400)
+
+    item = SHOP_ITEMS.get(food_id)
+    if item is None:
+        return web.json_response({"error": "Food not found"}, status=404)
+
+    price = item.get("price")
+    if isinstance(price, bool) or not isinstance(price, (int, float)) or price < 0:
+        return web.json_response({"error": "Invalid food price"}, status=500)
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user_row = connection.execute(
+                """
+                SELECT balance_r, data_json
+                FROM users
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (str(username),),
+            ).fetchone()
+
+            if user_row is None:
+                return web.json_response({"error": "User not found"}, status=404)
+
+            balance = float(user_row["balance_r"] or 0)
+            if balance < price:
+                return web.json_response(
+                    {"error": "Not enough R$", "balance": balance}, status=400
+                )
+
+            new_balance = balance - price
+            user_data = _decode_sql_json(user_row["data_json"])
+            if not isinstance(user_data, dict):
+                user_data = {}
+            user_data["r_currency"] = new_balance
+
+            connection.execute(
+                """
+                UPDATE users
+                SET balance_r = ?, data_json = ?
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (new_balance, _encode_sql_json(user_data), str(username)),
+            )
+            connection.execute(
+                """
+                INSERT INTO inventory (
+                    chat_id, user_id, item_id, quantity, record_type, data_json
+                )
+                VALUES ('', ?, ?, 1, 'item', ?)
+                ON CONFLICT(chat_id, user_id, item_id)
+                DO UPDATE SET
+                    quantity = inventory.quantity + 1,
+                    record_type = 'item',
+                    data_json = excluded.data_json
+                """,
+                (str(username), food_id, _encode_sql_json(item)),
+            )
+            quantity_row = connection.execute(
+                """
+                SELECT quantity FROM inventory
+                WHERE chat_id = '' AND user_id = ? AND item_id = ?
+                """,
+                (str(username), food_id),
+            ).fetchone()
+
+        return web.json_response(
+            {
+                "success": True,
+                "status": "purchased",
+                "food_id": food_id,
+                "quantity": int(quantity_row["quantity"]),
+                "balance": new_balance,
+            }
+        )
+    except sqlite3.Error as error:
+        print(f"Ошибка покупки еды в SQLite: {error}")
+        return web.json_response({"error": "Could not complete purchase"}, status=500)
 
 
 async def api_create_game(request):
@@ -2856,8 +3013,8 @@ async def start_webapp_api():
     )
 
     app.router.add_get(
-        "/api/chat/leaderboard",
-        api_chat_leaderboard,
+        "/api/leaderboard",
+        api_leaderboard,
     )
 
     app.router.add_post(
