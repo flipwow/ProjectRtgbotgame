@@ -78,12 +78,17 @@ function resolveChatContext() {
     const params = new URLSearchParams(window.location.search);
     let chatId = params.get('chat_id');
     let launchUserId = params.get('user_id');
-    const startParam = tg?.initDataUnsafe?.start_param || '';
-    const match = startParam.match(/^profile_(-?\d+)_(-?\d+)$/);
+    const startParam = tg?.initDataUnsafe?.start_param
+        || params.get('start_param')
+        || '';
+    const profileMatch = startParam.match(/^profile_(-?\d+)_(-?\d+)$/);
+    const chatMatch = startParam.match(/^chat_(-?\d+)$/);
 
-    if (match) {
-        chatId ||= match[1];
-        launchUserId ||= match[2];
+    if (profileMatch) {
+        chatId ||= profileMatch[1];
+        launchUserId ||= profileMatch[2];
+    } else if (chatMatch) {
+        chatId ||= chatMatch[1];
     }
 
     const telegramUserId = tg?.initDataUnsafe?.user?.id;
@@ -265,6 +270,7 @@ async function fetchUserData() {
             renderChatRegistry();
             return;
         }
+        showProfileFeedback('');
 
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''

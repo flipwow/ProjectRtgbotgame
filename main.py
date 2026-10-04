@@ -1845,6 +1845,28 @@ def resolve_chat_api_context(request, payload=None):
         )
 
     raw_chat_id = payload.get("chat_id") or request.query.get("chat_id")
+    if raw_chat_id is None:
+        start_param = request.query.get("start_param", "")
+        if not start_param:
+            init_data = request.headers.get("X-Telegram-Init-Data", "")
+            start_param = dict(parse_qsl(init_data, keep_blank_values=True)).get(
+                "start_param", ""
+            )
+        start_match = re.fullmatch(r"profile_(-?\d+)_(-?\d+)", start_param)
+        if start_match:
+            raw_chat_id = start_match.group(1)
+            if claimed_user_id is None:
+                claimed_user_id = start_match.group(2)
+                if str(claimed_user_id) != authenticated_user_id:
+                    return (
+                        None,
+                        None,
+                        web.json_response(
+                            {"error": "User does not match Telegram session"},
+                            status=403,
+                        ),
+                    )
+
     try:
         chat_id = str(int(raw_chat_id))
     except (TypeError, ValueError):
@@ -3215,7 +3237,7 @@ def get_main_app_url(
 ):
 
     if not BOT_USERNAME:
-        return WEBAPP_ORIGIN
+        return f"{WEBAPP_ORIGIN}?{urlencode({'start_param': start_param})}"
 
     return f"https://t.me/" f"{BOT_USERNAME}" f"?startapp={start_param}"
 
@@ -3235,20 +3257,27 @@ def get_duel_url(room_id):
 
 def get_main_hub_keyboard(
     chat_type="private",
+    chat_id=None,
+    user_id=None,
 ):
 
     if chat_type == "private":
 
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
-            web_app=WebAppInfo(url=WEBAPP_ORIGIN),
+            web_app=WebAppInfo(
+                url=(
+                    f"{WEBAPP_ORIGIN}?"
+                    f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
+                )
+            ),
         )
 
     else:
 
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
-            url=get_main_app_url("game"),
+            url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
         )
 
     return InlineKeyboardMarkup(
@@ -3284,7 +3313,11 @@ async def menu_hub(
 
     await callback.message.edit_text(
         "✨ **Главное меню Ритушки** ✨\n\n" "Выбирай нужный раздел 💅",
-        reply_markup=get_main_hub_keyboard(callback.message.chat.type),
+        reply_markup=get_main_hub_keyboard(
+            callback.message.chat.type,
+            callback.message.chat.id,
+            callback.from_user.id,
+        ),
         parse_mode="Markdown",
     )
 
@@ -3345,14 +3378,19 @@ async def menu_profile(
 
         game_button = InlineKeyboardButton(
             text="🎮 Открыть игру",
-            web_app=WebAppInfo(url=WEBAPP_ORIGIN),
+            web_app=WebAppInfo(
+                url=(
+                    f"{WEBAPP_ORIGIN}?"
+                    f"{urlencode({'chat_id': callback.message.chat.id, 'user_id': user.id})}"
+                )
+            ),
         )
 
     else:
 
         game_button = InlineKeyboardButton(
             text="🎮 Открыть игру",
-            url=get_main_app_url("game"),
+            url=get_main_app_url(f"profile_{callback.message.chat.id}_{user.id}"),
         )
 
     keyboard = InlineKeyboardMarkup(
@@ -3562,7 +3600,11 @@ async def cmd_menu(
 
     await message.answer(
         "✨ **Привет... Это я, " "RitushkaVIPai 👑**\n\n" "Выбирай раздел:",
-        reply_markup=get_main_hub_keyboard(message.chat.type),
+        reply_markup=get_main_hub_keyboard(
+            message.chat.type,
+            message.chat.id,
+            message.from_user.id,
+        ),
         parse_mode="Markdown",
     )
 
