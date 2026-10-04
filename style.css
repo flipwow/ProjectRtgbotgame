@@ -433,7 +433,43 @@ body {
 }
 
 .leaderboard-tabs {
+    margin-top: 8px;
     margin-bottom: 10px;
+}
+
+.leaderboard-game-picker {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    text-align: left;
+}
+
+.leaderboard-game-modal-content {
+    display: grid;
+    gap: 12px;
+}
+
+.leaderboard-game-modal-content .pet-modal-header {
+    margin-bottom: 0;
+}
+
+.leaderboard-game-options {
+    display: grid;
+    gap: 8px;
+}
+
+.leaderboard-game-option {
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.leaderboard-game-option[aria-current="true"] {
+    border-color: var(--accent-color);
+    color: var(--text-primary);
 }
 
 .category-tabs {
@@ -1063,7 +1099,8 @@ body {
 
 .profile-metrics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
     gap: 8px;
     margin-bottom: 12px;
 }
@@ -1107,9 +1144,7 @@ body {
     color: #86e0bd;
 }
 
-.convertible-tile strong {
-    color: #f4a58e;
-}
+
 
 .conversion-panel,
 .pet-profile-panel {
@@ -1600,9 +1635,7 @@ body {
     color: #26785f;
 }
 
-:root[data-theme="light"] .convertible-tile strong {
-    color: #a4513e;
-}
+
 
 :root[data-theme="light"] .conversion-preview {
     color: #42695b;

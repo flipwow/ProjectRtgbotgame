@@ -10,6 +10,8 @@ import tempfile
 import time
 import uuid
 import sqlite3
+from io import BytesIO
+
 from contextlib import contextmanager
 import urllib.error
 import urllib.request
@@ -2220,9 +2222,76 @@ async def api_leaderboard(request):
     return web.json_response(load_global_leaderboard())
 
 
+_avatar_cache = {}
+AVATAR_CACHE_TTL_SECONDS = 300
+
+
+async def api_avatar(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    telegram_id = int(telegram_user["id"])
+    cached = _avatar_cache.get(telegram_id)
+    if cached and cached[0] > time.monotonic():
+        if cached[1] is None:
+            return web.Response(
+                status=404, headers={"Cache-Control": "private, max-age=60"}
+            )
+        return web.Response(
+            body=cached[1],
+            content_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=300"},
+        )
+
+    async def download_profile_photo():
+        photos = await bot.get_user_profile_photos(user_id=telegram_id, limit=1)
+        if not photos.photos or not photos.photos[0]:
+            return None
+
+        photo = max(
+            photos.photos[0],
+            key=lambda size: (size.width * size.height, size.file_size or 0),
+        )
+        telegram_file = await bot.get_file(photo.file_id)
+        if not telegram_file.file_path:
+            return None
+
+        image_buffer = BytesIO()
+        await bot.download_file(telegram_file.file_path, destination=image_buffer)
+        image_bytes = image_buffer.getvalue()
+        return image_bytes or None
+
+    try:
+        image_bytes = await asyncio.wait_for(download_profile_photo(), timeout=10)
+    except Exception:
+        # The default avatar is rendered by the client whenever Telegram has no photo
+        # or its file service is temporarily unavailable.
+        return web.Response(status=404, headers={"Cache-Control": "no-store"})
+
+    expiry = time.monotonic() + AVATAR_CACHE_TTL_SECONDS
+    _avatar_cache[telegram_id] = (expiry, image_bytes)
+    if len(_avatar_cache) > 512:
+        now = time.monotonic()
+        for cached_user_id, entry in list(_avatar_cache.items()):
+            if entry[0] <= now or len(_avatar_cache) > 512:
+                _avatar_cache.pop(cached_user_id, None)
+
+    if image_bytes is None:
+        return web.Response(
+            status=404, headers={"Cache-Control": "private, max-age=60"}
+        )
+    return web.Response(
+        body=image_bytes,
+        content_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
 async def api_profile(request):
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
+
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     _, user_info = get_or_create_user(username, telegram_user["id"])
@@ -3232,6 +3301,11 @@ async def start_webapp_api():
     app.router.add_get(
         "/api/me",
         api_profile,
+    )
+
+    app.router.add_get(
+        "/api/avatar",
+        api_avatar,
     )
 
     app.router.add_post(

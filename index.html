@@ -143,11 +143,11 @@
 
                 <section class="leaderboard-section" aria-labelledby="mode-leaderboard-title">
                     <h4 id="mode-leaderboard-title" class="leaderboard-section-title">Очки по режимам</h4>
-                    <div class="category-tabs leaderboard-tabs" id="leaderboardModeTabs" role="tablist" aria-label="Режим игры">
-                        <button class="category-tab active" type="button" role="tab" aria-selected="true" data-leaderboard-mode="online" onclick="selectLeaderboardMode('online')">Онлайн-дуэли</button>
-                        <button class="category-tab" type="button" role="tab" aria-selected="false" data-leaderboard-mode="solo" onclick="selectLeaderboardMode('solo')">С ботом</button>
-                        <button class="category-tab" type="button" role="tab" aria-selected="false" data-leaderboard-mode="local" onclick="selectLeaderboardMode('local')">На одном телефоне</button>
-                    </div>
+                                        <button id="leaderboardGamePicker" class="category-tab leaderboard-game-picker" type="button" aria-haspopup="dialog" aria-controls="leaderboardGameModal">
+                        <span id="leaderboardGameName">Крестики-нолики</span>
+                        <span aria-hidden="true">⌄</span>
+                    </button>
+                    <div class="category-tabs leaderboard-tabs" id="leaderboardTypeTabs" role="tablist" aria-label="Тип игры"></div>
                     <div id="leaderboardList" class="leaderboard-list" aria-live="polite"></div>
                 </section>
 
@@ -370,11 +370,7 @@
                     <article class="metric-tile relationship-tile">
                         <span class="metric-label">Отношения</span>
                         <strong><span id="profile-rp">0</span><small>RP</small></strong>
-                    </article>
-                    <article class="metric-tile convertible-tile">
-                        <span class="metric-label">Доступно к обмену</span>
-                        <strong><span id="profile-convertible-rp">0</span><small>RP</small></strong>
-                    </article>
+                                            </article>
                 </section>
 
                 <section class="conversion-panel" aria-labelledby="conversion-title">
@@ -461,6 +457,16 @@
 
         </div>
 
+    </div>
+
+        <div id="leaderboardGameModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="leaderboard-game-title">
+        <section class="pet-modal-content leaderboard-game-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="leaderboard-game-title">Выбор игры</h3>
+                <button id="leaderboardGameModalClose" class="close-modal-btn" type="button" aria-label="Закрыть">✕</button>
+            </div>
+            <div id="leaderboardGameOptions" class="leaderboard-game-options"></div>
+        </section>
     </div>
 
     <!-- Настройки приложения -->
@@ -709,5 +715,6 @@
     </div>
 
     <script src="/script.js" defer></script>
+    <script src="/leaderboard-ui.js" defer></script>
 </body>
 </html>

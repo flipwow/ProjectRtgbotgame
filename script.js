@@ -244,30 +244,78 @@ function initTelegramUser() {
         return;
     }
 
+            
+    
+
     const usernameElement = document.getElementById('username');
-    const avatarElement = document.getElementById('user-avatar');
-    const avatarFallback = document.getElementById('avatar-fallback');
+
 
     if (usernameElement) {
         usernameElement.textContent =
             user.first_name || 'Пользователь';
     }
 
-    if (avatarElement && user.photo_url) {
-        avatarElement.src = user.photo_url;
-        avatarElement.classList.add('is-visible');
-        if (avatarFallback) avatarFallback.hidden = true;
+            
+    
 
-        avatarElement.onerror = () => {
-            console.warn('Не удалось загрузить аватарку');
-            avatarElement.classList.remove('is-visible');
-            if (avatarFallback) {
-                avatarFallback.hidden = false;
-                avatarFallback.textContent = user.first_name?.slice(0, 1) || '🐾';
-            }
+    loadTelegramAvatar(user);
+
+}
+
+
+function setAvatarFallback(user = {}) {
+    const avatarElement = document.getElementById('user-avatar');
+    const avatarFallback = document.getElementById('avatar-fallback');
+    if (avatarElement) {
+        avatarElement.classList.remove('is-visible');
+        avatarElement.removeAttribute('src');
+        avatarElement.onload = null;
+        avatarElement.onerror = null;
+        const previousObjectUrl = avatarElement.dataset.objectUrl;
+        if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl);
+        delete avatarElement.dataset.objectUrl;
+    }
+    if (avatarFallback) {
+        avatarFallback.hidden = false;
+        avatarFallback.textContent = user.first_name?.slice(0, 1) || '🐾';
+    }
+}
+
+
+async function loadTelegramAvatar(user = {}) {
+    const avatarElement = document.getElementById('user-avatar');
+    setAvatarFallback(user);
+    if (!avatarElement || !tg?.initData) return;
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+    try {
+        const response = await fetch('/api/avatar', {
+            headers: { 'X-Telegram-Init-Data': tg.initData },
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`Avatar request failed: ${response.status}`);
+
+        const image = await response.blob();
+        if (!image.type.startsWith('image/') || image.size === 0) {
+            throw new Error('Telegram returned no usable profile photo');
+        }
+
+        const objectUrl = URL.createObjectURL(image);
+        avatarElement.dataset.objectUrl = objectUrl;
+        avatarElement.onload = () => {
+            avatarElement.classList.add('is-visible');
+            const avatarFallback = document.getElementById('avatar-fallback');
+            if (avatarFallback) avatarFallback.hidden = true;
         };
-    } else if (avatarFallback && user.first_name) {
-        avatarFallback.textContent = user.first_name.slice(0, 1);
+        avatarElement.onerror = () => setAvatarFallback(user);
+        avatarElement.src = objectUrl;
+    } catch (error) {
+        console.info('Profile photo unavailable; showing the default avatar.', error);
+        setAvatarFallback(user);
+    } finally {
+        window.clearTimeout(timeoutId);
     }
 }
 
@@ -612,12 +660,13 @@ function renderProfile() {
     }
     if (balance) balance.textContent = userData.currency;
 
+                
+
     const currency = document.getElementById('profile-currency');
     const relationshipRp = document.getElementById('profile-rp');
-    const convertibleRp = document.getElementById('profile-convertible-rp');
+
     if (currency) currency.textContent = userData.currency;
     if (relationshipRp) relationshipRp.textContent = userData.rp;
-    if (convertibleRp) convertibleRp.textContent = userData.convertibleRp;
 
     renderProfilePet(userData.pet);
     updateConvertPreview();
