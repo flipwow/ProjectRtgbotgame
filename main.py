@@ -1340,7 +1340,7 @@ async def pet_status_command(
                 "spam_strikes_at": 0,
                 "offended_until": 0,
             }
-                        profiles[profile_key] = profile
+            profiles[profile_key] = profile
             if not save_chat_profiles(profiles):
                 await message.answer("Не удалось сохранить профиль в базе данных.")
                 return
@@ -3352,8 +3352,6 @@ def get_main_hub_keyboard(
             [game_button],
         ]
     )
-
-
 
 
 def get_start_keyboard(chat_type="private", chat_id=None, user_id=None):
