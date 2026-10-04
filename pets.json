@@ -1,6 +1,6 @@
 {
-    "bars": {
-    "id": "Barsik",
+  "bars": {
+    "id": "bars",
     "name": "Снежный барсик",
     "type": "Кошачий",
     "level": 1,
@@ -17,7 +17,7 @@
     "image": "/Pets/Снежный барсик.png"
   },
   "OrangeCat": {
-    "id": "Rizhiy",
+    "id": "OrangeCat",
     "name": "Рыжик",
     "type": "Кот",
     "level": 1,
@@ -34,7 +34,7 @@
     "image": "/Pets/Рыжик.png"
   },
   "Goidik": {
-    "id": "Gojo",
+    "id": "Goidik",
     "name": "Саторик",
     "type": "Человек",
     "level": 1,

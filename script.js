@@ -16,7 +16,7 @@ let userData = {
     maxRp: 0
 };
 
-let currentPetId = 'barsichela';
+let currentPetId = 'bars';
 let chatContext = { chatId: null, userId: null };
 
 let tttMode = 'solo';
@@ -289,7 +289,7 @@ async function fetchUserData() {
         userData.foodCatalog = data.food_catalog || [];
         userData.petCatalog = data.pet_catalog || [];
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
-        currentPetId = userData.pet?.id || 'barsichela';
+        currentPetId = userData.pet?.id || 'bars';
         await fetchLeaderboard();
         renderProfile();
 
@@ -644,7 +644,7 @@ function renderMemberPet(member, pet) {
     if (petName) petName.textContent = pet.name || 'Питомец';
     if (level) level.textContent = pet.level ?? 1;
     if (image) {
-        image.src = pet.image || '/Pets/Барсичела.png';
+        image.src = pet.image || '/Pets/Снежный барсик.png';
         image.alt = pet.name || 'Питомец';
         image.onerror = () => {
             image.replaceWith(document.createTextNode('🐾'));
@@ -667,14 +667,14 @@ function renderMemberPet(member, pet) {
 function normalizePetData(pet) {
     if (!pet) return null;
 
-    const id = pet.id || pet.pet_id || 'barsichela';
+    const id = pet.id || pet.pet_id || 'bars';
     const definition = userData.petCatalog.find(item => item.id === id) || {};
     return {
         ...definition,
         ...pet,
         id,
         name: pet.name || pet.pet_name || definition.name || 'Питомец',
-        image: pet.image || definition.image || '/Pets/Барсичела.png',
+        image: pet.image || definition.image || '/Pets/Снежный барсик.png',
         level: pet.level ?? 1,
         max_level: pet.max_level || 10
     };
@@ -880,7 +880,7 @@ function renderPetChoices() {
 
         card.innerHTML = `
             <img
-                src="${escapeHtml(pet.image || '/Pets/Барсичела.png')}"
+                src="${escapeHtml(pet.image || '/Pets/Снежный барсик.png')}"
                 alt="${escapeHtml(pet.name)}"
                 class="pet-choice-img"
             >
@@ -932,7 +932,7 @@ function updatePetView() {
         pet => pet.id === currentPetId
     ) || userData.petCatalog[0] || userData.pet || {
         name: 'Питомец',
-        image: '/Pets/Барсичела.png'
+        image: '/Pets/Снежный барсик.png'
     };
     const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
     const level = Math.max(1, Number(userData.pet?.level || 1));

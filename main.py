@@ -186,8 +186,9 @@ INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 CSS_FILE = os.path.join(BASE_DIR, "style.css")
 JS_FILE = os.path.join(BASE_DIR, "script.js")
 PETS_IMAGE_DIR = os.path.join(BASE_DIR, "Pets")
-# PNG-питомцы размещаются в Pets/: Барсичела.png, Мурчик.png, Пушок.png, Луна.png.
-PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Барсичела.png")
+# Картинки питомцев хранятся в Pets/ под именами из pets.json.
+PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Снежный барсик.png")
+DEFAULT_PET_ID = "bars"
 
 PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 
@@ -444,8 +445,8 @@ def chat_member_key(chat_id, user_id):
 def ensure_chat_pet(chat_id, user_id):
     pets = load_pets_data()
     pet_id = (
-        "barsichela"
-        if "barsichela" in pets
+        DEFAULT_PET_ID
+        if DEFAULT_PET_ID in pets
         else next(
             (key for key in pets if key != "users_pets"),
             None,
@@ -506,8 +507,11 @@ def ensure_pet_for_user(telegram_id):
             user_info = candidate
             break
 
-    pet_id = user_info.get("pet_id", "barsichela")
-    pet_definition = load_pets_data().get(pet_id, {})
+    pets = load_pets_data()
+    pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
+    if pet_id not in pets:
+        pet_id = DEFAULT_PET_ID
+    pet_definition = pets.get(pet_id, {})
     pet_defaults = {
         "pet_id": pet_id,
         "pet_name": pet_definition.get("name", "Барсичела"),
@@ -745,7 +749,7 @@ def create_default_user(telegram_id=None):
         "r_currency": 0,
         "started": False,
         "started_at": None,
-        "pet_id": "barsichela",
+        "pet_id": DEFAULT_PET_ID,
     }
 
     if telegram_id is not None:
@@ -793,7 +797,7 @@ def get_or_create_user(username, telegram_id=None):
         "r_currency": 0,
         "started": False,
         "started_at": None,
-        "pet_id": "barsichela",
+        "pet_id": DEFAULT_PET_ID,
     }
 
     changed = False
@@ -1019,7 +1023,7 @@ def find_chat_companion(chat_id, sender_id, text):
 
     companions = []
     chat_prefix = f"{chat_id}:"
-    default_pet_id = "barsichela" if "barsichela" in pets_data else None
+    default_pet_id = DEFAULT_PET_ID if DEFAULT_PET_ID in pets_data else None
     default_definition = pets_data.get(default_pet_id, {}) if default_pet_id else {}
 
     with db_connection() as connection:
@@ -1037,7 +1041,7 @@ def find_chat_companion(chat_id, sender_id, text):
             (
                 owner_id,
                 {
-                    "pet_id": default_pet_id or "barsichela",
+                    "pet_id": default_pet_id or DEFAULT_PET_ID,
                     "name": row["name"],
                     "health": row["health"],
                     "hunger": row["hunger"],
@@ -1054,7 +1058,7 @@ def find_chat_companion(chat_id, sender_id, text):
         owner_id = str(key).split(":", 1)[1]
         if any(existing_owner == owner_id for existing_owner, _, _ in companions):
             continue
-        pet_id = pet.get("pet_id", "barsichela")
+        pet_id = pet.get("pet_id", DEFAULT_PET_ID)
         definition = pets_data.get(pet_id, {})
         companions.append((owner_id, pet, definition))
 
@@ -1230,7 +1234,7 @@ async def generate_companion_reply(system_prompt, text):
 async def send_pet_selection(message: Message):
 
     if not os.path.exists(PET_IMAGE):
-        await message.answer("❌ Файл Barsichela.png не найден.")
+        await message.answer("❌ Файл Снежный барсик.png не найден.")
         return
 
     markup = InlineKeyboardMarkup(
@@ -1887,12 +1891,12 @@ def get_chat_pet_profile(chat_id, user_id):
     if not pet:
         return None
 
-    pet_id = pet.get("pet_id", "barsichela")
+    pet_id = pet.get("pet_id", DEFAULT_PET_ID)
     definition = pets_data.get(pet_id, {})
     return {
         "id": pet_id,
         "name": pet["name"],
-        "image": definition.get("image", "/Pets/Барсичела.png"),
+        "image": definition.get("image", "/Pets/Снежный барсик.png"),
         "level": pet.get("level", definition.get("level", 1)),
         "max_level": definition.get("max_level", 10),
         "experience": pet.get("experience", 0),
@@ -2029,7 +2033,7 @@ async def api_chat_profile(request):
             "id": pet_id,
             "name": definition.get("name", pet_id),
             "type": definition.get("type", pet_id),
-            "image": definition.get("image", "/Pets/Барсичела.png"),
+            "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
         for pet_id, definition in pets_data.items()
@@ -2179,7 +2183,7 @@ async def api_profile(request):
             "id": pet_id,
             "name": definition.get("name", pet_id),
             "type": definition.get("type", pet_id),
-            "image": definition.get("image", "/Pets/Барсичела.png"),
+            "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
         for pet_id, definition in pets_data.items()
@@ -2765,7 +2769,7 @@ async def js_handler(request):
 
 async def pet_image_handler(request):
     """Serve a pet PNG by filename, restricted to the Pets directory."""
-    filename = request.match_info.get("filename", "Барсичела.png")
+    filename = request.match_info.get("filename", "Снежный барсик.png")
     if os.path.basename(filename) != filename or not filename.lower().endswith(".png"):
         return web.Response(text="Invalid pet image", status=400)
 
@@ -3867,7 +3871,7 @@ async def handle_text(
     if companion is None and message.chat.type == "private":
         legacy_pet = get_pet_for_user(user.id)
         if legacy_pet:
-            pet_id = legacy_pet.get("pet_id", "barsichela")
+            pet_id = legacy_pet.get("pet_id", DEFAULT_PET_ID)
             companion = (sender_id, legacy_pet, load_pets_data().get(pet_id, {}))
 
     is_private = message.chat.type == "private"
