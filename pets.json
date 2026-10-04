@@ -1,5 +1,5 @@
 {
-  "barsichela": {
+    "barsichela": {
     "id": "barsichela",
     "name": "Барсичела",
     "type": "Снежный барсик",
@@ -14,6 +14,57 @@
       "energy": 100
     },
     "bonus": "",
-    "image": "/Barsichela.png"
+    "image": "/Pets/Барсичела.png"
+  },
+  "murzik": {
+    "id": "murzik",
+    "name": "Мурчик",
+    "type": "Домашний котик",
+    "level": 1,
+    "max_level": 10,
+    "description": "Любознательный и ласковый котик.",
+    "rarity": "Обычный",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Мурчик.png"
+  },
+  "pushok": {
+    "id": "pushok",
+    "name": "Пушок",
+    "type": "Пушистый друг",
+    "level": 1,
+    "max_level": 10,
+    "description": "Спокойный пушистик, который всегда рад игре.",
+    "rarity": "Обычный",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Пушок.png"
+  },
+  "luna": {
+    "id": "luna",
+    "name": "Луна",
+    "type": "Лунный котёнок",
+    "level": 1,
+    "max_level": 10,
+    "description": "Нежная любимица с вечерним характером.",
+    "rarity": "Редкий",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Луна.png"
   }
 }

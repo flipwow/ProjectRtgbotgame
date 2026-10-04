@@ -644,7 +644,7 @@ function renderMemberPet(member, pet) {
     if (petName) petName.textContent = pet.name || 'Питомец';
     if (level) level.textContent = pet.level ?? 1;
     if (image) {
-        image.src = pet.image || '/Barsichela.png';
+        image.src = pet.image || '/Pets/Барсичела.png';
         image.alt = pet.name || 'Питомец';
         image.onerror = () => {
             image.replaceWith(document.createTextNode('🐾'));
@@ -674,7 +674,7 @@ function normalizePetData(pet) {
         ...pet,
         id,
         name: pet.name || pet.pet_name || definition.name || 'Питомец',
-        image: pet.image || definition.image || '/Barsichela.png',
+        image: pet.image || definition.image || '/Pets/Барсичела.png',
         level: pet.level ?? 1,
         max_level: pet.max_level || 10
     };
@@ -871,28 +871,24 @@ function renderPetChoices() {
 
     grid.innerHTML = '';
 
-    userData.petCatalog.forEach(pet => {
-        const card =
-            document.createElement('div');
-
-        card.className =
-            `pet-choice-card ${
-                currentPetId === pet.id
-                    ? 'active'
-                    : ''
-            }`;
+        // В селекторе отображаются ровно четыре доступных питомца.
+    userData.petCatalog.slice(0, 4).forEach(pet => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `pet-choice-card ${currentPetId === pet.id ? 'active' : ''}`;
+        card.setAttribute('aria-pressed', String(currentPetId === pet.id));
 
         card.innerHTML = `
             <img
-                src="${escapeHtml(pet.image)}"
+                src="${escapeHtml(pet.image || '/Pets/Барсичела.png')}"
                 alt="${escapeHtml(pet.name)}"
                 class="pet-choice-img"
             >
-
-            <div class="pet-choice-name">
-                ${escapeHtml(pet.name)}
-            </div>
+            <span class="pet-choice-name">${escapeHtml(pet.name)}</span>
         `;
+        card.querySelector('img').onerror = event => {
+            event.currentTarget.replaceWith(document.createTextNode('🐾'));
+        };
 
         card.onclick = async () => {
             try {
@@ -932,11 +928,11 @@ function updatePetView() {
     const petDisplay = document.getElementById('petDisplay');
     if (!petDisplay) return;
 
-    const activePet = userData.petCatalog.find(
+        const activePet = userData.petCatalog.find(
         pet => pet.id === currentPetId
     ) || userData.petCatalog[0] || userData.pet || {
         name: 'Питомец',
-        image: '/Barsichela.png'
+        image: '/Pets/Барсичела.png'
     };
     const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
     const level = Math.max(1, Number(userData.pet?.level || 1));
@@ -980,10 +976,9 @@ function updatePetView() {
 
     petDisplay.innerHTML = `
         <img
-            src="${escapeHtml(userData.pet?.image || activePet.image)}"
+                        src="${escapeHtml(userData.pet?.image || activePet.image)}"
             alt="${escapeHtml(userData.pet?.name || activePet.name)}"
             class="active-pet-image"
-            style="width: 100px; height: 100px; object-fit: contain;"
         >
     `;
 

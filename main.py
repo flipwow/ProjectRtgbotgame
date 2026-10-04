@@ -185,7 +185,9 @@ PETS_FILE = os.path.join(BASE_DIR, "pets.json")
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 CSS_FILE = os.path.join(BASE_DIR, "style.css")
 JS_FILE = os.path.join(BASE_DIR, "script.js")
-PET_IMAGE = os.path.join(BASE_DIR, "Barsichela.png")
+PETS_IMAGE_DIR = os.path.join(BASE_DIR, "Pets")
+# PNG-питомцы размещаются в Pets/: Барсичела.png, Мурчик.png, Пушок.png, Луна.png.
+PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Барсичела.png")
 
 PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 
@@ -1890,7 +1892,7 @@ def get_chat_pet_profile(chat_id, user_id):
     return {
         "id": pet_id,
         "name": pet["name"],
-        "image": definition.get("image", "/Barsichela.png"),
+        "image": definition.get("image", "/Pets/Барсичела.png"),
         "level": pet.get("level", definition.get("level", 1)),
         "max_level": definition.get("max_level", 10),
         "experience": pet.get("experience", 0),
@@ -2027,7 +2029,7 @@ async def api_chat_profile(request):
             "id": pet_id,
             "name": definition.get("name", pet_id),
             "type": definition.get("type", pet_id),
-            "image": definition.get("image", "/Barsichela.png"),
+            "image": definition.get("image", "/Pets/Барсичела.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
         for pet_id, definition in pets_data.items()
@@ -2177,7 +2179,7 @@ async def api_profile(request):
             "id": pet_id,
             "name": definition.get("name", pet_id),
             "type": definition.get("type", pet_id),
-            "image": definition.get("image", "/Barsichela.png"),
+            "image": definition.get("image", "/Pets/Барсичела.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
         for pet_id, definition in pets_data.items()
@@ -2762,14 +2764,16 @@ async def js_handler(request):
 
 
 async def pet_image_handler(request):
+    """Serve a pet PNG by filename, restricted to the Pets directory."""
+    filename = request.match_info.get("filename", "Барсичела.png")
+    if os.path.basename(filename) != filename or not filename.lower().endswith(".png"):
+        return web.Response(text="Invalid pet image", status=400)
 
-    if not os.path.exists(PET_IMAGE):
-        return web.Response(
-            text="Barsichela.png не найден",
-            status=404,
-        )
+    image_path = os.path.join(PETS_IMAGE_DIR, filename)
+    if not os.path.isfile(image_path):
+        return web.Response(text=f"{filename} не найден", status=404)
 
-    return web.FileResponse(PET_IMAGE)
+    return web.FileResponse(image_path)
 
 
 # ============================================================
@@ -3108,8 +3112,13 @@ async def start_webapp_api():
         js_handler,
     )
 
+    # Совместимый старый URL и отдельная безопасная раздача PNG из Pets/.
     app.router.add_get(
         "/Barsichela.png",
+        pet_image_handler,
+    )
+    app.router.add_get(
+        "/Pets/{filename}",
         pet_image_handler,
     )
 
