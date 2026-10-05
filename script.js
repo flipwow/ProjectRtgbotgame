@@ -788,7 +788,6 @@ function closeRenamePetModal() {
     if (modal) modal.style.display = 'none';
 }
 
-
 async function submitPetRename(event) {
     event.preventDefault();
 
@@ -796,14 +795,21 @@ async function submitPetRename(event) {
     const feedback = document.getElementById('rename-pet-feedback');
     const button = document.getElementById('rename-pet-submit');
     const newName = input?.value.trim();
+
     if (!newName || newName.length > 32) {
         if (feedback) feedback.textContent = 'Имя должно содержать от 1 до 32 символов.';
         return;
     }
-    if (!chatContext.chatId || !chatContext.userId) {
-        if (feedback) feedback.textContent = 'Не удалось определить чат и пользователя.';
+
+    // ИСПРАВЛЕНО: Используем правильный JavaScript метод String() вместо Python-метода str()
+    const currentChatId = String(chatContext.chatId || "");
+    const currentUserId = String(chatContext.userId || "");
+    if (!currentUserId) {
+        if (feedback) feedback.textContent = 'Не удалось определить пользователя.';
         return;
     }
+
+    const currentPetId = userData.pet?.id || userData.pet?.pet_id || "";
 
     if (button) button.disabled = true;
     try {
@@ -814,20 +820,27 @@ async function submitPetRename(event) {
                 'X-Telegram-Init-Data': tg?.initData || ''
             },
             body: JSON.stringify({
-                user_id: chatContext.userId,
-                chat_id: chatContext.chatId,
+                user_id: currentUserId,
+                chat_id: currentChatId,
+                pet_id: currentPetId,
                 new_name: newName
             })
         });
+
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
-        userData.pet = {
-            ...userData.pet,
-            name: data.pet?.name || newName
-        };
+        // Локально изолируем имя питомца во фронтенде
+        if (userData.pet) userData.pet.name = newName;
+        if (userData.owned_pets && currentPetId) {
+            if (!userData.owned_pets[currentPetId]) {
+                userData.owned_pets[currentPetId] = {};
+            }
+            userData.owned_pets[currentPetId].custom_name = newName;
+        }
+
         updatePetView();
         renderProfilePet(userData.pet);
         closeRenamePetModal();
@@ -839,7 +852,6 @@ async function submitPetRename(event) {
         if (button) button.disabled = false;
     }
 }
-
 
 function showProfileFeedback(message, kind = '') {
     const feedback = document.getElementById('profile-feedback');
