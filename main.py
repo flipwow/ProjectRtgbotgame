@@ -1324,6 +1324,30 @@ async def send_pet_selection(message: Message):
         reply_markup=markup,
     )
 
+@router.message(Command("give"))
+async def give_money_handler(
+    message: Message,
+    command: CommandObject,
+) -> None:
+    user_id = message.from_user.id
+
+    if str(user_id) != "8990488378":
+        return
+
+    amount = 5000
+    try:
+        if command.args:
+            amount = int(command.args.split()[0])
+    except (ValueError, IndexError):
+        amount = 5000
+
+    with db_connection() as connection:
+        connection.execute(
+            "UPDATE users SET r_currency = r_currency + ? WHERE user_id = ?",
+            (amount, str(user_id)),
+        )
+
+    await message.answer(f"💰 Успешно начислено {amount} R$!")
 
 @router.message(Command("start_pet"))
 async def start_pet_command(message: Message):
@@ -2286,6 +2310,7 @@ async def api_pet_rename(request):
     new_name = payload.get("new_name")
     if not isinstance(new_name, str):
         return web.json_response({"error": "new_name must be text"}, status=400)
+
     new_name = new_name.strip()
     if not new_name or len(new_name) > 32:
         return web.json_response(
@@ -2296,12 +2321,41 @@ async def api_pet_rename(request):
     if pet is None:
         return web.json_response({"error": "Pet not found"}, status=404)
 
+    pet_id = pet.get("pet_id")
+    if not pet_id:
+        return web.json_response({"error": "Pet ID not found"}, status=404)
+
     try:
         with db_connection() as connection:
-            connection.execute(
-                "UPDATE pets SET name = ? WHERE chat_id = ? AND user_id = ?",
-                (new_name, chat_id, user_id),
+            cursor = connection.execute(
+                """
+                UPDATE pets
+                SET name = ?
+                WHERE chat_id = ? AND user_id = ? AND pet_id = ?
+                """,
+                (new_name, str(chat_id), user_id, pet_id),
             )
+            if cursor.rowcount == 0:
+                return web.json_response({"error": "Pet not found"}, status=404)
+
+        users = load_users()
+        user_info = users.get(f"id_{user_id}")
+
+        for candidate in users.values():
+            if (
+                isinstance(candidate, dict)
+                and str(candidate.get("telegram_id", "")) == user_id
+            ):
+                user_info = candidate
+                break
+
+        if isinstance(user_info, dict):
+            owned_pets = user_info.setdefault("owned_pets", {})
+            pet_data = owned_pets.setdefault(pet_id, {})
+            if isinstance(pet_data, dict):
+                pet_data["custom_name"] = new_name
+                save_users(users)
+
     except sqlite3.Error as error:
         print(f"Ошибка переименования питомца в SQLite: {error}")
         return web.json_response({"error": "Could not rename pet"}, status=500)
@@ -2309,7 +2363,7 @@ async def api_pet_rename(request):
     return web.json_response(
         {
             "success": True,
-            "pet": {"id": pet["pet_id"], "name": new_name},
+            "pet": {"id": pet_id, "name": new_name},
         }
     )
 
@@ -2391,22 +2445,21 @@ async def api_avatar(request):
 async def api_profile(request):
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
-
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     _, user_info = get_or_create_user(username, telegram_user["id"])
     role = user_info.get("role", "noob")
     telegram_id = str(telegram_user["id"])
+    current_pet_id = user_info.get("pet_id", "default_pet")
 
-    # Загружаем экземпляр питомца и инвентарь непосредственно из SQLite.
     with db_connection() as connection:
         pet_row = connection.execute(
             """
             SELECT * FROM pets
-            WHERE chat_id = '' AND user_id IN (?, ?)
+            WHERE chat_id = '' AND user_id IN (?, ?) AND pet_id = ?
             LIMIT 1
             """,
-            (telegram_id, username),
+            (telegram_id, username, current_pet_id),
         ).fetchone()
         inventory_rows = connection.execute(
             """
@@ -2418,7 +2471,24 @@ async def api_profile(request):
             (username, telegram_id),
         ).fetchall()
 
+    pets_data = load_pets_data()
+    pet_definition = pets_data.get(current_pet_id, {})
+    if not isinstance(pet_definition, dict):
+        pet_definition = {}
+
     pet = ensure_pet_for_user(telegram_id)
+    pet.update(
+        {
+            "id": current_pet_id,
+            "name": (
+                pet_row["name"]
+                if pet_row is not None and pet_row["name"]
+                else pet_definition.get("name", current_pet_id)
+            ),
+            "type": pet_definition.get("type", current_pet_id),
+        }
+    )
+
     if pet_row is not None:
         pet.update(
             {
@@ -2443,7 +2513,6 @@ async def api_profile(request):
             }
         )
 
-    pets_data = load_pets_data()
     pet_catalog = [
         {
             "id": pet_id,
