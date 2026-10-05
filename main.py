@@ -1324,6 +1324,7 @@ async def send_pet_selection(message: Message):
         reply_markup=markup,
     )
 
+
 @router.message(Command("give"))
 async def give_money_handler(
     message: Message,
@@ -1347,7 +1348,24 @@ async def give_money_handler(
             (amount, str(user_id)),
         )
 
+    users = load_users()
+    user_info = users.get(f"id_{user_id}")
+
+    if not isinstance(user_info, dict):
+        for candidate in users.values():
+            if isinstance(candidate, dict) and str(
+                candidate.get("telegram_id", "")
+            ) == str(user_id):
+                user_info = candidate
+                break
+
+    if isinstance(user_info, dict):
+        current_balance = user_info.get("r_currency", 0)
+        user_info["r_currency"] = current_balance + amount
+        save_users(users)
+
     await message.answer(f"💰 Успешно начислено {amount} R$!")
+
 
 @router.message(Command("start_pet"))
 async def start_pet_command(message: Message):
@@ -2297,9 +2315,14 @@ async def api_pet_rename(request):
     if payload is None:
         return web.json_response({"error": "JSON object is required"}, status=400)
 
-    chat_id, telegram_user, error_response = resolve_chat_api_context(request, payload)
-    if error_response:
-        return error_response
+    chat_id = request.rel_url.query.get("chat_id", "")
+    if not chat_id:
+        chat_id = payload.get("chat_id", "")
+    chat_id = str(chat_id or "")
+
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
 
     user_id = str(telegram_user["id"])
     if not get_active_chat_profile(chat_id, user_id):
@@ -2333,7 +2356,7 @@ async def api_pet_rename(request):
                 SET name = ?
                 WHERE chat_id = ? AND user_id = ? AND pet_id = ?
                 """,
-                (new_name, str(chat_id), user_id, pet_id),
+                (new_name, chat_id, user_id, pet_id),
             )
             if cursor.rowcount == 0:
                 return web.json_response({"error": "Pet not found"}, status=404)
@@ -2443,6 +2466,17 @@ async def api_avatar(request):
 
 
 async def api_profile(request):
+    # Пытаемся достать chat_id из query-параметров, затем из JSON payload.
+    chat_id = request.rel_url.query.get("chat_id", "")
+    if not chat_id:
+        try:
+            payload = await request.json()
+            if isinstance(payload, dict):
+                chat_id = payload.get("chat_id", "")
+        except Exception:
+            chat_id = ""
+    chat_id = str(chat_id or "")
+
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
@@ -2456,19 +2490,19 @@ async def api_profile(request):
         pet_row = connection.execute(
             """
             SELECT * FROM pets
-            WHERE chat_id = '' AND user_id IN (?, ?) AND pet_id = ?
+            WHERE chat_id = ? AND user_id IN (?, ?) AND pet_id = ?
             LIMIT 1
             """,
-            (telegram_id, username, current_pet_id),
+            (chat_id, telegram_id, username, current_pet_id),
         ).fetchone()
         inventory_rows = connection.execute(
             """
             SELECT * FROM inventory
-            WHERE chat_id = ''
+            WHERE chat_id = ?
               AND user_id IN (?, ?)
               AND record_type = 'item'
             """,
-            (username, telegram_id),
+            (chat_id, username, telegram_id),
         ).fetchall()
 
     pets_data = load_pets_data()
@@ -2476,7 +2510,7 @@ async def api_profile(request):
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-    pet = ensure_pet_for_user(telegram_id)
+    pet = ensure_chat_pet(chat_id, telegram_id) or {}
     pet.update(
         {
             "id": current_pet_id,
