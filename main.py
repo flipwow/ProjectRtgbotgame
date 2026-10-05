@@ -2518,18 +2518,35 @@ async def api_profile(request):
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-    # pet = ensure_chat_pet(chat_id, telegram_id) or {}
-    # pet.update(
-    #     {
-    #         "id": current_pet_id,
-    #         "name": (
-    #             pet_row["name"]
-    #             if pet_row is not None and pet_row["name"]
-    #             else pet_definition.get("name", current_pet_id)
-    #         ),
-    #         "type": pet_definition.get("type", current_pet_id),
-    #     }
-    # )
+    pet = ensure_chat_pet(chat_id, telegram_id) or {}
+
+    # 1. Извлекаем словарь купленных питомцев пользователя из кэша данных
+    owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
+
+    # 2. Ищем, задано ли кастомное имя для ТЕКУЩЕГО pet_id (например, для "SnowLeopard" или "BabyPig")
+    current_pet_data = (
+        owned_pets.get(current_pet_id, {}) if isinstance(owned_pets, dict) else {}
+    )
+    saved_custom_name = (
+        current_pet_data.get("custom_name")
+        if isinstance(current_pet_data, dict)
+        else None
+    )
+
+    # 3. Собираем объект питомца для отправки на фронтенд
+    pet.update(
+        {
+            "id": current_pet_id,
+            "name": (
+                saved_custom_name
+                if saved_custom_name  # Если игрок когда-то переименовал его, берем это имя
+                else pet_definition.get(
+                    "name", current_pet_id
+                )  # Иначе берем его родное имя из pets.json ("Baby Pig", "Snow Leopard")
+            ),
+            "type": pet_definition.get("type", current_pet_id),
+        }
+    )
 
     pet = ensure_chat_pet(chat_id, telegram_id) or {}
     pet.update(
