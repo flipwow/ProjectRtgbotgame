@@ -53,24 +53,6 @@
     "bonus": "",
     "image": "/Pets/BabyPig.png"
   },
-  "Slava": {
-    "id": "Slava",
-    "name": "Slava",
-    "type": "Human",
-    "series": "Original",
-    "level": 1,
-    "max_level": 10,
-    "description": "",
-    "rarity": "Bo$$",
-    "stats": {
-      "health": 100,
-      "hunger": 100,
-      "happiness": 100,
-      "energy": 100
-    },
-    "bonus": "",
-    "image": "/Pets/Slava.png"
-  },
   "Freddy": {
     "id": "Freddy",
     "name": "Freddy Fazbear",
@@ -88,6 +70,24 @@
     },
     "bonus": "",
     "image": "/Pets/Freddy.png"
+  },
+  "Slava": {
+    "id": "Slava",
+    "name": "Slava",
+    "type": "Human",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Slava.png"
   },
   "Isaak": {
     "id": "Isaak",
@@ -142,5 +142,41 @@
     },
     "bonus": "",
     "image": "/Pets/Eren.png"
-  }
+  },
+  "chris": {
+    "id": "chris",
+    "name": "Chris",
+    "type": "Human",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Chris.png"
+  },
+  "SpiderGwen": {
+    "id": "SpiderGwen",
+    "name": "SpiderGwen",
+    "type": "Human",
+    "series": "Comics",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/SpiderGwen.png"
+  },
 }
