@@ -1326,28 +1326,33 @@ async def send_pet_selection(message: Message):
 
 
 @router.message(Command("give"))
-async def give_money_handler(
-    message: Message,
-    command: CommandObject,
-) -> None:
+async def give_money_handler(message: Message) -> None:
     user_id = message.from_user.id
 
+    # Жесткая проверка вашего ID
     if str(user_id) != "8990488378":
         return
 
+    # Безопасный разбор текста без CommandObject
+    text_parts = message.text.split() if message.text else []
     amount = 5000
+    if len(text_parts) > 1:
+        try:
+            amount = int(text_parts[1])
+        except (ValueError, IndexError):
+            amount = 5000
+
+    # 1. Запись в SQLite
     try:
-        if command.args:
-            amount = int(command.args.split()[0])
-    except (ValueError, IndexError):
-        amount = 5000
+        with db_connection() as connection:
+            connection.execute(
+                "UPDATE users SET r_currency = r_currency + ? WHERE user_id = ?",
+                (amount, str(user_id)),
+            )
+    except Exception as e:
+        print(f"Ошибка SQLite: {e}")
 
-    with db_connection() as connection:
-        connection.execute(
-            "UPDATE users SET r_currency = r_currency + ? WHERE user_id = ?",
-            (amount, str(user_id)),
-        )
-
+    # 2. Обновление JSON-кэша игры (сразу три поля для надежности)
     users = load_users()
     user_info = users.get(f"id_{user_id}")
 
@@ -1360,10 +1365,12 @@ async def give_money_handler(
                 break
 
     if isinstance(user_info, dict):
-        current_balance = user_info.get("r_currency", 0)
-        user_info["r_currency"] = current_balance + amount
+        user_info["r_currency"] = user_info.get("r_currency", 0) + amount
+        user_info["currency"] = user_info.get("currency", 0) + amount
+        user_info["balance_r"] = user_info.get("balance_r", 0) + amount
         save_users(users)
 
+    # 3. Ответ в чат
     await message.answer(f"💰 Успешно начислено {amount} R$!")
 
 
