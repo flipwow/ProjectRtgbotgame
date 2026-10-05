@@ -1399,31 +1399,52 @@ function updatePetView() {
 
 
 function renderShop() {
-    const grid =
-        document.getElementById('shopItemsGrid');
+    const grid = document.getElementById('shopItemsGrid');
 
     if (!grid) return;
 
+    if (typeof currentShopTab === 'undefined') {
+        window.currentShopTab = userData.pet?.type || 'Human';
+    }
+
+    let tabs = document.getElementById('shopCategoryTabs');
+
+    if (!tabs) {
+        tabs = document.createElement('div');
+        tabs.id = 'shopCategoryTabs';
+        tabs.className = 'shop-category-tabs';
+        grid.parentNode.insertBefore(tabs, grid);
+    }
+
+    tabs.innerHTML = '';
+
+    ['Human', 'Animal', 'Robot'].forEach(type => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = type;
+        button.className = 'shop-category-tab';
+        button.setAttribute('aria-pressed', String(currentShopTab === type));
+
+        button.addEventListener('click', () => {
+            currentShopTab = type;
+            renderShop();
+        });
+
+        tabs.appendChild(button);
+    });
+
     grid.innerHTML = '';
 
-    if (!userData.foodCatalog || userData.foodCatalog.length === 0) {
-        grid.innerHTML = `
-            <p
-                style="
-                    grid-column: span 2;
-                    text-align: center;
-                    color: var(--text-secondary);
-                    padding: 20px;
-                "
-            >
-                Магазин еды пока пуст
-            </p>
-        `;
+    const foods = (userData.foodCatalog || []).filter(
+        food => food.compatible_with === currentShopTab
+    );
 
+    if (foods.length === 0) {
+        grid.innerHTML = '<p>В этой категории пока нет товаров</p>';
         return;
     }
 
-    userData.foodCatalog.forEach(food => {
+    foods.forEach(food => {
         const card = document.createElement('article');
         card.className = 'item-card food-item-card';
         card.innerHTML = `
@@ -1438,6 +1459,7 @@ function renderShop() {
 
         card.querySelector('.food-buy-button').addEventListener('click', async event => {
             event.stopPropagation();
+
             try {
                 const response = await fetch(
                     `/api/buy-food/${encodeURIComponent(food.id)}`,
@@ -1448,7 +1470,9 @@ function renderShop() {
                         }
                     }
                 );
+
                 const data = await response.json();
+
                 if (!response.ok) {
                     tg?.showAlert?.(data.error === 'Not enough currency'
                         ? 'Недостаточно R$ для покупки.'
@@ -1459,10 +1483,13 @@ function renderShop() {
                 userData.currency = data.currency;
                 userData.foodCatalog = data.food_catalog;
                 userData.pet = normalizePetData(data.pet);
+
                 const balance = document.getElementById('user-balance');
                 if (balance) balance.textContent = userData.currency;
+
                 const profileCurrency = document.getElementById('profile-currency');
                 if (profileCurrency) profileCurrency.textContent = userData.currency;
+
                 renderShop();
                 renderFoodInventory();
                 updatePetView();
@@ -1480,16 +1507,37 @@ function renderFoodInventory() {
     const grid = document.getElementById('inventoryGrid');
     if (!grid) return;
 
-    const foodItems = userData.foodCatalog
-        .filter(food => food.count > 0)
+    const petType = userData.pet?.type;
+    const foodItems = (userData.foodCatalog || [])
+        .filter(food => food.count > 0 && food.compatible_with === petType)
         .map(food => ({
             icon: food.name.split(' ')[0],
-            name: food.name.replace(/^\\S+\\s*/, ''),
+            name: food.name.replace(/^\S+\s*/, ''),
             count: `×${food.count}`
         }));
 
     if (foodItems.length === 0) {
-        grid.innerHTML = '<p class="inventory-empty">Холодильник пока пуст</p>';
+        grid.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <p style="margin: 0 0 16px; color: var(--text-secondary);">
+                    Пора закупиться вкусняшками 🛍
+                </p>
+                <button
+                    class="primary-action"
+                    type="button"
+                    data-open-shop
+                    style="padding: 10px 18px; border: 0; border-radius: 12px; cursor: pointer;"
+                >
+                    Перейти в магазин
+                </button>
+            </div>
+        `;
+
+        grid.querySelector('[data-open-shop]').addEventListener('click', () => {
+            closeFeedMenuModal();
+            switchTab('shop');
+            renderShop();
+        });
         return;
     }
 
@@ -1500,6 +1548,53 @@ function renderFoodInventory() {
             <strong class="inventory-item-count">${escapeHtml(food.count)}</strong>
         </article>
     `).join('');
+}
+
+function renderFeedItems() {
+    const grid = document.getElementById('feedItemsGrid');
+    if (!grid) return;
+
+    const petType = userData.pet?.type;
+    const availableFood = (userData.foodCatalog || []).filter(
+        food => food.count > 0 && food.compatible_with === petType
+    );
+
+    if (availableFood.length === 0) {
+        grid.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <p style="margin: 0 0 16px; color: var(--text-secondary);">
+                    Пора закупиться вкусняшками 🛍
+                </p>
+                <button
+                    class="primary-action"
+                    type="button"
+                    data-open-shop
+                    style="padding: 10px 18px; border: 0; border-radius: 12px; cursor: pointer;"
+                >
+                    Перейти в магазин
+                </button>
+            </div>
+        `;
+
+        grid.querySelector('[data-open-shop]').addEventListener('click', () => {
+            closeFeedMenuModal();
+            switchTab('shop');
+            renderShop();
+        });
+
+        return;
+    }
+
+    grid.innerHTML = availableFood.map(food => `
+        <button class="feed-food-button" type="button" data-food-id="${escapeHtml(food.id)}">
+            <span>${escapeHtml(food.name)} <small>×${escapeHtml(food.count)}</small></span>
+            <span class="feed-food-effect">Накормить</span>
+        </button>
+    `).join('');
+
+    grid.querySelectorAll('[data-food-id]').forEach(button => {
+        button.addEventListener('click', () => feedPet(button.dataset.foodId));
+    });
 }
 
 
@@ -2047,46 +2142,6 @@ function closeFeedMenuModal() {
         modal.style.display = 'none';
     }
 }
-
-
-function renderFeedItems() {
-    const grid =
-        document.getElementById('feedItemsGrid');
-
-    if (!grid) {
-        return;
-    }
-
-    const availableFood = userData.foodCatalog.filter(food => food.count > 0);
-
-    if (availableFood.length === 0) {
-        grid.innerHTML = `
-            <p
-                style="
-                    text-align: center;
-                    color: var(--text-secondary);
-                    padding: 15px;
-                "
-            >
-                Холодильник пуст. Загляни в магазин еды 🛍
-            </p>
-        `;
-
-        return;
-    }
-
-    grid.innerHTML = availableFood.map(food => `
-        <button class="feed-food-button" type="button" data-food-id="${escapeHtml(food.id)}">
-            <span>${escapeHtml(food.name)} <small>×${food.count}</small></span>
-            <span class="feed-food-effect">Накормить</span>
-        </button>
-    `).join('');
-
-    grid.querySelectorAll('[data-food-id]').forEach(button => {
-        button.addEventListener('click', () => feedPet(button.dataset.foodId));
-    });
-}
-
 
 async function feedPet(foodId) {
     try {

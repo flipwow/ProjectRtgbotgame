@@ -1736,3 +1736,36 @@ body {
     padding-top: 8px;
     border-top: 1px solid var(--card-border);
 }
+
+/* Изолированные стили вкладок магазина еды */
+.shop .shop-category-tabs {
+    display: flex !important;
+    gap: 10px !important;
+    margin: 15px 0 !important;
+    justify-content: center !important;
+    width: 100% !important;
+}
+
+.shop .shop-category-tab {
+    padding: 8px 16px !important;
+    border: 1px solid var(--text-secondary, #ccc) !important;
+    background: rgba(255, 255, 255, 0.05) !important; /* Легкий темный фон для читаемости */
+    color: var(--text-primary, #fff) !important;
+    border-radius: 20px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    transition: background 0.2s, transform 0.1s !important;
+}
+
+/* Эффект при наведении */
+.shop .shop-category-tab:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Активная вкладка (текущий тип питомца) */
+.shop .shop-category-tab[aria-pressed="true"] {
+    background: var(--accent-color, #0088cc) !important;
+    border-color: var(--accent-color, #0088cc) !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+}

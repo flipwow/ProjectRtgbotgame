@@ -34,10 +34,48 @@ from aiogram.types import (
 import google.generativeai as genai
 
 SHOP_ITEMS = {
-    "meat": {"name": "🥩 Сочный стейк", "price": 15},
-    "milk": {"name": "🥛 молоко", "price": 5},
-    "toy": {"name": "🥎 Мячик для игр", "price": 10},
-    "medicine": {"name": "💊 Витамины", "price": 25},
+    "meat": {
+        "name": "🥩 Сочный стейк",
+        "price": 15,
+        "compatible_with": "Human",
+        "hunger_restore": 30,
+        "happiness_restore": 5,
+    },
+    "milk": {
+        "name": "🥛 Молоко",
+        "price": 5,
+        "compatible_with": "Human",
+        "hunger_restore": 10,
+        "happiness_restore": 3,
+    },
+    "bone": {
+        "name": "🦴 Косточка",
+        "price": 8,
+        "compatible_with": "Animal",
+        "hunger_restore": 10,
+        "happiness_restore": 15,
+    },
+    "pet_food": {
+        "name": "🐾 Корм",
+        "price": 12,
+        "compatible_with": "Animal",
+        "hunger_restore": 30,
+        "happiness_restore": 5,
+    },
+    "battery": {
+        "name": "🔋 Батарейка",
+        "price": 10,
+        "compatible_with": "Robot",
+        "hunger_restore": 30,
+        "happiness_restore": 5,
+    },
+    "microchip": {
+        "name": "💾 Микросхема",
+        "price": 20,
+        "compatible_with": "Robot",
+        "hunger_restore": 5,
+        "happiness_restore": 20,
+    },
 }
 
 # Имя файла базы данных
@@ -946,6 +984,7 @@ def build_food_catalog(food_inventory):
                 "price": food["price"],
                 "hunger_restore": food.get("hunger_restore", 0),
                 "happiness_restore": food.get("happiness_restore", 0),
+                "compatible_with": food.get("compatible_with"),
                 "count": count,
             }
         )
