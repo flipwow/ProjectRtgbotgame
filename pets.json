@@ -1,12 +1,12 @@
 {
-  "bars": {
-    "id": "bars",
-    "name": "Снежный барсик",
-    "type": "Кошачий",
+  "SnowLeopard": {
+    "id": "SnowLeopard",
+    "name": "Snow Leopard",
+    "type": "Cat",
     "level": 1,
     "max_level": 10,
-    "description": "Милый, но очень дерзкий пиздюк с клыком наружу и невероятно сильным стремлениям захерачить Ритушку.",
-    "rarity": "Редкий",
+    "description": "",
+    "rarity": "Common",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -14,16 +14,16 @@
       "energy": 100
     },
     "bonus": "",
-    "image": "/Pets/Снежный барсик.png"
+    "image": "/Pets/SnowLeopard.png"
   },
-  "OrangeCat": {
-    "id": "OrangeCat",
-    "name": "Рыжик",
-    "type": "Кот",
+  "Orange": {
+    "id": "Orange",
+    "name": "Orange",
+    "type": "cat",
     "level": 1,
     "max_level": 10,
-    "description": "ласковый котик.",
-    "rarity": "Редкий",
+    "description": "",
+    "rarity": "Common",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -31,15 +31,49 @@
       "energy": 100
     },
     "bonus": "",
-    "image": "/Pets/Рыжик.png"
+    "image": "/Pets/Orange.png"
   },
-  "Goidik": {
-    "id": "Goidik",
-    "name": "Саторик",
-    "type": "Человек",
+  "BabyPig": {
+    "id": "BabyPig",
+    "name": "Baby Pig",
+    "type": "Animal",
     "level": 1,
     "max_level": 10,
-    "description": "«Разделён, но не сломлен, не сломлен, но мёртв»",
+    "description": "",
+    "rarity": "Common",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/BabyPig.png"
+  },
+  "Freddy": {
+    "id": "Freddy",
+    "name": "Freddy Fazbear",
+    "type": "Game",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Legendary",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Freddy.png"
+  },
+  "Isaak": {
+    "id": "Isaak",
+    "name": "Isaak",
+    "type": "Game",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
     "rarity": "Epic",
     "stats": {
       "health": 100,
@@ -48,16 +82,16 @@
       "energy": 100
     },
     "bonus": "",
-    "image": "/Pets/Gojo.png"
+    "image": "/Pets/Isaak.png"
   },
-  "luna": {
-    "id": "luna",
-    "name": "Луна",
-    "type": "Лунный котёнок",
+  "Satoru": {
+    "id": "Satoru",
+    "name": "Goida Satoru",
+    "type": "Legendary",
     "level": 1,
     "max_level": 10,
-    "description": "Нежная любимица с вечерним характером.",
-    "rarity": "Редкий",
+    "description": "«»",
+    "rarity": "Epic",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -65,6 +99,23 @@
       "energy": 100
     },
     "bonus": "",
-    "image": "/Pets/Луна.png"
+    "image": "/Pets/Satoru.png"
+  },
+  "Eren": {
+    "id": "Eren",
+    "name": "Eren Yeager",
+    "type": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Eren.png"
   }
 }

@@ -1286,7 +1286,7 @@ function renderPetChoices() {
     grid.innerHTML = '';
 
         // В селекторе отображаются ровно четыре доступных питомца.
-    userData.petCatalog.slice(0, 4).forEach(pet => {
+    userData.petCatalog.forEach(pet => {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = `pet-choice-card ${currentPetId === pet.id ? 'active' : ''}`;
@@ -1294,7 +1294,7 @@ function renderPetChoices() {
 
         card.innerHTML = `
             <img
-                src="${escapeHtml(pet.image || '/Pets/Снежный барсик.png')}"
+                src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}"
                 alt="${escapeHtml(pet.name)}"
                 class="pet-choice-img"
             >
