@@ -2375,7 +2375,6 @@ async def api_profile(request):
     if pet_row is not None:
         pet.update(
             {
-                "pet_name": pet_row["name"],
                 "health": pet_row["health"],
                 "hunger": pet_row["hunger"],
                 "happiness": pet_row["happiness"],
