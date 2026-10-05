@@ -171,13 +171,24 @@ function applyLanguage() {
     let node;
     while ((node = walker.nextNode())) translateNode(node);
     document.querySelectorAll('[title], [aria-label], [placeholder]').forEach(element => {
+        if (!element) return;
+
         ['title', 'aria-label', 'placeholder'].forEach(attribute => {
-            if (!element.hasAttribute(attribute)) return;
-            const key = `${attribute}:${element}`;
-            if (!element.dataset[`i18n${attribute}`]) {
-                element.dataset[`i18n${attribute}`] = element.getAttribute(attribute);
+            try {
+                if (!element.hasAttribute(attribute)) return;
+
+                const datasetKey = `i18n${attribute}`;
+                if (!element.dataset[datasetKey]) {
+                    element.dataset[datasetKey] = element.getAttribute(attribute);
+                }
+                element.setAttribute(
+                    attribute,
+                    translateSource(element.dataset[datasetKey])
+                );
+            } catch (error) {
+                // Один некорректный атрибут не должен прерывать локализацию остальных элементов.
+                console.warn(`Не удалось локализовать атрибут ${attribute}:`, error);
             }
-            element.setAttribute(attribute, translateSource(element.dataset[`i18n${attribute}`]));
         });
     });
 }
