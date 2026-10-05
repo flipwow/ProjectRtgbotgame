@@ -127,12 +127,13 @@ def init_db():
             CREATE TABLE IF NOT EXISTS pets (
                 chat_id TEXT,
                 user_id TEXT,
+                pet_id TEXT NOT NULL DEFAULT 'default_pet',
                 name TEXT DEFAULT 'Питомец',
                 health INTEGER DEFAULT 100,
                 hunger INTEGER DEFAULT 100,
                 happiness INTEGER DEFAULT 100,
                 energy INTEGER DEFAULT 100,
-                PRIMARY KEY (chat_id, user_id)
+                PRIMARY KEY (chat_id, user_id, pet_id)
             );
 
             CREATE TABLE IF NOT EXISTS scores (
@@ -157,6 +158,9 @@ def init_db():
             "users": {
                 "record_type": "TEXT NOT NULL DEFAULT 'user'",
                 "data_json": "TEXT NOT NULL DEFAULT '{}'",
+            },
+            "pets": {
+                "pet_id": "TEXT NOT NULL DEFAULT 'default_pet'",
             },
             "inventory": {
                 "record_type": "TEXT NOT NULL DEFAULT 'item'",
@@ -800,7 +804,10 @@ def create_default_user(telegram_id=None):
         "started": False,
         "started_at": None,
         "pet_id": DEFAULT_PET_ID,
+        "owned_pets": {},
     }
+
+    user["owned_pets"][DEFAULT_PET_ID] = {"custom_name": None}
 
     if telegram_id is not None:
         user["telegram_id"] = str(telegram_id)
@@ -848,6 +855,7 @@ def get_or_create_user(username, telegram_id=None):
         "started": False,
         "started_at": None,
         "pet_id": DEFAULT_PET_ID,
+        "owned_pets": {DEFAULT_PET_ID: {"custom_name": None}},  # ИСПРАВЛЕНО ТУТ
     }
 
     changed = False
