@@ -2318,85 +2318,86 @@ async def api_chat_profile(request):
 
 
 async def api_pet_rename(request):
-    return web.json_response({"error": "Кастомные имена отключены."}, status=403)
-    # payload = await read_json_object(request)
-    # if payload is None:
-    #     return web.json_response({"error": "JSON object is required"}, status=400)
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
 
-    # chat_id = request.rel_url.query.get("chat_id", "")
-    # if not chat_id:
-    #     chat_id = payload.get("chat_id", "")
-    # chat_id = str(chat_id or "")
+    chat_id = request.rel_url.query.get("chat_id", "")
+    if not chat_id:
+        chat_id = payload.get("chat_id", "")
+    chat_id = str(chat_id or "")
 
-    # username, telegram_user = get_webapp_user(request)
-    # if not username or not telegram_user:
-    #     return web.json_response({"error": "Unauthorized"}, status=401)
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
 
-    # user_id = str(telegram_user["id"])
-    # if not get_active_chat_profile(chat_id, user_id):
-    #     return web.json_response(
-    #         {"error": "Activate /pet activate in this chat first"}, status=404
-    #     )
+    user_id = str(telegram_user["id"])
+    if not get_active_chat_profile(chat_id, user_id):
+        return web.json_response(
+            {"error": "Activate /pet activate in this chat first"}, status=404
+        )
 
-    # new_name = payload.get("new_name")
-    # if not isinstance(new_name, str):
-    #     return web.json_response({"error": "new_name must be text"}, status=400)
+    new_name = payload.get("new_name")
+    if not isinstance(new_name, str):
+        return web.json_response({"error": "new_name must be text"}, status=400)
 
-    # new_name = new_name.strip()
-    # if not new_name or len(new_name) > 32:
-    #     return web.json_response(
-    #         {"error": "Pet name must contain 1 to 32 characters"}, status=400
-    #     )
+    new_name = new_name.strip()
+    if not new_name or len(new_name) > 32:
+        return web.json_response(
+            {"error": "Pet name must contain 1 to 32 characters"}, status=400
+        )
 
-    # pet = ensure_chat_pet(chat_id, user_id)
-    # if pet is None:
-    #     return web.json_response({"error": "Pet not found"}, status=404)
+    pet = ensure_chat_pet(chat_id, user_id)
+    if pet is None:
+        return web.json_response({"error": "Pet not found"}, status=404)
 
-    # pet_id = pet.get("pet_id")
-    # if not pet_id:
-    #     return web.json_response({"error": "Pet ID not found"}, status=404)
+    pet_id = pet.get("pet_id")
+    if not pet_id:
+        return web.json_response({"error": "Pet ID not found"}, status=404)
 
-    # try:
-    #     with db_connection() as connection:
-    #         cursor = connection.execute(
-    #             """
-    #             UPDATE pets
-    #             SET name = ?
-    #             WHERE chat_id = ? AND user_id = ? AND pet_id = ?
-    #             """,
-    #             (new_name, chat_id, user_id, pet_id),
-    #         )
-    #         if cursor.rowcount == 0:
-    #             return web.json_response({"error": "Pet not found"}, status=404)
+    try:
+        # 1. Обновляем имя в SQLite (для групп и ЛС точечно по pet_id)
+        with db_connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE pets
+                SET name = ?
+                WHERE chat_id = ? AND user_id = ? AND pet_id = ?
+                """,
+                (new_name, chat_id, user_id, pet_id),
+            )
+            if cursor.rowcount == 0:
+                return web.json_response({"error": "Pet not found"}, status=404)
 
-    #     users = load_users()
-    #     user_info = users.get(f"id_{user_id}")
+        # 2. Синхронизируем с JSON-файлом для кэша профиля
+        users = load_users()
+        user_info = users.get(f"id_{user_id}")
 
-    #     for candidate in users.values():
-    #         if (
-    #             isinstance(candidate, dict)
-    #             and str(candidate.get("telegram_id", "")) == user_id
-    #         ):
-    #             user_info = candidate
-    #             break
+        for candidate in users.values():
+            if (
+                isinstance(candidate, dict)
+                and str(candidate.get("telegram_id", "")) == user_id
+            ):
+                user_info = candidate
+                break
 
-    #     if isinstance(user_info, dict):
-    #         owned_pets = user_info.setdefault("owned_pets", {})
-    #         pet_data = owned_pets.setdefault(pet_id, {})
-    #         if isinstance(pet_data, dict):
-    #             pet_data["custom_name"] = new_name
-    #             save_users(users)
+        if isinstance(user_info, dict):
+            owned_pets = user_info.setdefault("owned_pets", {})
+            pet_data = owned_pets.setdefault(pet_id, {})
+            if isinstance(pet_data, dict):
+                pet_data["custom_name"] = new_name
+                save_users(users)
 
-    # except sqlite3.Error as error:
-    #     print(f"Ошибка переименования питомца в SQLite: {error}")
-    #     return web.json_response({"error": "Could not rename pet"}, status=500)
+    except sqlite3.Error as error:
+        print(f"Ошибка переименования питомца в SQLite: {error}")
+        return web.json_response({"error": "Could not rename pet"}, status=500)
 
-    # return web.json_response(
-    #     {
-    #         "success": True,
-    #         "pet": {"id": pet_id, "name": new_name},
-    #     }
-    # )
+    return web.json_response(
+        {
+            "success": True,
+            "pet": {"id": pet_id, "name": new_name},
+        }
+    )
 
 
 async def api_leaderboard(request):
@@ -2513,17 +2514,15 @@ async def api_profile(request):
             (chat_id, username, telegram_id),
         ).fetchall()
 
-    pets_data = load_pets_data()
+        pets_data = load_pets_data()
     pet_definition = pets_data.get(current_pet_id, {})
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
+    # Получаем или инициализируем структуру питомца для текущего контекста чата
     pet = ensure_chat_pet(chat_id, telegram_id) or {}
 
-    # 1. Извлекаем словарь купленных питомцев пользователя из кэша данных
     owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
-
-    # 2. Ищем, задано ли кастомное имя для ТЕКУЩЕГО pet_id (например, для "SnowLeopard" или "BabyPig")
     current_pet_data = (
         owned_pets.get(current_pet_id, {}) if isinstance(owned_pets, dict) else {}
     )
@@ -2533,32 +2532,27 @@ async def api_profile(request):
         else None
     )
 
-    # 3. Собираем объект питомца для отправки на фронтенд
+    # Умный приоритет для имён: сначала проверяем SQLite (критично для групп),
+    # затем ищем в JSON-кэше, и если ничего нет — берём дефолт из pets.json
+    db_name = pet_row["name"] if (pet_row is not None and pet_row["name"]) else None
+
     pet.update(
         {
             "id": current_pet_id,
             "name": (
-                saved_custom_name
-                if saved_custom_name  # Если игрок когда-то переименовал его, берем это имя
-                else pet_definition.get(
-                    "name", current_pet_id
-                )  # Иначе берем его родное имя из pets.json ("Baby Pig", "Snow Leopard")
+                db_name
+                if db_name
+                else (
+                    saved_custom_name
+                    if saved_custom_name
+                    else pet_definition.get("name", current_pet_id)
+                )
             ),
             "type": pet_definition.get("type", current_pet_id),
         }
     )
 
-    pet = ensure_chat_pet(chat_id, telegram_id) or {}
-    pet.update(
-        {
-            "id": current_pet_id,
-            "name": pet_definition.get(
-                "name", current_pet_id
-            ),  # ВСЕГДА берём чистое системное имя из pets_data
-            "type": pet_definition.get("type", current_pet_id),
-        }
-    )
-
+    # Накатываем динамические характеристики из базы данных SQLite, если запись существует
     if pet_row is not None:
         pet.update(
             {
