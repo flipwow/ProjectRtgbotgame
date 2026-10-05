@@ -2115,15 +2115,29 @@ async function feedPet(foodId) {
 document.addEventListener(
     'DOMContentLoaded',
     () => {
-        initSettings();
-                initTelegramUser();
+        const initializeSafely = (name, initialize) => {
+            try {
+                initialize();
+            } catch (error) {
+                console.error(`Ошибка инициализации ${name}:`, error);
+            }
+        };
 
-        document.getElementById('convert-rp-amount')
-            ?.addEventListener('input', updateConvertPreview);
-
-        updateConvertPreview();
-
-        checkDuelParams();
-        void fetchUserData();
+        try {
+            initializeSafely('настроек', initSettings);
+            initializeSafely('данных Telegram', initTelegramUser);
+            initializeSafely('обработчика суммы обмена', () => {
+                document.getElementById('convert-rp-amount')
+                    ?.addEventListener('input', updateConvertPreview);
+            });
+            initializeSafely('предпросмотра обмена', updateConvertPreview);
+            initializeSafely('параметров дуэли', checkDuelParams);
+        } catch (error) {
+            // Ошибка необязательной инициализации интерфейса не должна блокировать авторизацию.
+            console.error('Ошибка запуска интерфейса:', error);
+        } finally {
+            // Запрашиваем профиль независимо от ошибок инициализации UI.
+            void fetchUserData();
+        }
     }
 );

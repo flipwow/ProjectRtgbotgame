@@ -35,7 +35,7 @@ import google.generativeai as genai
 
 SHOP_ITEMS = {
     "meat": {"name": "🥩 Сочный стейк", "price": 15},
-    "milk": {"name": "🥛 Молодёжное молоко", "price": 5},
+    "milk": {"name": "🥛 молоко", "price": 5},
     "toy": {"name": "🥎 Мячик для игр", "price": 10},
     "medicine": {"name": "💊 Витамины", "price": 25},
 }
@@ -187,6 +187,7 @@ PETS_FILE = os.path.join(BASE_DIR, "pets.json")
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 CSS_FILE = os.path.join(BASE_DIR, "style.css")
 JS_FILE = os.path.join(BASE_DIR, "script.js")
+LEADERBOARD_UI_FILE = os.path.join(BASE_DIR, "leaderboard-ui.js")
 PETS_IMAGE_DIR = os.path.join(BASE_DIR, "Pets")
 # Картинки питомцев хранятся в Pets/ под именами из pets.json.
 PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Снежный барсик.png")
@@ -2980,7 +2981,6 @@ async def css_handler(request):
 
 
 async def js_handler(request):
-
     if not os.path.exists(JS_FILE):
         return web.Response(
             text="script.js не найден",
@@ -2989,6 +2989,19 @@ async def js_handler(request):
 
     return web.FileResponse(
         JS_FILE,
+        headers={"Content-Type": "application/javascript"},
+    )
+
+
+async def leaderboard_ui_handler(request):
+    if not os.path.exists(LEADERBOARD_UI_FILE):
+        return web.Response(
+            text="leaderboard-ui.js не найден",
+            status=404,
+        )
+
+    return web.FileResponse(
+        LEADERBOARD_UI_FILE,
         headers={"Content-Type": "application/javascript"},
     )
 
@@ -3331,6 +3344,11 @@ async def start_webapp_api():
     app.router.add_get(
         "/script.js",
         js_handler,
+    )
+
+    app.router.add_get(
+        "/leaderboard-ui.js",
+        leaderboard_ui_handler,
     )
 
     # Совместимый старый URL и отдельная безопасная раздача PNG из Pets/.
