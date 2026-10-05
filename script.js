@@ -769,17 +769,22 @@ function renderProfilePet(pet) {
 }
 
 
-function openRenamePetModal() {
-    const modal = document.getElementById('renamePetModal');
-    const input = document.getElementById('rename-pet-input');
-    const feedback = document.getElementById('rename-pet-feedback');
-    if (!modal || !input) return;
+// function openRenamePetModal() {
+//     const modal = document.getElementById('renamePetModal');
+//     const input = document.getElementById('rename-pet-input');
+//     const feedback = document.getElementById('rename-pet-feedback');
+//     if (!modal || !input) return;
 
-    input.value = userData.pet?.name || '';
-    if (feedback) feedback.textContent = '';
-    modal.style.display = 'flex';
-    input.focus();
-    input.select();
+//     input.value = userData.pet?.name || '';
+//     if (feedback) feedback.textContent = '';
+//     modal.style.display = 'flex';
+//     input.focus();
+//     input.select();
+// }
+
+function openRenamePetModal() {
+    // Функция полностью отключена (заглушка)
+    return;
 }
 
 
