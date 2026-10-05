@@ -53,6 +53,24 @@
     "bonus": "",
     "image": "/Pets/BabyPig.png"
   },
+  "Slava": {
+    "id": "Slava",
+    "name": "Slava",
+    "type": "Human",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/BabyPig.png"
+  },
   "Freddy": {
     "id": "Freddy",
     "name": "Freddy Fazbear",

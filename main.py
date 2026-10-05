@@ -2185,7 +2185,7 @@ async def api_chat_profile(request):
             "id": pet_id,
             "name": definition.get("name", pet_id),
             "type": definition.get("type", pet_id),
-            "series":definition.get("series", "default"),
+            "series": definition.get("series", "default"),
             "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
