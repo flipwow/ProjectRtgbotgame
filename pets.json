@@ -178,5 +178,23 @@
     },
     "bonus": "",
     "image": "/Pets/SpiderGwen.png"
+  },
+  "Geralt": {
+    "id": "Geralt",
+    "name": "Geralt",
+    "type": "Human",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Geralt.png"
   }
 }
