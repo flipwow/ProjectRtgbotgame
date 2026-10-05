@@ -2,7 +2,8 @@
   "SnowLeopard": {
     "id": "SnowLeopard",
     "name": "Snow Leopard",
-    "type": "Cat",
+    "type": "Animal",
+    "series": "Original",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -19,7 +20,8 @@
   "Orange": {
     "id": "Orange",
     "name": "Orange",
-    "type": "cat",
+    "type": "Animal",
+    "series": "Original",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -37,6 +39,7 @@
     "id": "BabyPig",
     "name": "Baby Pig",
     "type": "Animal",
+    "series": "Original",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -53,7 +56,8 @@
   "Freddy": {
     "id": "Freddy",
     "name": "Freddy Fazbear",
-    "type": "Game",
+    "type": "Human",
+    "series": "VideoGame",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -70,7 +74,8 @@
   "Isaak": {
     "id": "Isaak",
     "name": "Isaak",
-    "type": "Game",
+    "type": "Human",
+    "series": "VideoGame",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -87,7 +92,8 @@
   "Satoru": {
     "id": "Satoru",
     "name": "Goida Satoru",
-    "type": "Legendary",
+    "type": "Human",
+    "series": "Anime",
     "level": 1,
     "max_level": 10,
     "description": "«»",
@@ -104,7 +110,8 @@
   "Eren": {
     "id": "Eren",
     "name": "Eren Yeager",
-    "type": "Anime",
+    "type": "Human",
+    "series": "Anime",
     "level": 1,
     "max_level": 10,
     "description": "",
