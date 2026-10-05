@@ -74,7 +74,7 @@
   "Freddy": {
     "id": "Freddy",
     "name": "Freddy Fazbear",
-    "type": "Human",
+    "type": "Robot",
     "series": "VideoGame",
     "level": 1,
     "max_level": 10,
