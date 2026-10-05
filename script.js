@@ -1,6 +1,6 @@
 // === ВСТАВИТЬ СТРОГО НА ПЕРВУЮ СТРОКУ SCRIPT.JS ===
 (() => {
-    const RENDER_URL = 'https://onrender.com';
+    const RENDER_URL = 'https://projectrtgbotgame.onrender.com';
     const originalFetch = window.fetch;
     
     window.fetch = function(input, init) {
