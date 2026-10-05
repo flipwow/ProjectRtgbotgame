@@ -2519,35 +2519,49 @@ async def api_profile(request):
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-    # Получаем или инициализируем структуру питомца для текущего контекста чата
+        # Получаем или инициализируем структуру питомца для текущего контекста чата
     pet = ensure_chat_pet(chat_id, telegram_id) or {}
 
+    # 1. Считываем данные из глобального JSON-кэша для ЛС
     owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
     current_pet_data = (
         owned_pets.get(current_pet_id, {}) if isinstance(owned_pets, dict) else {}
     )
-    saved_custom_name = (
+    json_custom_name = (
         current_pet_data.get("custom_name")
         if isinstance(current_pet_data, dict)
         else None
     )
 
-    # Умный приоритет для имён: сначала проверяем SQLite (критично для групп),
-    # затем ищем в JSON-кэше, и если ничего нет — берём дефолт из pets.json
+    # 2. ЛОГИКА ДЛЯ ГРУПП: Проверяем сохраненное имя внутри chat_profiles
+    chat_custom_name = None
+    try:
+        chat_profiles = load_users_document().get("chat_profiles", {})
+        current_chat_profile = chat_profiles.get(str(chat_id), {})
+        if isinstance(current_chat_profile, dict):
+            # Извлекаем имя, закрепленное за этим pet_id в конкретном групповом чате
+            chat_custom_name = (
+                current_chat_profile.get("pets", {}).get(current_pet_id, {}).get("name")
+            )
+    except Exception as e:
+        print(f"Ошибка чтения chat_profiles: {e}")
+
+    # 3. Приоритет имени из базы данных SQLite
     db_name = pet_row["name"] if (pet_row is not None and pet_row["name"]) else None
+
+    # 4. Собираем идеальное имя по цепочке каскадных приоритетов
+    final_name = pet_definition.get("name", current_pet_id)  # Дефолт из каталога
+    if db_name:
+        final_name = db_name
+    elif chat_custom_name:
+        final_name = chat_custom_name
+    elif json_custom_name:
+        final_name = json_custom_name
 
     pet.update(
         {
             "id": current_pet_id,
-            "name": (
-                db_name
-                if db_name
-                else (
-                    saved_custom_name
-                    if saved_custom_name
-                    else pet_definition.get("name", current_pet_id)
-                )
-            ),
+            "name": final_name,
             "type": pet_definition.get("type", current_pet_id),
         }
     )
