@@ -1361,6 +1361,43 @@ function renderPetChoices() {
 }
 
 
+async function savePetName(event) {
+    const petNameInput = event.currentTarget;
+    const petId = currentPetId || userData.pet?.id;
+    if (!petNameInput || !petId) return;
+
+    try {
+        const response = await fetchWithTimeout(
+            '/api/me',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': tg?.initData || ''
+                },
+                body: JSON.stringify({
+                    pet_id: petId,
+                    pet_name: petNameInput.value
+                })
+            },
+            API_REQUEST_TIMEOUT_MS
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to save pet name');
+        }
+
+        userData.pet = normalizePetData(data.pet);
+        currentPetId = userData.pet?.id || petId;
+        updatePetView();
+    } catch (error) {
+        console.error('Failed to save pet name:', error);
+        tg?.showAlert?.('Could not save the pet name. Please try again.');
+        updatePetView();
+    }
+}
+
+
 function updatePetView() {
     const petDisplay = document.getElementById('petDisplay');
     if (!petDisplay) return;
@@ -1376,8 +1413,15 @@ function updatePetView() {
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
     const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
-    const petName = document.getElementById('pet-name');
-    if (petName) petName.value = userData.pet?.name || activePet.name;
+        const petName = document.getElementById('pet-name');
+    if (petName) {
+        petName.value = userData.pet?.name || userData.pet?.pet_name || activePet.name;
+        if (petName.dataset.saveHandlerAttached !== 'true') {
+            petName.addEventListener('change', savePetName);
+            petName.dataset.saveHandlerAttached = 'true';
+        }
+    }
+
 
 
 
