@@ -2642,14 +2642,16 @@ async def api_profile(request):
 
     db_name = pet_row["name"] if (pet_row is not None and pet_row["name"]) else None
 
-    # Приоритет выбора имени
-    final_name = pet_definition.get("name", current_pet_id)
-    if db_name:
-        final_name = db_name
-    elif chat_custom_name and is_group_context:
-        final_name = chat_custom_name
-    elif json_custom_name and not is_group_context:
-        final_name = json_custom_name
+    # Custom names are authoritative; the database may still contain the
+    # catalog default (for example, "Snow Leopard") from the initial insert.
+    if is_group_context:
+        final_name = (
+            chat_custom_name or db_name or pet_definition.get("name", current_pet_id)
+        )
+    else:
+        final_name = (
+            json_custom_name or db_name or pet_definition.get("name", current_pet_id)
+        )
 
     pet.update(
         {
