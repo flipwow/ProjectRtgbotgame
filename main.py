@@ -2278,15 +2278,16 @@ async def api_chat_profile(request):
     pets_data = load_pets_data()
     pet_catalog = [
         {
-            "id": pet_id,
-            "name": definition.get("name", pet_id),
-            "type": definition.get("type", pet_id),
+            "id": p_id,
+            "name": definition.get("name", p_id),
+            "type": definition.get("type", p_id),
             "series": definition.get("series", "default"),
             "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
+            "description": definition.get("description", ""),
         }
-        for pet_id, definition in pets_data.items()
-        if pet_id != "users_pets" and isinstance(definition, dict)
+        for p_id, definition in pets_data.items()
+        if p_id != "users_pets" and isinstance(definition, dict)
     ]
     pet = get_chat_pet_profile(chat_id, user_id)
 
@@ -2687,17 +2688,6 @@ async def api_profile(request):
         )
     pet["inventory"] = food_inventory
 
-    pet_catalog = [
-        {
-            "id": p_id,
-            "name": definition.get("name", p_id),
-            "type": definition.get("type", p_id),
-            "image": definition.get("image", "/Pets/Снежный барсик.png"),
-            "rarity": definition.get("rarity", "Обычный"),
-        }
-        for p_id, definition in pets_data.items()
-        if p_id != "users_pets" and isinstance(definition, dict)
-    ]
     food_catalog = build_food_catalog(food_inventory)
 
     return web.json_response(

@@ -671,5 +671,21 @@
 
     <script src="/script.js" defer></script>
     <script src="/leaderboard-ui.js" defer></script>
+
+    <!-- Модальное окно с информацией о питомце -->
+<div id="pet-info-modal" class="pet-modal-overlay" style="display: none;" onclick="closePetInfoModal(event)">
+    <div class="pet-modal-card" onclick="event.stopPropagation()">
+        <button class="modal-close-btn" onclick="closePetInfoModal()">&times;</button>
+        <img id="modal-pet-img" src="" alt="Pet Image" class="modal-pet-image">
+        <h2 id="modal-pet-name"></h2>
+        <div class="modal-pet-badges">
+            <span id="modal-pet-rarity" class="badge-rarity"></span>
+            <span id="modal-pet-series" class="badge-series"></span>
+            <span id="modal-pet-type" class="badge-type"></span>
+        </div>
+        <p id="modal-pet-desc" class="modal-pet-description"></p>
+    </div>
+</div>
+
 </body>
 </html>

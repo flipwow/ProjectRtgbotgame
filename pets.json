@@ -53,7 +53,7 @@
     "bonus": "",
     "image": "/Pets/BabyPig.png"
   },
-  "Freddy": {
+  "FreddyFazbear": {
     "id": "Freddy",
     "name": "Freddy Fazbear",
     "type": "Robot",
@@ -201,7 +201,7 @@
     "id": "HarryPotter",
     "name": "Harry Potter",
     "type": "Human",
-    "series": "Series",
+    "series": "Movie",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -255,7 +255,7 @@
     "id": "Mable",
     "name": "Mable",
     "type": "Human",
-    "series": "Series",
+    "series": "Cartoons",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -268,5 +268,23 @@
     },
     "bonus": "",
     "image": "/Pets/Mable.png"
+  },
+  "El": {
+    "id": "El",
+    "name": "El",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/El.png"
   }
 }

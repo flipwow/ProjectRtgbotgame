@@ -1295,7 +1295,6 @@ function renderPetChoices() {
 
     grid.innerHTML = '';
 
-        // В селекторе отображаются ровно четыре доступных питомца.
     userData.petCatalog.forEach(pet => {
         const card = document.createElement('button');
         card.type = 'button';
@@ -1314,7 +1313,8 @@ function renderPetChoices() {
             event.currentTarget.replaceWith(document.createTextNode('🐾'));
         };
 
-        card.onclick = async () => {
+                card.onclick = async () => {
+            showPetInfo(pet);
             try {
                 const response = await fetch('/api/me', {
                     method: 'POST',
@@ -2217,3 +2217,22 @@ document.addEventListener(
         }
     }
 );
+
+function showPetInfo(pet) {
+    document.getElementById("modal-pet-name").innerText = pet.name || "Питомец";
+    document.getElementById("modal-pet-rarity").innerText = `Редкость: ${pet.rarity || "Обычный"}`;
+    document.getElementById("modal-pet-series").innerText = `Серия: ${pet.series || "Default"}`;
+    document.getElementById("modal-pet-type").innerText = `Тип: ${pet.type || "Unknown"}`;
+    document.getElementById("modal-pet-desc").innerText = pet.description || "У этого персонажа пока нет описания.";
+    
+    const imgEl = document.getElementById("modal-pet-img");
+    if (pet.image) {
+        imgEl.src = pet.image;
+    }
+    
+    document.getElementById("pet-info-modal").style.display = "flex";
+}
+
+function closePetInfoModal() {
+    document.getElementById("pet-info-modal").style.display = "none";
+}
