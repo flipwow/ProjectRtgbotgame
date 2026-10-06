@@ -151,7 +151,7 @@
     "level": 1,
     "max_level": 10,
     "description": "",
-    "rarity": "Bo$$",
+    "rarity": "Epic",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -169,7 +169,7 @@
     "level": 1,
     "max_level": 10,
     "description": "",
-    "rarity": "Bo$$",
+    "rarity": "Epic",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -187,7 +187,7 @@
     "level": 1,
     "max_level": 10,
     "description": "",
-    "rarity": "Bo$$",
+    "rarity": "Epic",
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -196,5 +196,59 @@
     },
     "bonus": "",
     "image": "/Pets/Geralt.png"
+  },
+  "HarryPotter": {
+    "id": "HarryPotter",
+    "name": "Harry Potter",
+    "type": "Human",
+    "series": "Books",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/HarryPotter.png"
+  },
+  "Miku": {
+    "id": "Miku",
+    "name": "Miku",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Miku.png"
+  },
+  "AI": {
+    "id": "AI",
+    "name": "AI",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/AI.png"
   }
 }
