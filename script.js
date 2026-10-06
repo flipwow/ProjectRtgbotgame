@@ -1408,10 +1408,16 @@ function updatePetView() {
     const level = Math.max(1, Number(userData.pet?.level || 1));
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
-    const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
-            const petName = document.getElementById('pet-name');
+        const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
+    const petName = document.getElementById('pet-name');
     if (petName) {
-        petName.value = userData.pet?.name || userData.pet?.pet_name || activePet.name;
+        petName.value = userData.pet?.custom_name
+            || userData.owned_pets?.[currentPetId]?.custom_name
+            || userData.pet_name
+            || userData.custom_name
+            || userData.pet?.pet_name
+            || userData.pet?.name
+            || activePet.name;
         if (petName.dataset.saveHandlerAttached !== 'true') {
             petName.addEventListener('change', savePetName);
             petName.dataset.saveHandlerAttached = 'true';

@@ -1,4 +1,22 @@
 {
+  "SnowLeopard": {
+    "id": "SnowLeopard",
+    "name": "Snow Leopard",
+    "type": "Animal",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Common",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/SnowLeopard.png"
+  },
   "Orange": {
     "id": "Orange",
     "name": "Orange",
@@ -268,23 +286,5 @@
     },
     "bonus": "",
     "image": "/Pets/El.png"
-  },
-  "SnowLeopard": {
-    "id": "SnowLeopard",
-    "name": "Snow Leopard",
-    "type": "Animal",
-    "series": "Original",
-    "level": 1,
-    "max_level": 10,
-    "description": "",
-    "rarity": "Common",
-    "stats": {
-      "health": 100,
-      "hunger": 100,
-      "happiness": 100,
-      "energy": 100
-    },
-    "bonus": "",
-    "image": "/Pets/SnowLeopard.png"
   }
 }

@@ -3015,7 +3015,18 @@ async def api_save_profile(request):
     data["users_pets"][user_id] = pet
     save_inventory_data(data)
 
-    return web.json_response({"success": True, "pet": pet})
+    return web.json_response(
+        {
+            "success": True,
+            "pet": {
+                **pet,
+                "id": pet_id,
+                "name": custom_name,
+                "pet_name": custom_name,
+                "custom_name": custom_name,
+            },
+        }
+    )
 
 
 async def api_pet_feed(request):
