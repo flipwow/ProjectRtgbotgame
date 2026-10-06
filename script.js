@@ -1288,9 +1288,7 @@ function closePetSelector() {
 
 
 function renderPetChoices() {
-    const grid =
-        document.getElementById('petChoicesGrid');
-
+    const grid = document.getElementById('petChoicesGrid');
     if (!grid) return;
 
     grid.innerHTML = '';
@@ -1301,42 +1299,40 @@ function renderPetChoices() {
         card.className = `pet-choice-card ${currentPetId === pet.id ? 'active' : ''}`;
         card.setAttribute('aria-pressed', String(currentPetId === pet.id));
 
+        // Добавили кнопку «i» прямо внутрь карточки
         card.innerHTML = `
-            <img
-                                src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}"
-
-                alt="Питомец"
-                class="pet-choice-img"
-            >
-
+            <img src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}" alt="Питомец" class="pet-choice-img">
+            <button type="button" class="pet-info-btn" title="Информация о питомце">i</button>
         `;
+
         card.querySelector('img').onerror = event => {
             event.currentTarget.replaceWith(document.createTextNode('🐾'));
         };
 
-                card.onclick = async () => {
-    try {
-        // Получаем текст из нового инпута
+        // Обработчик для кнопки информации (не дает выбрать питомец при клике на «i»)
+        card.querySelector('.pet-info-btn').onclick = (e) => {
+            e.stopPropagation();
+            showPetInfo(pet);
+        };
+
+        // Клик по самой карточке выбирает питомца
+        card.onclick = async () => {
+            try {
                 const customNameInput = document.getElementById('pet-name');
                 const customName = customNameInput ? customNameInput.value.trim() : '';
 
-
-
-
-        const response = await fetch('/api/me', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': tg?.initData || ''
-            },
-            // Передаем и ID питомца, и его новое кастомное имя
-                        body: JSON.stringify({
-                pet_id: pet.id,
-                pet_name: customName
-            })
+                const response = await fetch('/api/me', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tg?.initData || ''
+                    },
+                    body: JSON.stringify({
+                        pet_id: pet.id,
+                        pet_name: customName
+                    })
                 });
 
-        // Дальнейший код обработки ответа...
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || 'Pet selection failed');
