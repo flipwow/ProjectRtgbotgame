@@ -2490,11 +2490,30 @@ async def api_profile(request):
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-    _, user_info = get_or_create_user(username, telegram_user["id"])
+        _, user_info = get_or_create_user(username, telegram_user["id"])
     role = user_info.get("role", "noob")
     telegram_id = str(telegram_user["id"])
+
+    # 1. Задаем базовый ID из глобального JSON-профиля
     current_pet_id = user_info.get("pet_id", "default_pet")
 
+    # 2. КРИТИЧЕСКИЙ ФИКС: Проверяем по базе SQLite, какой питомец активен именно в этой группе/чате
+    with db_connection() as connection:
+        # Ищем запись питомца для этого конкретного chat_id
+        db_active_pet = connection.execute(
+            """
+            SELECT pet_id FROM pets
+            WHERE chat_id = ? AND user_id IN (?, ?)
+            LIMIT 1
+            """,
+            (chat_id, telegram_id, username),
+        ).fetchone()
+
+        # Если в этой группе сохранен другой питомец, принудительно переключаем контекст на его ID
+        if db_active_pet and db_active_pet["pet_id"]:
+            current_pet_id = db_active_pet["pet_id"]
+
+    # 3. Теперь загружаем полные характеристики и инвентарь строго под правильный current_pet_id
     with db_connection() as connection:
         pet_row = connection.execute(
             """
@@ -2504,6 +2523,7 @@ async def api_profile(request):
             """,
             (chat_id, telegram_id, username, current_pet_id),
         ).fetchone()
+
         inventory_rows = connection.execute(
             """
             SELECT * FROM inventory
