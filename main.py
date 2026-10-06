@@ -2506,9 +2506,10 @@ async def api_profile(request):
                 """
                 SELECT pet_id FROM pets
                 WHERE chat_id = ? AND user_id IN (?, ?)
+                ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END, rowid
                 LIMIT 1
                 """,
-                (chat_id, telegram_id, username),
+                (chat_id, telegram_id, username, telegram_id),
             ).fetchone()
 
             if db_active_pet and db_active_pet["pet_id"]:
@@ -2522,20 +2523,62 @@ async def api_profile(request):
         current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
 
     pets_data = load_pets_data()
-    if current_pet_id not in pets_data:
-        current_pet_id = DEFAULT_PET_ID
+    if not isinstance(pets_data, dict):
+        pets_data = {}
+    if not is_group_context and current_pet_id not in pets_data:
+        current_pet_id = (
+            DEFAULT_PET_ID
+            if DEFAULT_PET_ID in pets_data
+            else next(
+                (
+                    pet_id
+                    for pet_id, definition in pets_data.items()
+                    if pet_id != "users_pets" and isinstance(definition, dict)
+                ),
+                DEFAULT_PET_ID,
+            )
+        )
 
-    # Загружаем данные питомца и инвентаря из SQLite в зависимости от контекста
+    # Загружаем данные питомца и инвентаря только из текущего контекста.
+
     with db_connection() as connection:
         query_chat_id = chat_id if is_group_context else ""
+        pet_definition_for_defaults = pets_data.get(current_pet_id, {})
+        stats_for_defaults = (
+            pet_definition_for_defaults.get("stats", {})
+            if isinstance(pet_definition_for_defaults, dict)
+            else {}
+        )
+        if not isinstance(stats_for_defaults, dict):
+            stats_for_defaults = {}
+
+        if is_group_context:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO pets (
+                    chat_id, user_id, pet_id, name, health, hunger, happiness, energy
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    query_chat_id,
+                    telegram_id,
+                    current_pet_id,
+                    pet_definition_for_defaults.get("name", current_pet_id),
+                    stats_for_defaults.get("health", 100),
+                    stats_for_defaults.get("hunger", 100),
+                    stats_for_defaults.get("happiness", 100),
+                    stats_for_defaults.get("energy", 100),
+                ),
+            )
 
         pet_row = connection.execute(
             """
             SELECT * FROM pets
             WHERE chat_id = ? AND user_id IN (?, ?) AND pet_id = ?
+            ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END
             LIMIT 1
             """,
-            (query_chat_id, telegram_id, username, current_pet_id),
+            (query_chat_id, telegram_id, username, current_pet_id, telegram_id),
         ).fetchone()
 
         inventory_rows = connection.execute(
@@ -2552,8 +2595,21 @@ async def api_profile(request):
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-    # Получаем структуру питомца для текущего контекста
-    pet = ensure_chat_pet(chat_id if is_group_context else "", telegram_id) or {}
+    # Строим объект с нуля, чтобы ensure_chat_pet не подмешивал данные ЛС.
+    pet_stats = pet_definition.get("stats", {})
+
+    if not isinstance(pet_stats, dict):
+        pet_stats = {}
+    pet = {
+        "id": current_pet_id,
+        "type": pet_definition.get("type", current_pet_id),
+        "level": pet_definition.get("level", 1),
+        "experience": 0,
+        "health": pet_stats.get("health", 100),
+        "hunger": pet_stats.get("hunger", 100),
+        "happiness": pet_stats.get("happiness", 100),
+        "energy": pet_stats.get("energy", 100),
+    }
 
     # Получаем кастомные имена с учетом разделения
     json_custom_name = None
@@ -2615,6 +2671,7 @@ async def api_profile(request):
 
     food_inventory = {}
     inventory_details = []
+
     for row in inventory_rows:
         item_id = row["item_id"]
         quantity = max(0, int(row["quantity"] or 0))
@@ -2626,6 +2683,7 @@ async def api_profile(request):
                 "data": _decode_sql_json(row["data_json"]),
             }
         )
+    pet["inventory"] = food_inventory
 
     pet_catalog = [
         {
