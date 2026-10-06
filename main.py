@@ -2949,14 +2949,10 @@ async def api_inventory(request):
 
 
 async def api_save_profile(request):
-
     username, telegram_user = get_webapp_user(request)
 
     if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
+        return web.json_response({"error": "Unauthorized"}, status=401)
 
     try:
         body = await request.json()
@@ -2975,11 +2971,31 @@ async def api_save_profile(request):
     if not isinstance(pet_id, str) or pet_id not in pet_catalog:
         return web.json_response({"error": "Pet not found"}, status=404)
 
+    custom_name = body.get("pet_name")
+    if custom_name is not None:
+        if not isinstance(custom_name, str):
+            return web.json_response({"error": "pet_name must be text"}, status=400)
+        custom_name = custom_name.strip()
+        if len(custom_name) > 20:
+            return web.json_response(
+                {"error": "Pet name must be 20 characters or fewer"}, status=400
+            )
+    if not custom_name:
+        custom_name = pet_catalog[pet_id].get("name", pet_id)
+
     users = load_users()
     user_info = users.get(username)
     if not user_info:
         return web.json_response({"error": "User not found"}, status=404)
+
     user_info["pet_id"] = pet_id
+    owned_pets = user_info.get("owned_pets")
+    if not isinstance(owned_pets, dict):
+        owned_pets = {}
+        user_info["owned_pets"] = owned_pets
+    pet_data = owned_pets.setdefault(pet_id, {})
+    if isinstance(pet_data, dict):
+        pet_data["custom_name"] = custom_name
     users[username] = user_info
     save_users(users)
 
@@ -2989,26 +3005,21 @@ async def api_save_profile(request):
     if not pet:
         pet = ensure_pet_for_user(telegram_user["id"])
         data = load_inventory_data()
-    pet_definition = pet_catalog[pet_id]
     pet.update(
         {
             "pet_id": pet_id,
-            "pet_name": pet_definition.get("name", pet_id),
+            "pet_name": custom_name,
             "pet_type": pet_id,
         }
     )
     data["users_pets"][user_id] = pet
     save_inventory_data(data)
 
-    return web.json_response(
-        {
-            "success": True,
-            "pet": pet,
-        }
-    )
+    return web.json_response({"success": True, "pet": pet})
 
 
 async def api_pet_feed(request):
+
     username, telegram_user = get_webapp_user(request)
 
     if not username:

@@ -1303,27 +1303,40 @@ function renderPetChoices() {
 
         card.innerHTML = `
             <img
-                src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}"
-                alt="${escapeHtml(pet.name)}"
+                                src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}"
+
+                alt="Питомец"
                 class="pet-choice-img"
             >
-            <span class="pet-choice-name">${escapeHtml(pet.name)}</span>
+
         `;
         card.querySelector('img').onerror = event => {
             event.currentTarget.replaceWith(document.createTextNode('🐾'));
         };
 
                 card.onclick = async () => {
-            showPetInfo(pet);
-            try {
-                const response = await fetch('/api/me', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': tg?.initData || ''
-                    },
-                    body: JSON.stringify({ pet_id: pet.id })
+    try {
+        // Получаем текст из нового инпута
+                const customNameInput = document.getElementById('pet-name');
+                const customName = customNameInput ? customNameInput.value.trim() : '';
+
+
+
+
+        const response = await fetch('/api/me', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            // Передаем и ID питомца, и его новое кастомное имя
+                        body: JSON.stringify({
+                pet_id: pet.id,
+                pet_name: customName
+            })
                 });
+
+        // Дальнейший код обработки ответа...
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || 'Pet selection failed');
@@ -1364,7 +1377,12 @@ function updatePetView() {
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
     const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
     const petName = document.getElementById('pet-name');
-    if (petName) petName.textContent = userData.pet?.name || activePet.name;
+    if (petName) petName.value = userData.pet?.name || activePet.name;
+
+
+
+
+
 
         const statValues = {
             'pet-level-value': `${level} / ${maxLevel}`,
