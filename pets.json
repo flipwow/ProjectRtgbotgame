@@ -201,7 +201,7 @@
     "id": "HarryPotter",
     "name": "Harry Potter",
     "type": "Human",
-    "series": "Books",
+    "series": "Series",
     "level": 1,
     "max_level": 10,
     "description": "",
@@ -250,5 +250,23 @@
     },
     "bonus": "",
     "image": "/Pets/AI.png"
+  },
+  "Mable": {
+    "id": "Mable",
+    "name": "Mable",
+    "type": "Human",
+    "series": "Series",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Mable.png"
   }
 }
