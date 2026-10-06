@@ -1851,21 +1851,65 @@ body {
 }
 
 /* Стили для поля ввода имени питомца в стиле приложения */
+.pet-name-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 240px;
+    margin: 4px auto;
+}
+
 .pet-name-input {
     background: rgba(255, 255, 255, 0.06); /* Полупрозрачная темная подложка */
     border: 1px solid rgba(255, 255, 255, 0.1); /* Тонкая еле заметная рамка */
     border-radius: 10px; /* Скругленные углы под карточки */
     color: #ffffff; /* Белый цвет текста */
     font-size: 22px;
-    font-weight: bold;
+        font-weight: bold;
     text-align: center;
     width: 100%;
-    max-width: 240px;
+    max-width: none;
     outline: none;
-    padding: 6px 12px;
-    margin: 4px auto;
+    padding: 6px 36px 6px 12px;
+    margin: 0;
     display: block;
     transition: all 0.2s ease;
+}
+
+.save-name-inline-btn {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border: 0;
+    border-radius: 7px;
+    background: rgba(120, 218, 186, 0.16);
+    color: var(--accent-color);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.pet-name-wrapper:focus-within .save-name-inline-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.save-name-inline-btn:hover {
+    background: rgba(120, 218, 186, 0.28);
+}
+
+.save-name-inline-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
 }
 
 /* Эффект при наведении или когда пользователь кликнул в поле */

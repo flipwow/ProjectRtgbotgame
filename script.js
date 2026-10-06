@@ -1409,14 +1409,29 @@ function updatePetView() {
     const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
     const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
     const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
-        const petName = document.getElementById('pet-name');
+            const petName = document.getElementById('pet-name');
     if (petName) {
         petName.value = userData.pet?.name || userData.pet?.pet_name || activePet.name;
         if (petName.dataset.saveHandlerAttached !== 'true') {
             petName.addEventListener('change', savePetName);
             petName.dataset.saveHandlerAttached = 'true';
         }
+
+        const savePetNameButton = document.getElementById('save-pet-name-btn');
+        if (savePetNameButton && savePetNameButton.dataset.saveHandlerAttached !== 'true') {
+            savePetNameButton.addEventListener('mousedown', event => event.preventDefault());
+            savePetNameButton.addEventListener('click', () => {
+                savePetName({ currentTarget: petName });
+                petName.blur();
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            });
+            savePetNameButton.dataset.saveHandlerAttached = 'true';
+        }
     }
+
+
 
 
 
