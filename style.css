@@ -1849,3 +1849,34 @@ body {
     margin-top: 10px;
     line-height: 1.4;
 }
+
+/* Стили для поля ввода имени питомца в стиле приложения */
+.pet-name-input {
+    background: rgba(255, 255, 255, 0.06); /* Полупрозрачная темная подложка */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Тонкая еле заметная рамка */
+    border-radius: 10px; /* Скругленные углы под карточки */
+    color: #ffffff; /* Белый цвет текста */
+    font-size: 22px;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+    max-width: 240px;
+    outline: none;
+    padding: 6px 12px;
+    margin: 4px auto;
+    display: block;
+    transition: all 0.2s ease;
+}
+
+/* Эффект при наведении или когда пользователь кликнул в поле */
+.pet-name-input:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+}
+
+/* Цвет плейсхолдера (текста-подсказки), если поле пустое */
+.pet-name-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: normal;
+}
