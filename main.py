@@ -2484,44 +2484,58 @@ async def api_profile(request):
                 chat_id = payload.get("chat_id", "")
         except Exception:
             chat_id = ""
-    chat_id = str(chat_id or "")
+    chat_id = str(chat_id or "").strip()
 
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-        _, user_info = get_or_create_user(username, telegram_user["id"])
+    _, user_info = get_or_create_user(username, telegram_user["id"])
     role = user_info.get("role", "noob")
     telegram_id = str(telegram_user["id"])
 
-    # 1. Задаем базовый ID из глобального JSON-профиля
-    current_pet_id = user_info.get("pet_id", "default_pet")
+    # РАЗДЕЛЕНИЕ КОНТЕКСТОВ (ЛС vs Группа)
+    is_group_context = bool(chat_id and chat_id != "None" and chat_id != "0")
 
-    # 2. КРИТИЧЕСКИЙ ФИКС: Проверяем по базе SQLite, какой питомец активен именно в этой группе/чате
+    current_pet_id = None
+
+    if is_group_context:
+        # 1. Групповой контекст: вычисляем pet_id строго из SQLite для конкретной группы
+        with db_connection() as connection:
+            db_active_pet = connection.execute(
+                """
+                SELECT pet_id FROM pets
+                WHERE chat_id = ? AND user_id IN (?, ?)
+                LIMIT 1
+                """,
+                (chat_id, telegram_id, username),
+            ).fetchone()
+
+            if db_active_pet and db_active_pet["pet_id"]:
+                current_pet_id = db_active_pet["pet_id"]
+
+        # Если в SQLite для группы ничего не нашлось, берем дефолтный, но НЕ из глобального JSON ЛС!
+        if not current_pet_id:
+            current_pet_id = DEFAULT_PET_ID
+    else:
+        # 2. Контекст ЛС: берем pet_id строго из личного JSON-профиля
+        current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
+
+    pets_data = load_pets_data()
+    if current_pet_id not in pets_data:
+        current_pet_id = DEFAULT_PET_ID
+
+    # Загружаем данные питомца и инвентаря из SQLite в зависимости от контекста
     with db_connection() as connection:
-        # Ищем запись питомца для этого конкретного chat_id
-        db_active_pet = connection.execute(
-            """
-            SELECT pet_id FROM pets
-            WHERE chat_id = ? AND user_id IN (?, ?)
-            LIMIT 1
-            """,
-            (chat_id, telegram_id, username),
-        ).fetchone()
+        query_chat_id = chat_id if is_group_context else ""
 
-        # Если в этой группе сохранен другой питомец, принудительно переключаем контекст на его ID
-        if db_active_pet and db_active_pet["pet_id"]:
-            current_pet_id = db_active_pet["pet_id"]
-
-    # 3. Теперь загружаем полные характеристики и инвентарь строго под правильный current_pet_id
-    with db_connection() as connection:
         pet_row = connection.execute(
             """
             SELECT * FROM pets
             WHERE chat_id = ? AND user_id IN (?, ?) AND pet_id = ?
             LIMIT 1
             """,
-            (chat_id, telegram_id, username, current_pet_id),
+            (query_chat_id, telegram_id, username, current_pet_id),
         ).fetchone()
 
         inventory_rows = connection.execute(
@@ -2531,51 +2545,54 @@ async def api_profile(request):
               AND user_id IN (?, ?)
               AND record_type = 'item'
             """,
-            (chat_id, username, telegram_id),
+            (query_chat_id, username, telegram_id),
         ).fetchall()
 
-        pets_data = load_pets_data()
     pet_definition = pets_data.get(current_pet_id, {})
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-        # Получаем или инициализируем структуру питомца для текущего контекста чата
-    pet = ensure_chat_pet(chat_id, telegram_id) or {}
+    # Получаем структуру питомца для текущего контекста
+    pet = ensure_chat_pet(chat_id if is_group_context else "", telegram_id) or {}
 
-    # 1. Считываем данные из глобального JSON-кэша для ЛС
-    owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
-    current_pet_data = (
-        owned_pets.get(current_pet_id, {}) if isinstance(owned_pets, dict) else {}
-    )
-    json_custom_name = (
-        current_pet_data.get("custom_name")
-        if isinstance(current_pet_data, dict)
-        else None
-    )
+    # Получаем кастомные имена с учетом разделения
+    json_custom_name = None
+    if not is_group_context:
+        owned_pets = (
+            user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
+        )
+        current_pet_data = (
+            owned_pets.get(current_pet_id, {}) if isinstance(owned_pets, dict) else {}
+        )
+        json_custom_name = (
+            current_pet_data.get("custom_name")
+            if isinstance(current_pet_data, dict)
+            else None
+        )
 
-    # 2. ЛОГИКА ДЛЯ ГРУПП: Проверяем сохраненное имя внутри chat_profiles
     chat_custom_name = None
-    try:
-        chat_profiles = load_users_document().get("chat_profiles", {})
-        current_chat_profile = chat_profiles.get(str(chat_id), {})
-        if isinstance(current_chat_profile, dict):
-            # Извлекаем имя, закрепленное за этим pet_id в конкретном групповом чате
-            chat_custom_name = (
-                current_chat_profile.get("pets", {}).get(current_pet_id, {}).get("name")
-            )
-    except Exception as e:
-        print(f"Ошибка чтения chat_profiles: {e}")
+    if is_group_context:
+        try:
+            chat_profiles = load_users_document().get("chat_profiles", {})
+            current_chat_profile = chat_profiles.get(str(chat_id), {})
+            if isinstance(current_chat_profile, dict):
+                chat_custom_name = (
+                    current_chat_profile.get("pets", {})
+                    .get(current_pet_id, {})
+                    .get("name")
+                )
+        except Exception as e:
+            print(f"Ошибка чтения chat_profiles: {e}")
 
-    # 3. Приоритет имени из базы данных SQLite
     db_name = pet_row["name"] if (pet_row is not None and pet_row["name"]) else None
 
-    # 4. Собираем идеальное имя по цепочке каскадных приоритетов
-    final_name = pet_definition.get("name", current_pet_id)  # Дефолт из каталога
+    # Приоритет выбора имени
+    final_name = pet_definition.get("name", current_pet_id)
     if db_name:
         final_name = db_name
-    elif chat_custom_name:
+    elif chat_custom_name and is_group_context:
         final_name = chat_custom_name
-    elif json_custom_name:
+    elif json_custom_name and not is_group_context:
         final_name = json_custom_name
 
     pet.update(
@@ -2586,7 +2603,6 @@ async def api_profile(request):
         }
     )
 
-    # Накатываем динамические характеристики из базы данных SQLite, если запись существует
     if pet_row is not None:
         pet.update(
             {
@@ -2613,14 +2629,14 @@ async def api_profile(request):
 
     pet_catalog = [
         {
-            "id": pet_id,
-            "name": definition.get("name", pet_id),
-            "type": definition.get("type", pet_id),
+            "id": p_id,
+            "name": definition.get("name", p_id),
+            "type": definition.get("type", p_id),
             "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
         }
-        for pet_id, definition in pets_data.items()
-        if pet_id != "users_pets" and isinstance(definition, dict)
+        for p_id, definition in pets_data.items()
+        if p_id != "users_pets" and isinstance(definition, dict)
     ]
     food_catalog = build_food_catalog(food_inventory)
 
