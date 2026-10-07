@@ -960,6 +960,7 @@ body {
 }
 
 .pet-choice-card {
+    position: relative;
     min-width: 0;
     min-height: 112px;
     background: var(--card-bg);
@@ -985,6 +986,37 @@ body {
 .pet-choice-card.active {
     border-color: #ec4899;
     background: rgba(236, 72, 153, 0.12);
+}
+
+.pet-info-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+    width: 27px;
+    height: 27px;
+    place-items: center;
+    border: 1px solid var(--card-border);
+    border-radius: 50%;
+    background: rgba(120, 218, 186, 0.12);
+    color: var(--accent-color);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.pet-info-btn:hover {
+    background: var(--accent-gradient);
+    color: #10201b;
+    transform: scale(1.06);
+}
+
+.pet-info-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
 }
 
 .pet-choice-img {
