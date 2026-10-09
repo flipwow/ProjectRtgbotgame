@@ -369,7 +369,13 @@ function resolveChatContext() {
         chatId ||= chatMatch[1];
     }
 
-    const telegramUserId = tg?.initDataUnsafe?.user?.id;
+            const telegramUserId = tg?.initDataUnsafe?.user?.id;
+
+    // Telegram private-chat IDs equal the user's ID; they are not group context.
+    if (chatId && telegramUserId && String(chatId) === String(telegramUserId)) {
+        chatId = null;
+    }
+
     return {
         chatId,
         userId: telegramUserId ? String(telegramUserId) : launchUserId

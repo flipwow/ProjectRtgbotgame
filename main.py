@@ -1462,10 +1462,8 @@ async def pet_status_command(
             profile_button = InlineKeyboardButton(
                 text="👤 Открыть профиль",
                 web_app=WebAppInfo(
-                    url=(
-                        f"{WEBAPP_ORIGIN}?"
-                        f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
-                    )
+                    # Personal Mini App launch: never pass the private chat ID as chat context.
+                    url=WEBAPP_ORIGIN,
                 ),
             )
         else:
@@ -1550,10 +1548,8 @@ async def cmd_chat_profile(message: Message):
                     InlineKeyboardButton(
                         text="👤 Открыть профиль",
                         web_app=WebAppInfo(
-                            url=(
-                                f"{WEBAPP_ORIGIN}/?"
-                                f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
-                            )
+                            # Personal Mini App launch: never pass the private chat ID as chat context.
+                            url=WEBAPP_ORIGIN,
                         ),
                     )
                     if message.chat.type == "private"
@@ -3991,10 +3987,8 @@ def get_main_hub_keyboard(
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             web_app=WebAppInfo(
-                url=(
-                    f"{WEBAPP_ORIGIN}?"
-                    f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
-                )
+                # Personal Mini App launch: never pass the private chat ID as chat context.
+                url=WEBAPP_ORIGIN,
             ),
         )
     else:
@@ -4025,10 +4019,8 @@ def get_start_keyboard(chat_type="private", chat_id=None, user_id=None):
         app_button = InlineKeyboardButton(
             text="🎮 Запустить Mini App",
             web_app=WebAppInfo(
-                url=(
-                    f"{WEBAPP_ORIGIN}?"
-                    f"{urlencode({'chat_id': chat_id, 'user_id': user_id})}"
-                )
+                # Personal Mini App launch: never pass the private chat ID as chat context.
+                url=WEBAPP_ORIGIN,
             ),
         )
     else:
@@ -4127,10 +4119,8 @@ async def menu_profile(
         game_button = InlineKeyboardButton(
             text="🎮 Открыть игру",
             web_app=WebAppInfo(
-                url=(
-                    f"{WEBAPP_ORIGIN}?"
-                    f"{urlencode({'chat_id': callback.message.chat.id, 'user_id': user.id})}"
-                )
+                # Personal Mini App launch: never pass the private chat ID as chat context.
+                url=WEBAPP_ORIGIN,
             ),
         )
 
