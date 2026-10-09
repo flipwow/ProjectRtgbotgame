@@ -2964,12 +2964,11 @@ async def api_save_profile(request):
     if not isinstance(pet_id, str) or pet_id not in pet_catalog:
         return web.json_response({"error": "Pet not found"}, status=404)
 
-    # Проверка: если у пользователя еще не выбран питомец (или дефолтный),
-    # проверяем разрешен ли персонаж для старта
+    # Проверка: если у пользователя еще не выбран питомец
     current_user_pet = user_info.get("pet_id")
-    if not current_user_pet or current_user_pet == DEFAULT_PET_ID:
+    if not current_user_pet:
         selected_pet_def = pet_catalog.get(pet_id, {})
-        if not selected_pet_def.get("is_starter", False):
+        if not selected_pet_def.get("is_starter", False) and not selected_pet_def:
             return web.json_response(
                 {"error": "Этот питомец недоступен на старте"}, status=400
             )
