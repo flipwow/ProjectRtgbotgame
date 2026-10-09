@@ -4351,27 +4351,12 @@ async def cmd_menu(
         users[username] = user_info
         save_users(users)
 
-    is_start = command_name == "/start"
     await message.answer(
-        "✨ **Привет... Это я, "
-        "RitushkaVIPai 👑**\n\n"
-        + (
-            "Открой Mini App или посмотри правила игры:"
-            if is_start
-            else "Выбирай раздел:"
-        ),
-        reply_markup=(
-            get_start_keyboard(
-                message.chat.type,
-                message.chat.id,
-                message.from_user.id,
-            )
-            if is_start
-            else get_main_hub_keyboard(
-                message.chat.type,
-                message.chat.id,
-                message.from_user.id,
-            )
+        "✨ **Привет... Это я, " "RitushkaVIPai 👑**\n\n" "Выбирай раздел:",
+        reply_markup=get_main_hub_keyboard(
+            message.chat.type,
+            message.chat.id,
+            message.from_user.id,
         ),
         parse_mode="Markdown",
     )
