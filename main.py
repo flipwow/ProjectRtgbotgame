@@ -554,30 +554,54 @@ def ensure_chat_pet(chat_id, user_id):
 
 def ensure_pet_for_user(telegram_id):
     data = load_inventory_data()
+
+    users_pets = data.get("users_pets")
+    if not isinstance(users_pets, dict):
+        users_pets = {}
+        data["users_pets"] = users_pets
+
     user_id = str(telegram_id)
+    pet = users_pets.get(user_id)
 
-    # Проверяем, есть ли уже сохраненный питомец у юзера в inventory
-    pet = data.get("users_pets", {}).get(user_id)
-    if not pet or not pet.get("pet_id"):
-        return None  # Питомец не выбран!
+    # Отсутствие питомца здесь штатно: новый пользователь ещё не сделал выбор.
+    if not isinstance(pet, dict) or not pet.get("pet_id"):
+        return None
 
-    return pet
+    pet_catalog = load_pets_data()
+    pet_id = pet["pet_id"]
+    definition = pet_catalog.get(pet_id)
 
-    if user_id not in data["users_pets"]:
-        data["users_pets"][user_id] = pet_defaults
+    if not isinstance(definition, dict):
+        return None
 
-    pet = data["users_pets"][user_id]
+    stats = definition.get("stats", {})
+    if not isinstance(stats, dict):
+        stats = {}
+
+    defaults = {
+        "pet_name": definition.get("name", pet_id),
+        "pet_type": pet_id,
+        "level": definition.get("level", 1),
+        "experience": 0,
+        "health": stats.get("health", 100),
+        "hunger": stats.get("hunger", 100),
+        "happiness": stats.get("happiness", 100),
+        "energy": stats.get("energy", 100),
+        "inventory": {},
+    }
+
     changed = False
-    for key, value in pet_defaults.items():
-        if key not in pet:
+    for key, value in defaults.items():
+        if key not in pet or pet[key] is None:
             pet[key] = value
             changed = True
-    if pet.get("pet_id") != pet_id:
-        pet["pet_id"] = pet_id
-        pet["pet_name"] = pet_definition.get("name", pet["pet_name"])
-        pet["pet_type"] = pet_id
+
+    if not isinstance(pet.get("inventory"), dict):
+        pet["inventory"] = {}
         changed = True
+
     if changed:
+        users_pets[user_id] = pet
         save_inventory_data(data)
 
     return pet
@@ -2937,7 +2961,7 @@ async def api_inventory(request):
 async def api_save_profile(request):
     username, telegram_user = get_webapp_user(request)
 
-    if not username:
+    if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     try:
@@ -2953,68 +2977,144 @@ async def api_save_profile(request):
 
     users = load_users()
     user_info = users.get(username)
-    if not user_info:
+    if not isinstance(user_info, dict):
         return web.json_response({"error": "User not found"}, status=404)
 
+    # Запрос без pet_id — это чтение текущего выбора, а не создание питомца.
     if pet_id is None:
         return web.json_response(
-            {"success": True, "pet": ensure_pet_for_user(telegram_user["id"])},
+            {"success": True, "pet": ensure_pet_for_user(telegram_user["id"])}
         )
 
-    if not isinstance(pet_id, str) or pet_id not in pet_catalog:
+    if (
+        not isinstance(pet_id, str)
+        or pet_id == "users_pets"
+        or not isinstance(pet_catalog.get(pet_id), dict)
+    ):
         return web.json_response({"error": "Pet not found"}, status=404)
 
-    # Проверка: если у пользователя еще не выбран питомец
+    pet_definition = pet_catalog[pet_id]
+
+    # Пока питомец не выбран, разрешён только питомец со статусом стартового.
     current_user_pet = user_info.get("pet_id")
-    if not current_user_pet:
-        selected_pet_def = pet_catalog.get(pet_id, {})
-        if not selected_pet_def.get("is_starter", False) and not selected_pet_def:
-            return web.json_response(
-                {"error": "Этот питомец недоступен на старте"}, status=400
-            )
+    if not current_user_pet and not pet_definition.get("is_starter", False):
+        return web.json_response(
+            {"error": "Можно выбрать только стартового питомца"},
+            status=400,
+        )
 
     custom_name = body.get("pet_name")
     if custom_name is not None:
         if not isinstance(custom_name, str):
-            return web.json_response({"error": "pet_name must be text"}, status=400)
+            return web.json_response(
+                {"error": "pet_name must be text"},
+                status=400,
+            )
         custom_name = custom_name.strip()
         if len(custom_name) > 20:
             return web.json_response(
-                {"error": "Pet name must be 20 characters or fewer"}, status=400
+                {"error": "Pet name must be 20 characters or fewer"},
+                status=400,
             )
 
-    if not custom_name:
-        existing_owned = user_info.get("owned_pets", {}).get(pet_id, {})
-        custom_name = existing_owned.get("custom_name") or pet_catalog[pet_id].get(
-            "name", pet_id
-        )
-
-    user_info["pet_id"] = pet_id
     owned_pets = user_info.get("owned_pets")
     if not isinstance(owned_pets, dict):
         owned_pets = {}
-        user_info["owned_pets"] = owned_pets
-    pet_data = owned_pets.setdefault(pet_id, {})
-    if isinstance(pet_data, dict):
-        pet_data["custom_name"] = custom_name
-    users[username] = user_info
-    save_users(users)
 
+    if not custom_name:
+        existing_owned = owned_pets.get(pet_id)
+        if not isinstance(existing_owned, dict):
+            existing_owned = {}
+        custom_name = (
+            existing_owned.get("custom_name") or pet_definition.get("name") or pet_id
+        )
+
+    stats = pet_definition.get("stats", {})
+    if not isinstance(stats, dict):
+        stats = {}
+
+    initial_stats = {
+        "health": stats.get("health", 100),
+        "hunger": stats.get("hunger", 100),
+        "happiness": stats.get("happiness", 100),
+        "energy": stats.get("energy", 100),
+    }
+
+    # Инициализируем словарь и запись: их может не быть у нового пользователя.
     data = load_inventory_data()
+    users_pets = data.get("users_pets")
+    if not isinstance(users_pets, dict):
+        users_pets = {}
+        data["users_pets"] = users_pets
+
     user_id = str(telegram_user["id"])
-    pet = data["users_pets"].get(user_id)
-    if not pet:
-        pet = ensure_pet_for_user(telegram_user["id"])
-        data = load_inventory_data()
+    old_pet = users_pets.get(user_id)
+
+    # При повторном сохранении того же питомца не сбрасываем его статы
+    # и инвентарь. Для нового выбранного питомца используем стартовые значения.
+    if isinstance(old_pet, dict) and old_pet.get("pet_id") == pet_id:
+        pet = old_pet
+    else:
+        pet = {
+            **initial_stats,
+            "level": pet_definition.get("level", 1),
+            "experience": 0,
+            "inventory": {},
+        }
+
     pet.update(
         {
             "pet_id": pet_id,
             "pet_name": custom_name,
             "pet_type": pet_id,
+            "level": pet.get("level", pet_definition.get("level", 1)),
+            "experience": pet.get("experience", 0),
         }
     )
-    data["users_pets"][user_id] = pet
+
+    for stat_name, default_value in initial_stats.items():
+        pet.setdefault(stat_name, default_value)
+
+    if not isinstance(pet.get("inventory"), dict):
+        pet["inventory"] = {}
+
+    users_pets[user_id] = pet
+
+    # Сохраняем также в SQLite. При повторном выборе обновляем существующую строку.
+    with db_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO pets (
+                chat_id, user_id, pet_id, name,
+                health, hunger, happiness, energy
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(chat_id, user_id, pet_id) DO UPDATE SET
+                name = excluded.name,
+                health = excluded.health,
+                hunger = excluded.hunger,
+                happiness = excluded.happiness,
+                energy = excluded.energy
+            """,
+            (
+                "",
+                user_id,
+                pet_id,
+                custom_name,
+                pet["health"],
+                pet["hunger"],
+                pet["happiness"],
+                pet["energy"],
+            ),
+        )
+
     save_inventory_data(data)
+
+    owned_pets[pet_id] = {"custom_name": custom_name}
+    user_info["owned_pets"] = owned_pets
+    user_info["pet_id"] = pet_id
+    users[username] = user_info
+    save_users(users)
 
     return web.json_response(
         {
