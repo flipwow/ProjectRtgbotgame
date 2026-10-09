@@ -1395,6 +1395,14 @@ async function savePetName(event) {
     if (!petNameInput || !petId) return;
 
     try {
+        if (chatContext.chatId) {
+            await postChatAction('/api/pet/rename', {
+                new_name: petNameInput.value
+            });
+            await fetchUserData();
+            return;
+        }
+
         const response = await fetchWithTimeout(
             '/api/me',
             {
