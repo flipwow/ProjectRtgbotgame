@@ -1298,9 +1298,16 @@ function renderPetChoices() {
     const grid = document.getElementById('petChoicesGrid');
     if (!grid) return;
 
-    grid.innerHTML = '';
+        grid.innerHTML = '';
 
-    userData.petCatalog.forEach(pet => {
+    const ownedPets = userData.owned_pets && typeof userData.owned_pets === 'object'
+        ? userData.owned_pets
+        : {};
+    const selectablePets = (userData.petCatalog || []).filter(pet =>
+        Object.prototype.hasOwnProperty.call(ownedPets, pet.id)
+    );
+
+    selectablePets.forEach(pet => {
         const card = document.createElement('button');
         card.type = 'button';
         card.className = `pet-choice-card ${currentPetId === pet.id ? 'active' : ''}`;
@@ -2352,7 +2359,12 @@ function openFirstPetSelector() {
     grid.innerHTML = '';
 
     // Берем только тех питомцев, у которых is_starter: true
-    const starterPets = (userData.petCatalog || []).filter(pet => pet.is_starter === true);
+        const starterPets = (userData.petCatalog || []).filter(pet => pet.is_starter === true);
+
+    if (starterPets.length === 0) {
+        grid.textContent = 'Не удалось загрузить стартовых питомцев. Закрой и открой приложение ещё раз.';
+        return;
+    }
 
     starterPets.forEach(pet => {
         const card = document.createElement('button');

@@ -2552,6 +2552,13 @@ async def api_profile(request):
         if pet_id != "users_pets" and isinstance(definition, dict)
     ]
 
+    # A pet_id without a matching owned_pets entry can be an old automatic
+    # fallback selection; do not treat it as a user-owned pet.
+    if not is_group_context and current_pet_id:
+        owned_pets = user_info.get("owned_pets", {})
+        if not isinstance(owned_pets, dict) or current_pet_id not in owned_pets:
+            current_pet_id = None
+
     # A new personal profile must stay petless until the user chooses a starter.
     if not is_group_context and not current_pet_id:
         food_catalog = build_food_catalog({})
@@ -3045,13 +3052,21 @@ async def api_save_profile(request):
 
     pet_definition = pet_catalog[pet_id]
 
-    # Пока питомец не выбран, разрешён только питомец со статусом стартового.
-    current_user_pet = user_info.get("pet_id")
-    if not current_user_pet and not pet_definition.get("is_starter", False):
-        return web.json_response(
-            {"error": "Можно выбрать только стартового питомца"},
-            status=400,
-        )
+    # A starter can be selected only when this account owns no catalog pet yet.
+    # Existing users may switch only to pets already present in owned_pets.
+    owned_pets = user_info.get("owned_pets")
+    if not isinstance(owned_pets, dict):
+        owned_pets = {}
+    has_owned_pet = any(
+        owned_id in pet_catalog and isinstance(owned_data, dict)
+        for owned_id, owned_data in owned_pets.items()
+    )
+    if pet_id not in owned_pets:
+        if has_owned_pet or not pet_definition.get("is_starter", False):
+            return web.json_response(
+                {"error": "Этот питомец не куплен или не принадлежит аккаунту"},
+                status=403,
+            )
 
     custom_name = body.get("pet_name")
     if custom_name is not None:
