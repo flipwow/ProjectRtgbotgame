@@ -2329,7 +2329,7 @@ function closePetInfoModal() {
     document.getElementById("pet-info-modal").style.display = "none";
 }
 
-// Открытие модального окна выбора СТАРТОВОГО питомца (ровно 4 штуки)
+// Открытие модального окна выбора СТАРТОВОГО питомца (фильтрация по is_starter)
 function openFirstPetSelector() {
     const modal = document.getElementById('firstPetModal');
     const grid = document.getElementById('firstPetChoicesGrid');
@@ -2338,8 +2338,8 @@ function openFirstPetSelector() {
     modal.style.display = 'flex';
     grid.innerHTML = '';
 
-    // Берем первые 4 питомца из каталога
-    const starterPets = (userData.petCatalog || []).slice(0, 4);
+    // Берем только тех питомцев, у которых is_starter: true
+    const starterPets = (userData.petCatalog || []).filter(pet => pet.is_starter === true);
 
     starterPets.forEach(pet => {
         const card = document.createElement('button');

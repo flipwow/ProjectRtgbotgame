@@ -8,6 +8,7 @@
     "max_level": 10,
     "description": "",
     "rarity": "Common",
+    "is_starter": true,
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -26,6 +27,7 @@
     "max_level": 10,
     "description": "",
     "rarity": "Common",
+    "is_starter": true,
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -44,6 +46,7 @@
     "max_level": 10,
     "description": "",
     "rarity": "Common",
+    "is_starter": true,
     "stats": {
       "health": 100,
       "hunger": 100,
@@ -80,6 +83,7 @@
     "max_level": 10,
     "description": "",
     "rarity": "Bo$$",
+    "is_starter": true,
     "stats": {
       "health": 100,
       "hunger": 100,

@@ -552,32 +552,14 @@ def ensure_chat_pet(chat_id, user_id):
 
 def ensure_pet_for_user(telegram_id):
     data = load_inventory_data()
-
     user_id = str(telegram_id)
-    users = load_users()
-    user_info = users.get(f"id_{user_id}", {})
-    for username, candidate in users.items():
-        if str(candidate.get("telegram_id", "")) == user_id:
-            user_info = candidate
-            break
 
-    pets = load_pets_data()
-    pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
-    if pet_id not in pets:
-        pet_id = DEFAULT_PET_ID
-    pet_definition = pets.get(pet_id, {})
-    pet_defaults = {
-        "pet_id": pet_id,
-        "pet_name": pet_definition.get("name", "Барсичела"),
-        "pet_type": pet_id,
-        "level": pet_definition.get("level", 1),
-        "experience": 0,
-        "health": pet_definition.get("stats", {}).get("health", 100),
-        "hunger": pet_definition.get("stats", {}).get("hunger", 100),
-        "happiness": pet_definition.get("stats", {}).get("happiness", 100),
-        "energy": pet_definition.get("stats", {}).get("energy", 100),
-        "inventory": {},
-    }
+    # Проверяем, есть ли уже сохраненный питомец у юзера в inventory
+    pet = data.get("users_pets", {}).get(user_id)
+    if not pet or not pet.get("pet_id"):
+        return None  # Питомец не выбран!
+
+    return pet
 
     if user_id not in data["users_pets"]:
         data["users_pets"][user_id] = pet_defaults
@@ -2285,6 +2267,7 @@ async def api_chat_profile(request):
             "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
             "description": definition.get("description", ""),
+            "is_starter": definition.get("is_starter", False),  # Добавлено поле
         }
         for p_id, definition in pets_data.items()
         if p_id != "users_pets" and isinstance(definition, dict)
@@ -2964,12 +2947,29 @@ async def api_save_profile(request):
 
     pet_id = body.get("pet_id")
     pet_catalog = load_pets_data()
+
+    users = load_users()
+    user_info = users.get(username)
+    if not user_info:
+        return web.json_response({"error": "User not found"}, status=404)
+
     if pet_id is None:
         return web.json_response(
             {"success": True, "pet": ensure_pet_for_user(telegram_user["id"])},
         )
+
     if not isinstance(pet_id, str) or pet_id not in pet_catalog:
         return web.json_response({"error": "Pet not found"}, status=404)
+
+    # Проверка: если у пользователя еще не выбран питомец (или дефолтный),
+    # проверяем разрешен ли персонаж для старта
+    current_user_pet = user_info.get("pet_id")
+    if not current_user_pet or current_user_pet == DEFAULT_PET_ID:
+        selected_pet_def = pet_catalog.get(pet_id, {})
+        if not selected_pet_def.get("is_starter", False):
+            return web.json_response(
+                {"error": "Этот питомец недоступен на старте"}, status=400
+            )
 
     custom_name = body.get("pet_name")
     if custom_name is not None:
@@ -2981,18 +2981,11 @@ async def api_save_profile(request):
                 {"error": "Pet name must be 20 characters or fewer"}, status=400
             )
 
-    # Если имя не передано или пустое, берем то, что уже было сохранено,
-    # а не дефолт из pets.json!
     if not custom_name:
         existing_owned = user_info.get("owned_pets", {}).get(pet_id, {})
         custom_name = existing_owned.get("custom_name") or pet_catalog[pet_id].get(
             "name", pet_id
         )
-
-    users = load_users()
-    user_info = users.get(username)
-    if not user_info:
-        return web.json_response({"error": "User not found"}, status=404)
 
     user_info["pet_id"] = pet_id
     owned_pets = user_info.get("owned_pets")
