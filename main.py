@@ -2531,11 +2531,60 @@ async def api_profile(request):
             current_pet_id = DEFAULT_PET_ID
     else:
         # 2. Контекст ЛС: берем pet_id строго из личного JSON-профиля
-        current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
+                current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
 
     pets_data = load_pets_data()
     if not isinstance(pets_data, dict):
         pets_data = {}
+
+    pet_catalog = [
+        {
+            "id": pet_id,
+            "name": definition.get("name", pet_id),
+            "type": definition.get("type", pet_id),
+            "series": definition.get("series", "default"),
+            "image": definition.get("image", "/Pets/Slava.png"),
+            "rarity": definition.get("rarity", "Common"),
+            "description": definition.get("description", ""),
+            "is_starter": definition.get("is_starter", False),
+        }
+        for pet_id, definition in pets_data.items()
+        if pet_id != "users_pets" and isinstance(definition, dict)
+    ]
+
+    # A new personal profile must stay petless until the user chooses a starter.
+    if not is_group_context and not current_pet_id:
+        food_catalog = build_food_catalog({})
+        return web.json_response(
+            {
+                "user": {
+                    "id": telegram_user["id"],
+                    "username": username,
+                    "first_name": telegram_user.get("first_name", ""),
+                    "last_name": telegram_user.get("last_name", ""),
+                    "display_name": " ".join(
+                        part
+                        for part in (
+                            telegram_user.get("first_name", ""),
+                            telegram_user.get("last_name", ""),
+                        )
+                        if part
+                    ),
+                    "photo_url": telegram_user.get("photo_url", ""),
+                },
+                "pet": None,
+                "pet_catalog": pet_catalog,
+                "owned_pets": user_info.get("owned_pets", {}),
+                "food_catalog": food_catalog,
+                "rp": user_info.get("rp", 0),
+                "max_rp": RP_CEILINGS.get(role, 200),
+                "currency": user_info.get("r_currency", 0),
+                "inventory": [],
+                "catalog": food_catalog,
+                "leaderboard": load_global_leaderboard(),
+            }
+        )
+
     if not is_group_context and current_pet_id not in pets_data:
         current_pet_id = (
             DEFAULT_PET_ID
@@ -2719,6 +2768,7 @@ async def api_profile(request):
             },
             "pet": pet,
             "pet_catalog": pet_catalog,
+            "owned_pets": user_info.get("owned_pets", {}),
             "food_catalog": food_catalog,
             "rp": user_info.get("rp", 0),
             "max_rp": RP_CEILINGS.get(role, 200),

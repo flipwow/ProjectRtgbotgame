@@ -640,11 +640,14 @@ async function refreshChatMembers() {
 function applyPersonalProfile(data) {
     const user = data.user || tg?.initDataUnsafe?.user || {};
     const relationshipRp = Number(data.rp ?? 0);
-    const balance = Number(data.currency ?? 0);
+        const balance = Number(data.currency ?? 0);
     userData.user = {
         ...user,
         display_name: user.display_name || [user.first_name, user.last_name].filter(Boolean).join(' ')
     };
+    userData.owned_pets = data.owned_pets && typeof data.owned_pets === 'object'
+        ? data.owned_pets
+        : {};
     userData.chat = null;
     userData.chatProfile = {
         status: 'Active',
@@ -1349,10 +1352,15 @@ function renderPetChoices() {
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || 'Pet selection failed');
-                }
+                                                }
 
                 userData.pet = normalizePetData(data.pet);
                 currentPetId = userData.pet.id;
+                userData.owned_pets = userData.owned_pets || {};
+                userData.owned_pets[currentPetId] = {
+                    ...(userData.owned_pets[currentPetId] || {}),
+                    custom_name: data.pet.custom_name || data.pet.name || pet.name
+                };
                 updatePetView();
                 closePetSelector();
 
@@ -1394,10 +1402,15 @@ async function savePetName(event) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw new Error(data.error || 'Failed to save pet name');
-        }
+                        }
 
-        userData.pet = normalizePetData(data.pet);
+                userData.pet = normalizePetData(data.pet);
         currentPetId = userData.pet?.id || petId;
+        userData.owned_pets = userData.owned_pets || {};
+        userData.owned_pets[currentPetId] = {
+            ...(userData.owned_pets[currentPetId] || {}),
+            custom_name: data.pet?.custom_name || data.pet?.name || petNameInput.value.trim()
+        };
         updatePetView();
     } catch (error) {
         console.error('Failed to save pet name:', error);
@@ -2260,9 +2273,9 @@ async function feedPet(foodId) {
         if (!response.ok) {
             tg?.showAlert?.('Не удалось покормить питомца.');
             return;
-        }
+                        }
 
-        userData.pet = normalizePetData(data.pet);
+                userData.pet = normalizePetData(data.pet);
         userData.foodCatalog = userData.foodCatalog.map(food => ({
             ...food,
             count: data.pet.inventory?.[food.id] || 0
@@ -2374,10 +2387,15 @@ function openFirstPetSelector() {
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || 'Starter pet selection failed');
-                }
+                                                }
 
                 userData.pet = normalizePetData(data.pet);
                 currentPetId = userData.pet.id;
+                userData.owned_pets = userData.owned_pets || {};
+                userData.owned_pets[currentPetId] = {
+                    ...(userData.owned_pets[currentPetId] || {}),
+                    custom_name: data.pet.custom_name || data.pet.name || pet.name
+                };
                 updatePetView();
                 
                 // Закрываем стартовое модальное окно
