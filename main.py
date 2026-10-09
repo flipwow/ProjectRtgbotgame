@@ -803,7 +803,7 @@ def create_default_user(telegram_id=None):
         "r_currency": 0,
         "started": False,
         "started_at": None,
-        "pet_id": DEFAULT_PET_ID,
+        "pet_id": None,
         "owned_pets": {},
     }
 

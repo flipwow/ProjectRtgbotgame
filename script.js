@@ -547,9 +547,9 @@ async function fetchUserData() {
     try {
         if (chatContext.chatId && !chatContext.userId) {
             showProfileFeedback('Открой профиль через кнопку бота в нужном чате.', 'error');
-                        renderChatRegistry();
+            renderChatRegistry();
             return;
-                }
+        }
         showProfileFeedback('');
 
         const isChatProfile = Boolean(chatContext.chatId);
@@ -561,7 +561,7 @@ async function fetchUserData() {
         };
         const response = await fetchWithTimeout(
             endpoint,
-                        { headers },
+            { headers },
             API_REQUEST_TIMEOUT_MS
         );
         const data = await response.json().catch(() => ({}));
@@ -569,7 +569,7 @@ async function fetchUserData() {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
-                userData.foodCatalog = data.food_catalog || data.catalog || [];
+        userData.foodCatalog = data.food_catalog || data.catalog || [];
         userData.petCatalog = data.pet_catalog || [];
         if (isChatProfile) {
             if (data.chat?.id) chatContext.chatId = String(data.chat.id);
@@ -577,8 +577,15 @@ async function fetchUserData() {
         } else {
             applyPersonalProfile(data);
         }
+
         userData.pet = normalizePetData(data.pet || data.profile?.pet);
-        currentPetId = userData.pet?.id || 'bars';
+        currentPetId = userData.pet?.id || '';
+
+        // Если у пользователя вообще нет питомца или не задан его ID — открываем выбор 4 стартовых
+        if (!userData.pet || !userData.pet.id) {
+            openFirstPetSelector();
+        }
+
         userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
         renderLeaderboard();
         renderProfile();
@@ -593,16 +600,13 @@ async function fetchUserData() {
             'Не удалось загрузить данные профиля:',
             error
         );
-                showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
+        showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
         renderChatRegistry();
     } finally {
         const status = document.getElementById('profile-status');
         if (status && !userData.user) status.textContent = 'Unavailable';
     }
 }
-
-
-
 
 async function refreshChatMembers() {
     const profileTab = document.getElementById('tab-profile');
@@ -2323,4 +2327,71 @@ function showPetInfo(pet) {
 
 function closePetInfoModal() {
     document.getElementById("pet-info-modal").style.display = "none";
+}
+
+// Открытие модального окна выбора СТАРТОВОГО питомца (ровно 4 штуки)
+function openFirstPetSelector() {
+    const modal = document.getElementById('firstPetModal');
+    const grid = document.getElementById('firstPetChoicesGrid');
+    if (!modal || !grid) return;
+
+    modal.style.display = 'flex';
+    grid.innerHTML = '';
+
+    // Берем первые 4 питомца из каталога
+    const starterPets = (userData.petCatalog || []).slice(0, 4);
+
+    starterPets.forEach(pet => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'pet-choice-card';
+        card.style.minHeight = '120px';
+
+        card.innerHTML = `
+            <img src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}" alt="${escapeHtml(pet.name)}" class="pet-choice-img" style="width: 70px; height: 70px;">
+            <span class="pet-choice-name">${escapeHtml(pet.name)}</span>
+        `;
+
+        card.querySelector('img').onerror = event => {
+            event.currentTarget.replaceWith(document.createTextNode('🐾'));
+        };
+
+        // Клик по карточке сохраняет выбор и закрывает модалку
+        card.onclick = async () => {
+            try {
+                const response = await fetch('/api/me', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tg?.initData || ''
+                    },
+                    body: JSON.stringify({
+                        pet_id: pet.id,
+                        pet_name: pet.name
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Starter pet selection failed');
+                }
+
+                userData.pet = normalizePetData(data.pet);
+                currentPetId = userData.pet.id;
+                updatePetView();
+                
+                // Закрываем стартовое модальное окно
+                modal.style.display = 'none';
+
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (error) {
+                console.error('Не удалось выбрать стартового питомца:', error);
+                tg?.showAlert?.('Не удалось выбрать питомца. Попробуй ещё раз.');
+            }
+        };
+
+        grid.appendChild(card);
+    });
 }
