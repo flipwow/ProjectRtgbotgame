@@ -1,12 +1,10 @@
 // === ВСТАВИТЬ СТРОГО НА ПЕРВУЮ СТРОКУ SCRIPT.JS ===
 (() => {
-    const RENDER_URL = 'https://projectrtgbotgame.onrender.com';
-    const originalFetch = window.fetch;
-    
+    const originalFetch = window.fetch.bind(window);
+
     window.fetch = function(input, init) {
         if (typeof input === 'string' && input.startsWith('/api/')) {
-            const cleanPath = input.replace(/^\/+/, '');
-            input = `${RENDER_URL}/${cleanPath}`;
+            input = apiUrl(input);
         }
         return originalFetch(input, init);
     };
@@ -1344,7 +1342,7 @@ function renderPetChoices() {
                     customName = userData.owned_pets?.[pet.id]?.custom_name || pet.name || '';
                 }
 
-                const response = await fetch('/api/me', {
+                const response = await fetchWithTimeout('/api/me', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1430,6 +1428,13 @@ async function savePetName(event) {
 function updatePetView() {
     const petDisplay = document.getElementById('petDisplay');
     if (!petDisplay) return;
+
+    if (!userData.pet?.id) {
+        const petNameInput = document.getElementById('pet-name');
+        if (petNameInput) petNameInput.value = '';
+        petDisplay.replaceChildren();
+        return;
+    }
 
         const activePet = userData.petCatalog.find(
         pet => pet.id === currentPetId
@@ -2384,7 +2389,7 @@ function openFirstPetSelector() {
         // Клик по карточке сохраняет выбор и закрывает модалку
         card.onclick = async () => {
             try {
-                const response = await fetch('/api/me', {
+                const response = await fetchWithTimeout('/api/me', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

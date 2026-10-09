@@ -2552,9 +2552,11 @@ async def api_profile(request):
         if pet_id != "users_pets" and isinstance(definition, dict)
     ]
 
-    # A pet_id without a matching owned_pets entry can be an old automatic
-    # fallback selection; do not treat it as a user-owned pet.
-    if not is_group_context and current_pet_id:
+    # Existing user records may contain a fallback pet written before the
+    # starter-choice flow existed. Only the explicit marker proves a choice.
+    if not is_group_context and user_info.get("starter_pet_selected") is not True:
+        current_pet_id = None
+    elif not is_group_context and current_pet_id:
         owned_pets = user_info.get("owned_pets", {})
         if not isinstance(owned_pets, dict) or current_pet_id not in owned_pets:
             current_pet_id = None
@@ -3052,21 +3054,23 @@ async def api_save_profile(request):
 
     pet_definition = pet_catalog[pet_id]
 
-    # A starter can be selected only when this account owns no catalog pet yet.
-    # Existing users may switch only to pets already present in owned_pets.
+    # Before the first explicit choice, only a starter is selectable.
+    # Afterwards, the user may select only a pet already in owned_pets.
+    starter_selected = user_info.get("starter_pet_selected") is True
     owned_pets = user_info.get("owned_pets")
     if not isinstance(owned_pets, dict):
         owned_pets = {}
-    has_owned_pet = any(
-        owned_id in pet_catalog and isinstance(owned_data, dict)
-        for owned_id, owned_data in owned_pets.items()
-    )
-    if pet_id not in owned_pets:
-        if has_owned_pet or not pet_definition.get("is_starter", False):
+    if not starter_selected:
+        if not pet_definition.get("is_starter", False):
             return web.json_response(
-                {"error": "Этот питомец не куплен или не принадлежит аккаунту"},
+                {"error": "Сначала выберите одного из стартовых питомцев"},
                 status=403,
             )
+    elif pet_id not in owned_pets:
+        return web.json_response(
+            {"error": "Этот питомец не куплен или не принадлежит аккаунту"},
+            status=403,
+        )
 
     custom_name = body.get("pet_name")
     if custom_name is not None:
@@ -3178,6 +3182,7 @@ async def api_save_profile(request):
     owned_pets[pet_id] = {"custom_name": custom_name}
     user_info["owned_pets"] = owned_pets
     user_info["pet_id"] = pet_id
+    user_info["starter_pet_selected"] = True
     users[username] = user_info
     save_users(users)
 
