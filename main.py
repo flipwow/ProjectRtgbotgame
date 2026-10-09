@@ -2531,7 +2531,7 @@ async def api_profile(request):
             current_pet_id = DEFAULT_PET_ID
     else:
         # 2. Контекст ЛС: берем pet_id строго из личного JSON-профиля
-                current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
+        current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
 
     pets_data = load_pets_data()
     if not isinstance(pets_data, dict):
