@@ -2980,8 +2980,14 @@ async def api_save_profile(request):
             return web.json_response(
                 {"error": "Pet name must be 20 characters or fewer"}, status=400
             )
+
+    # Если имя не передано или пустое, берем то, что уже было сохранено,
+    # а не дефолт из pets.json!
     if not custom_name:
-        custom_name = pet_catalog[pet_id].get("name", pet_id)
+        existing_owned = user_info.get("owned_pets", {}).get(pet_id, {})
+        custom_name = existing_owned.get("custom_name") or pet_catalog[pet_id].get(
+            "name", pet_id
+        )
 
     users = load_users()
     user_info = users.get(username)

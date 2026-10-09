@@ -999,7 +999,7 @@ function renderMemberPet(member, pet) {
     if (petName) petName.textContent = pet.name || 'Питомец';
     if (level) level.textContent = pet.level ?? 1;
     if (image) {
-        image.src = pet.image || '/Pets/Снежный барсик.png';
+        image.src = pet.image || '/Pets/Slava.png';
         image.alt = pet.name || 'Питомец';
         image.onerror = () => {
             image.replaceWith(document.createTextNode('🐾'));
@@ -1029,7 +1029,7 @@ function normalizePetData(pet) {
         ...pet,
         id,
         name: pet.name || pet.pet_name || definition.name || 'Питомец',
-        image: pet.image || definition.image || '/Pets/Снежный барсик.png',
+        image: pet.image || definition.image || '/Pets/Slava.png',
         level: pet.level ?? 1,
         max_level: pet.max_level || 10
     };
@@ -1318,8 +1318,17 @@ function renderPetChoices() {
         // Клик по самой карточке выбирает питомца
         card.onclick = async () => {
             try {
-                const customNameInput = document.getElementById('pet-name');
-                const customName = customNameInput ? customNameInput.value.trim() : '';
+                // Берём сохраненное имя текущего питомца из стейта, если кликнули по тому же питомцу,
+                // либо берем дефолтное имя нового питомца, если переключаем на другого.
+                let customName = '';
+                if (currentPetId === pet.id) {
+                    const customNameInput = document.getElementById('pet-name');
+                    customName = customNameInput ? customNameInput.value.trim() : '';
+                } else {
+                    // Если выбираем другого питомца, берем его дефолтное имя из каталога 
+                    // или то, что уже было сохранено для него ранее
+                    customName = userData.owned_pets?.[pet.id]?.custom_name || pet.name || '';
+                }
 
                 const response = await fetch('/api/me', {
                     method: 'POST',
@@ -1402,7 +1411,7 @@ function updatePetView() {
         pet => pet.id === currentPetId
     ) || userData.petCatalog[0] || userData.pet || {
         name: 'Питомец',
-        image: '/Pets/Снежный барсик.png'
+        image: '/Pets/Slava.png'
     };
     const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
     const level = Math.max(1, Number(userData.pet?.level || 1));

@@ -54,7 +54,7 @@
     "image": "/Pets/BabyPig.png"
   },
   "FreddyFazbear": {
-    "id": "Freddy",
+    "id": "FreddyFazbear",
     "name": "Freddy Fazbear",
     "type": "Robot",
     "series": "VideoGame",
