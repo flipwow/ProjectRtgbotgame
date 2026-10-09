@@ -1389,13 +1389,11 @@ async def give_money_handler(message: Message) -> None:
     await message.answer(f"💰 Успешно начислено {amount} R$!")
 
 
-@router.message(Command("start_pet"))
 async def start_pet_command(message: Message):
 
     await send_pet_selection(message)
 
 
-@router.callback_query(F.data == "select_pet_barsichela")
 async def set_pet_handler(
     callback: CallbackQuery,
 ):
@@ -1417,7 +1415,7 @@ async def set_pet_handler(
         )
 
 
-@router.message(Command("pet", "barsichela"))
+@router.message(Command("pet"))
 async def pet_status_command(
     message: Message,
     command: CommandObject,
@@ -1538,7 +1536,6 @@ async def pet_status_command(
     )
 
 
-@router.message(Command("profile"))
 async def cmd_chat_profile(message: Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -4400,7 +4397,6 @@ async def cmd_duel(
     game_rooms[room_id]["challenge_message_id"] = invitation.message_id
 
 
-@router.message(Command("lvlup"))
 async def cmd_lvlup(
     message: Message,
 ):
@@ -4459,7 +4455,6 @@ async def cmd_lvlup(
     )
 
 
-@router.message(Command("approve"))
 async def cmd_approve_role(
     message: Message,
 ):
@@ -4518,7 +4513,6 @@ async def cmd_approve_role(
     )
 
 
-@router.message(Command("slay"))
 async def cmd_slay(
     message: Message,
 ):

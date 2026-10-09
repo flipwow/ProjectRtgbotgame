@@ -58,7 +58,7 @@ const englishText = {
     'Тема': 'Theme', 'Исходная': 'Original', 'Светлая': 'Light', 'Тёмная': 'Dark', '📖 Правила': '📖 Rules', 'Правила': 'Rules', 'Готово': 'Done',
     'Основные команды бота': 'Main bot commands', '/start</code> — запустить бота и открыть приложение.': '/start</code> — start the bot and open the app.',
     '/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.': '/duel</code> — create an online tic-tac-toe duel and post the challenge in chat.',
-    '/profile</code> — открыть профиль чата; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.': '/profile</code> — open chat profile; <code>/balance</code> — check your balance; <code>/pet</code> — view your pet.',
+    '/menu</code> — открыть меню; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.': '/menu</code> — open the menu; <code>/balance</code> — check your balance; <code>/pet</code> — view your pet.',
     'В онлайн-дуэли ходи только в свой ход. Победитель получает 30–60 RP, ничья не награждается.': 'In an online duel, make a move only on your turn. The winner receives 30–60 RP; a draw has no reward.',
     'Заботься о питомце, покупай еду за R$ и используй RP для обмена на валюту.': 'Take care of your pet, buy food with R$, and exchange RP for currency.', 'Играйте честно и уважайте других участников чата.': 'Play fair and respect other chat members.',
     'Другие участники пока не активировали бота в этом чате.': 'Other members have not activated the bot in this chat yet.', 'В этом чате пока нет участников рейтинга.': 'There are no ranked players in this chat yet.',
