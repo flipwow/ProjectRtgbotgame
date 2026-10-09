@@ -232,8 +232,8 @@ JS_FILE = os.path.join(BASE_DIR, "script.js")
 LEADERBOARD_UI_FILE = os.path.join(BASE_DIR, "leaderboard-ui.js")
 PETS_IMAGE_DIR = os.path.join(BASE_DIR, "Pets")
 # Картинки питомцев хранятся в Pets/ под именами из pets.json.
-PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Снежный барсик.png")
-DEFAULT_PET_ID = "bars"
+PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Slava.png")
+DEFAULT_PET_ID = None
 
 PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
 
@@ -495,18 +495,20 @@ def ensure_chat_pet(chat_id, user_id):
         if str(candidate.get("telegram_id", "")) == str(user_id):
             user_info = candidate
             break
+
     pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
-    if pet_id not in pets or pet_id == "users_pets":
-        pet_id = (
-            DEFAULT_PET_ID
-            if DEFAULT_PET_ID in pets
-            else next(
-                (key for key in pets if key != "users_pets"),
-                None,
-            )
+    if not pet_id or pet_id not in pets or pet_id == "users_pets":
+        # Ищем первый стартовый питомец или любой доступный
+        pet_id = next(
+            (
+                k
+                for k, v in pets.items()
+                if k != "users_pets" and isinstance(v, dict) and v.get("is_starter")
+            ),
+            next((k for k in pets if k != "users_pets"), DEFAULT_PET_ID),
         )
 
-    if pet_id is None:
+    if pet_id is None or pet_id not in pets:
         return None
 
     definition = pets[pet_id]
@@ -789,7 +791,8 @@ def create_default_user(telegram_id=None):
         "owned_pets": {},
     }
 
-    user["owned_pets"][DEFAULT_PET_ID] = {"custom_name": None}
+    if DEFAULT_PET_ID:
+        user["owned_pets"][DEFAULT_PET_ID] = {"custom_name": None}
 
     if telegram_id is not None:
         user["telegram_id"] = str(telegram_id)
