@@ -492,38 +492,44 @@ def ensure_chat_pet(chat_id, user_id):
     users = load_users()
     user_info = users.get(f"id_{user_id}", {})
     for candidate in users.values():
-        if str(candidate.get("telegram_id", "")) == str(user_id):
+        if isinstance(candidate, dict) and str(candidate.get("telegram_id", "")) == str(
+            user_id
+        ):
             user_info = candidate
             break
 
-    pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
-    if not pet_id or pet_id not in pets or pet_id == "users_pets":
-        # Ищем первый стартовый питомец или любой доступный
-        pet_id = next(
-            (
-                k
-                for k, v in pets.items()
-                if k != "users_pets" and isinstance(v, dict) and v.get("is_starter")
-            ),
-            next((k for k in pets if k != "users_pets"), DEFAULT_PET_ID),
-        )
-
-    if pet_id is None or pet_id not in pets:
+    # Do not assign a default pet before the user explicitly chooses a starter.
+    if (
+        not isinstance(user_info, dict)
+        or user_info.get("starter_pet_selected") is not True
+    ):
         return None
 
-    definition = pets[pet_id]
+    pet_id = user_info.get("pet_id")
+    definition = pets.get(pet_id)
+    if not isinstance(definition, dict) or pet_id == "users_pets":
+        return None
+
     stats = definition.get("stats", {})
+    owned_pets = user_info.get("owned_pets", {})
+    owned_pet = owned_pets.get(pet_id, {}) if isinstance(owned_pets, dict) else {}
+    pet_name = (
+        owned_pet.get("custom_name") if isinstance(owned_pet, dict) else None
+    ) or definition.get("name", pet_id)
+
     with db_connection() as connection:
         connection.execute(
             """
             INSERT OR IGNORE INTO pets (
-                chat_id, user_id, name, health, hunger, happiness, energy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                chat_id, user_id, pet_id, name,
+                health, hunger, happiness, energy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(chat_id),
                 str(user_id),
-                definition.get("name", "Питомец"),
+                pet_id,
+                pet_name,
                 stats.get("health", 100),
                 stats.get("hunger", 100),
                 stats.get("happiness", 100),
@@ -533,9 +539,9 @@ def ensure_chat_pet(chat_id, user_id):
         row = connection.execute(
             """
             SELECT name, health, hunger, happiness, energy
-            FROM pets WHERE chat_id = ? AND user_id = ?
+            FROM pets WHERE chat_id = ? AND user_id = ? AND pet_id = ?
             """,
-            (str(chat_id), str(user_id)),
+            (str(chat_id), str(user_id), pet_id),
         ).fetchone()
 
     if row is None:
@@ -1453,11 +1459,6 @@ async def pet_status_command(
                 await message.answer("Не удалось сохранить профиль в базе данных.")
                 return
 
-        pet = ensure_chat_pet(chat_id, user_id)
-        if pet is None:
-            await message.answer("Не удалось создать запись питомца в базе данных.")
-            return
-
         if message.chat.type == "private":
             profile_button = InlineKeyboardButton(
                 text="👤 Открыть профиль",
@@ -1493,7 +1494,7 @@ async def pet_status_command(
 
     if not pet:
         await message.answer(
-            "🐾 Сначала создай профиль в этом чате командой /pet activate."
+            "🐾 Сначала активируй профиль командой /pet activate, затем открой Mini App и выбери стартового питомца."
         )
         return
 
