@@ -2274,6 +2274,18 @@ async def api_chat_profile(request):
     if profile is None:
         return web.json_response({"error": "Could not save chat member"}, status=500)
 
+    # Достаем owned_pets из общей базы пользователей
+    users = load_users()
+    user_info = users.get(f"id_{user_id}")
+    for candidate in users.values():
+        if (
+            isinstance(candidate, dict)
+            and str(candidate.get("telegram_id", "")) == user_id
+        ):
+            user_info = candidate
+            break
+    owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
+
     leaderboard = get_chat_leaderboard(chat_id)
     member_profiles = [member for member in leaderboard if member["user_id"] != user_id]
     member_profiles.sort(key=lambda member: member["display_name"].casefold())

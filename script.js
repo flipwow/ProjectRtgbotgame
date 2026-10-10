@@ -666,9 +666,7 @@ function applyPersonalProfile(data) {
     userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
 }
 
-
 function applyChatProfile(data) {
-
     const profile = data.profile || data;
     userData.chatProfile = profile;
     userData.chat = data.chat || null;
@@ -681,8 +679,10 @@ function applyChatProfile(data) {
     userData.currency = Number(profile.balance_r ?? data.balance_r ?? 0);
     userData.rp = Number(profile.relationship_rp ?? data.relationship_rp ?? 0);
     userData.convertibleRp = Number(profile.convertible_rp ?? data.convertible_rp ?? 0);
+    
+    // Добавьте эту строку в самый конец функции:
+    userData.owned_pets = data.owned_pets && typeof data.owned_pets === 'object' ? data.owned_pets : {};
 }
-
 
 async function fetchLeaderboard() {
     try {
