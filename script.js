@@ -41,6 +41,11 @@ let mySymbol = null;
 let socket = null;
 let currentRoomId = null;
 
+let selectedPackCount = 1;
+let selectedPackMode = 'slow'; // 'slow' или 'fast'
+let currentBatchPets = [];
+let currentBatchIndex = 0;
+
 const SETTINGS_KEY = 'ritushka-miniapp-settings';
 const textSourceCache = new WeakMap();
 let appSettings = loadAppSettings();
@@ -100,6 +105,25 @@ Object.assign(englishText, {
     'Пока нет набранных очков.': 'No points have been earned yet.',
     'В этом режиме пока нет набранных очков.': 'No points have been earned in this mode yet.'
 });
+
+function setPackCount(count) {
+    selectedPackCount = count;
+    const buttons = document.querySelectorAll('#packCountSelector .category-tab');
+    buttons.forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === count);
+    });
+    renderPetPacksShop();
+}
+
+function setPackMode(mode) {
+    selectedPackMode = mode;
+    const slowBtn = document.querySelectorAll('#packModeSelector .category-tab')[0];
+    const fastBtn = document.querySelectorAll('#packModeSelector .category-tab')[1];
+    if (slowBtn && fastBtn) {
+        slowBtn.classList.toggle('active', mode === 'slow');
+        fastBtn.classList.toggle('active', mode === 'fast');
+    }
+}
 
 function loadAppSettings() {
     try {
@@ -2482,16 +2506,52 @@ function renderPetPacksShop() {
     const grid = document.getElementById('petPacksGrid');
     if (!grid) return;
 
-    grid.innerHTML = PET_PACKS_CLIENT.map(pack => `
-        <article class="item-card food-item-card">
-            <div class="item-art">📦</div>
-            <div class="item-name">${escapeHtml(pack.name)}</div>
-            <div class="food-item-effect">${escapeHtml(pack.desc)}</div>
-            <button class="food-buy-button" type="button" onclick="buyPetPack('${pack.id}')" ${userData.currency < pack.price ? 'disabled' : ''}>
-                Открыть · ${pack.price} R$
-            </button>
-        </article>
+    grid.innerHTML = PET_PACKS_CLIENT.map(pack => {
+        const totalPrice = pack.price * selectedPackCount;
+        return `
+            <article class="item-card food-item-card">
+                <div class="item-art">📦</div>
+                <div class="item-name">${escapeHtml(pack.name)} (${selectedPackCount} шт.)</div>
+                <div class="food-item-effect">${escapeHtml(pack.desc)}</div>
+                <button class="food-buy-button" type="button" onclick="buyPetPack('${pack.id}')" ${userData.currency < totalPrice ? 'disabled' : ''}>
+                    Открыть · ${totalPrice} R$
+                </button>
+            </article>
+        `;
+    }).join('');
+}
+
+// Быстрое открытие пачки
+function startFastBatchAnimation(pets) {
+    const modal = document.getElementById('gachaRouletteModal');
+    const windowContainer = document.getElementById('rouletteWindowContainer');
+    const resultSec = document.getElementById('rouletteResult');
+    const batchContainer = document.getElementById('batchResultsContainer');
+    const titleEl = document.getElementById('rouletteModalTitle');
+    const nextBtn = document.getElementById('nextRouletteItemBtn');
+    const finalBtn = document.getElementById('closeRouletteFinalBtn');
+
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+    titleEl.textContent = `🎁 Открыто кейсов: ${pets.length} шт.`;
+    windowContainer.style.display = 'none';
+    resultSec.style.display = 'none';
+    nextBtn.style.display = 'none';
+    finalBtn.style.display = 'block';
+
+    batchContainer.style.display = 'grid';
+    batchContainer.innerHTML = pets.map(pet => `
+        <div class="batch-reward-card rarity-${pet.rarity || 'Common'}">
+            <img src="${pet.image || '/Pets/Slava.png'}" alt="${escapeHtml(pet.name)}">
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${escapeHtml(pet.name)}</div>
+            <small style="font-size: 9px; color: var(--text-secondary);">${escapeHtml(pet.rarity || 'Common')}</small>
+        </div>
     `).join('');
+
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+    }
 }
 
 async function buyPetPack(packId) {
@@ -2502,7 +2562,10 @@ async function buyPetPack(packId) {
                 'Content-Type': 'application/json',
                 'X-Telegram-Init-Data': tg?.initData || ''
             },
-            body: JSON.stringify({ pack_id: packId })
+            body: JSON.stringify({ 
+                pack_id: packId,
+                count: selectedPackCount 
+            })
         });
         const data = await response.json();
         if (!response.ok || !data.success) {
@@ -2513,47 +2576,53 @@ async function buyPetPack(packId) {
         const balanceEl = document.getElementById('user-balance');
         if (balanceEl) balanceEl.textContent = userData.currency;
 
-        // Вместо showAlert запускаем анимацию рулетки
-        startRouletteAnimation(data.won_pet);
+        currentBatchPets = data.won_pets || [data.won_pet];
+        currentBatchIndex = 0;
+
+        if (selectedPackMode === 'fast' || currentBatchPets.length > 1) {
+            startFastBatchAnimation(currentBatchPets);
+        } else {
+            startRouletteAnimation(currentBatchPets[0]);
+        }
         
         await fetchUserData();
         renderPetPacksShop();
     } catch (error) {
         console.error('Ошибка покупки пака:', error);
-        tg?.showAlert?.(error.message || 'Недостаточно R$ или ошибка сервера.');
+        showAppAlert(error.message || 'Недостаточно R$ или ошибка сервера.', 'Ошибка');
     }
 }
 
 // Переменная для хранения контекста текущего выбитого питомца
 let currentGachaResult = null;
 
-function startRouletteAnimation(wonPet, packPrice = 100) {
+// Медленное открытие рулеткой (по одному)
+function startRouletteAnimation(wonPet) {
     const modal = document.getElementById('gachaRouletteModal');
     const track = document.getElementById('rouletteTrack');
     const resultSec = document.getElementById('rouletteResult');
-    const windowEl = document.querySelector('.roulette-window');
+    const windowContainer = document.getElementById('rouletteWindowContainer');
+    const batchContainer = document.getElementById('batchResultsContainer');
+    const titleEl = document.getElementById('rouletteModalTitle');
+    const nextBtn = document.getElementById('nextRouletteItemBtn');
+    const finalBtn = document.getElementById('closeRouletteFinalBtn');
     
     if (!modal || !track) return;
 
-    // Сохраняем информацию о текущем выпадении
-    const ownedPets = userData.owned_pets || {};
-    const isDuplicate = Object.prototype.hasOwnProperty.call(ownedPets, wonPet.id);
-    const refundAmount = Math.floor((packPrice || 100) * 0.6); // 60% от стоимости кейса
-
-    currentGachaResult = {
-        pet: wonPet,
-        isDuplicate: isDuplicate,
-        refundAmount: refundAmount
-    };
-
-    // Сброс состояний
     modal.style.display = 'flex';
+    titleEl.textContent = currentBatchPets.length > 1 
+        ? `Открытие кейса ${currentBatchIndex + 1} из ${currentBatchPets.length}...`
+        : 'Открытие пака...';
+
+    batchContainer.style.display = 'none';
     resultSec.style.display = 'none';
-    windowEl.style.display = 'block';
+    windowContainer.style.display = 'block';
+    nextBtn.style.display = 'none';
+    finalBtn.style.display = 'block';
+
     track.style.transition = 'none';
     track.style.transform = 'translateX(0px)';
 
-    // Формируем рулетку
     const catalog = userData.petCatalog || [];
     const items = [];
     const totalCards = 25;
@@ -2570,50 +2639,46 @@ function startRouletteAnimation(wonPet, packPrice = 100) {
 
     track.innerHTML = items.map(pet => `
         <div class="roulette-card rarity-${pet.rarity || 'Common'}">
-            <img src="${pet.image || '/Pets/Slava.png'}" alt="${pet.name}">
-            <div class="roulette-card-name">${pet.name}</div>
+            <img src="${pet.image || '/Pets/Slava.png'}" alt="${escapeHtml(pet.name)}">
+            <div class="roulette-card-name">${escapeHtml(pet.name)}</div>
         </div>
     `).join('');
 
     const cardWidth = 100;
-    const windowWidth = windowEl.offsetWidth;
+    const windowWidth = windowContainer.offsetWidth || 320;
     const targetOffset = (winnerIndex * cardWidth) - (windowWidth / 2) + (cardWidth / 2);
 
-    // Анимация на 8 секунд
     setTimeout(() => {
-        track.style.transition = 'transform 8.0s cubic-bezier(0.15, 0.9, 0.2, 1)';
+        track.style.transition = 'transform 6.0s cubic-bezier(0.15, 0.9, 0.2, 1)';
         track.style.transform = `translateX(-${targetOffset}px)`;
     }, 50);
 
-    // По завершении 8 секунд показать карточку и варианты
     setTimeout(() => {
-        windowEl.style.display = 'none';
+        windowContainer.style.display = 'none';
         
         document.getElementById('rouletteResultImg').src = wonPet.image || '/Pets/Slava.png';
         document.getElementById('rouletteResultName').textContent = wonPet.name;
         document.getElementById('rouletteResultRarity').textContent = `Редкость: ${wonPet.rarity || 'Common'}`;
-
-        const titleEl = document.getElementById('rouletteResultTitle');
-        const normalActions = document.getElementById('normalResultActions');
-        const duplicateActions = document.getElementById('duplicateResultActions');
-
-        if (isDuplicate) {
-            titleEl.textContent = '🔄 Выпал дубликат!';
-            normalActions.style.display = 'none';
-            duplicateActions.style.display = 'flex';
-            document.getElementById('sellRefundAmount').textContent = refundAmount;
-        } else {
-            titleEl.textContent = '🎉 Новый персонаж!';
-            normalActions.style.display = 'block';
-            duplicateActions.style.display = 'none';
-        }
         
         resultSec.style.display = 'flex';
+
+        // Если открываем пачку по одному и есть еще не открытые кейсы
+        if (currentBatchIndex < currentBatchPets.length - 1) {
+            nextBtn.style.display = 'block';
+            finalBtn.style.display = 'none';
+        }
 
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
-    }, 8200);
+    }, 6200);
+}
+
+function showNextInBatch() {
+    currentBatchIndex++;
+    if (currentBatchIndex < currentBatchPets.length) {
+        startRouletteAnimation(currentBatchPets[currentBatchIndex]);
+    }
 }
 
 // Оставить повторку в инвентаре
@@ -2695,6 +2760,8 @@ async function sellDuplicatePet() {
 function closeRouletteModal() {
     const modal = document.getElementById('gachaRouletteModal');
     if (modal) modal.style.display = 'none';
+    currentBatchPets = [];
+    currentBatchIndex = 0;
 }
 
 // Глобальные переменные для крафта

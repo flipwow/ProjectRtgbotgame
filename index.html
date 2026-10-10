@@ -335,9 +335,25 @@
     </div>
 
     <!-- Контейнер для паков питомцев -->
-    <div id="petsShopSection" style="display: none;">
-        <div class="items-grid" id="petPacksGrid"></div>
+<div id="petsShopSection" style="display: none;">
+    <!-- Панель выбора количества кейсов -->
+    <div class="glass-card" style="padding: 12px; margin-bottom: 12px; text-align: center;">
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Количество кейсов для открытия:</div>
+        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 10px;" id="packCountSelector">
+            <button type="button" class="category-tab active" onclick="setPackCount(1)">1 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(2)">2 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(3)">3 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(4)">4 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(5)">5 шт.</button>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Режим анимации:</div>
+        <div style="display: flex; justify-content: center; gap: 10px;" id="packModeSelector">
+            <button type="button" class="category-tab active" onclick="setPackMode('slow')">🎡 Медленно (рулетка)</button>
+            <button type="button" class="category-tab" onclick="setPackMode('fast')">⚡ Быстро (мгновенно)</button>
+        </div>
     </div>
+    <div class="items-grid" id="petPacksGrid"></div>
+</div>
 
     <!-- Контейнер для Апгрейда (Крафта) -->
     <div id="craftShopSection" style="display: none; text-align: center;">
@@ -711,39 +727,34 @@
     </div>
 </div>
 
-<!-- Модальное окно с анимацией рулетки -->
+<!-- Модальное окно с анимацией рулетки и пачкой результатов -->
 <div id="gachaRouletteModal" class="pet-modal-overlay" style="display: none;">
-    <div class="roulette-container">
+    <div class="roulette-container" style="max-width: 420px;">
         <div class="roulette-header">
-            <h3>Открытие пака...</h3>
+            <h3 id="rouletteModalTitle">Открытие пака...</h3>
         </div>
         
-        <!-- Окно рулетки со стрелкой-указателем -->
-        <div class="roulette-window">
+        <!-- Окно рулетки со стрелкой-указателем (для медленного режима) -->
+        <div class="roulette-window" id="rouletteWindowContainer">
             <div class="roulette-pointer">▼</div>
             <div class="roulette-track" id="rouletteTrack"></div>
         </div>
 
-        <!-- Карточка выигранного персонажа (появляется после прокрутки) -->
+        <!-- Сетка для быстрого открытия или итогов пачки -->
+        <div id="batchResultsContainer" style="display: none; max-height: 280px; overflow-y: auto; gap: 8px; margin-bottom: 12px; grid-template-columns: repeat(2, 1fr);"></div>
+
+        <!-- Карточка выигранного персонажа (для медленного режима) -->
         <div class="roulette-result" id="rouletteResult" style="display: none;">
             <div id="rouletteResultTitle" class="result-title">🎉 Новый персонаж!</div>
             <img id="rouletteResultImg" src="" alt="Pet" class="result-pet-img">
             <div id="rouletteResultName" class="result-pet-name"></div>
             <div id="rouletteResultRarity" class="result-pet-rarity"></div>
+        </div>
 
-            <!-- Блок действий для нового персонажа -->
-            <div id="normalResultActions">
-                <button type="button" class="primary-action" onclick="closeRouletteModal()">Отлично!</button>
-            </div>
-
-            <!-- Блок действий, если выпал дубликат (повторка) -->
-            <div id="duplicateResultActions" style="display: none; flex-direction: column; gap: 8px; width: 100%;">
-                <div class="duplicate-badge">⚠️ У вас уже есть этот персонаж</div>
-                <button type="button" class="primary-action" onclick="keepDuplicatePet()">Оставить в инвентаре</button>
-                <button type="button" class="secondary-action" id="sellDuplicateBtn" onclick="sellDuplicatePet()">
-                    Продать за <span id="sellRefundAmount">0</span> R$ (60%)
-                </button>
-            </div>
+        <!-- Кнопки управления модалкой -->
+        <div id="rouletteActionButtons" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            <button type="button" id="nextRouletteItemBtn" class="primary-action" style="display: none;" onclick="showNextInBatch()">Далее ➔</button>
+            <button type="button" id="closeRouletteFinalBtn" class="primary-action" onclick="closeRouletteModal()">Забрать в инвентарь</button>
         </div>
     </div>
 </div>

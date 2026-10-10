@@ -2171,3 +2171,21 @@ body {
     background: rgba(242, 193, 78, 0.2) !important;
     box-shadow: 0 0 12px rgba(242, 193, 78, 0.4);
 }
+
+.batch-reward-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.batch-reward-card img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    margin-bottom: 6px;
+}
