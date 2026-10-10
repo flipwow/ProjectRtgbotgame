@@ -81,7 +81,7 @@ SHOP_ITEMS = {
 # Конфигурация паков (кейсов) питомцев с шансами выпадения по редкости
 PET_PACKS = {
     "human_pack": {
-        "name": "👤 Пак людей",
+        "name": "👤 Набор с челиками",
         "price": 100,
         "type": "Human",
         "chances": {
@@ -92,7 +92,7 @@ PET_PACKS = {
         },
     },
     "animal_pack": {
-        "name": "🐾 Пак животных",
+        "name": "🐾 Набор с рофланами",
         "price": 75,
         "type": "Animal",
         "chances": {
@@ -103,7 +103,7 @@ PET_PACKS = {
         },
     },
     "robot_pack": {
-        "name": "🤖 Пак роботов",
+        "name": "🤖 Набор с роботами",
         "price": 120,
         "type": "Robot",
         "chances": {

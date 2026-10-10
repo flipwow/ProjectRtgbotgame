@@ -2497,9 +2497,9 @@ function switchShopSubTab(subTab) {
 }
 
 const PET_PACKS_CLIENT = [
-    { id: 'human_pack', name: '👤 Пак людей', price: 100, desc: 'Шанс на редких персонажей-людей' },
-    { id: 'animal_pack', name: '🐾 Пак животных', price: 75, desc: 'Милые и забавные питомцы' },
-    { id: 'robot_pack', name: '🤖 Пак роботов', price: 120, desc: 'Технологичные и кибернетические существа' },
+    { id: 'human_pack', name: '👤 Пак людей', price: 100, desc: 'Шанс выбить особенных персонажей' },
+    { id: 'animal_pack', name: '🐾 Пак животных', price: 75, desc: 'Простые, но милые и забавные рофланы' },
+    { id: 'robot_pack', name: '🤖 Пак роботов', price: 120, desc: 'Технологичные и кибернетические особи' },
 ];
 
 function renderPetPacksShop() {
@@ -2813,9 +2813,9 @@ function renderCraftPetChoices() {
     let userPetsList = [];
     Object.keys(ownedPets).forEach(petId => {
         const petDef = catalog.find(p => p.id === petId);
-        if (petDef && !petDef.is_starter) {
+        if (petDef) {
             const count = ownedPets[petId].count || 1;
-            // Добавляем питомца в список с указанием его общего количества (count)
+            // Теперь разрешаем и стартовых питомцев (учитываем их повторки)
             userPetsList.push({
                 id: petId,
                 count: count,
@@ -2825,7 +2825,7 @@ function renderCraftPetChoices() {
     });
 
     if (userPetsList.length === 0) {
-        grid.innerHTML = '<p style="grid-column: 1/-1; color: var(--text-secondary);">У вас нет повторок для апгрейда (стартовые не учитываются).</p>';
+        grid.innerHTML = '<p style="grid-column: 1/-1; color: var(--text-secondary);">У вас нет питомцев для апгрейда.</p>';
         return;
     }
 
@@ -2838,7 +2838,7 @@ function renderCraftPetChoices() {
         }
     } else {
         if (instruction) {
-            instruction.textContent = 'Выбери питомца для апгрейда (учитываются все накопленные копии):';
+            instruction.textContent = 'Выбери питомца для апгрейда (учитываются повторки стартовых и обычных персонажей):';
         }
     }
 
@@ -2854,14 +2854,12 @@ function renderCraftPetChoices() {
             <small style="font-size: 11px; color: #f2c14e; font-weight: 700;">Кол-во: ${pet.count} шт.</small>
         `;
 
-        // Клик сразу выбирает этого питомца для апгрейда, если у пользователя накопилось >= 5 штук
         card.onclick = () => {
             if (pet.count < 5) {
                 showAppAlert(`Недостаточно копий! У вас ${pet.count} из 5 необходимых для апгрейда.`, 'Апгрейд');
                 return;
             }
             baseCraftTarget = pet;
-            // Автоматически набираем 5 штук для отправки в крафт
             selectedCraftPets = Array(5).fill(pet);
             updateCraftButtonState();
             renderCraftPetChoices();
