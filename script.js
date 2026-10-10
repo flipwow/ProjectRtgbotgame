@@ -2617,8 +2617,40 @@ function startRouletteAnimation(wonPet, packPrice = 100) {
 }
 
 // Оставить повторку в инвентаре
-function keepDuplicatePet() {
-    closeRouletteModal();
+async function keepDuplicatePet() {
+    if (!currentGachaResult || !currentGachaResult.pet) {
+        closeRouletteModal();
+        return;
+    }
+
+    try {
+        // Отправляем запрос на сохранение повторки в инвентарь (увеличение count)
+        const response = await fetchWithTimeout('/api/keep-duplicate-pet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({
+                pet_id: currentGachaResult.pet.id
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Не удалось сохранить повторку');
+        }
+
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        closeRouletteModal();
+        await fetchUserData();
+    } catch (error) {
+        console.error('Ошибка сохранения повторки:', error);
+        closeRouletteModal();
+    }
 }
 
 // Продать повторку за 60% стоимости кейса
@@ -2711,44 +2743,40 @@ function renderCraftPetChoices() {
     const ownedPets = userData.owned_pets || {};
     const catalog = userData.petCatalog || [];
 
-    // Получаем список питомцев пользователя (исключая стартовых: is_starter)
     let userPetsList = [];
     Object.keys(ownedPets).forEach(petId => {
         const petDef = catalog.find(p => p.id === petId);
         if (petDef && !petDef.is_starter) {
             const count = ownedPets[petId].count || 1;
-            // Каждая копия — отдельный вариант выбора
-            for (let i = 0; i < count; i++) {
-                userPetsList.push({
-                    uid: `${petId}_${i}`,
-                    id: petId,
-                    ...petDef
-                });
-            }
+            // Добавляем питомца в список с указанием его общего количества (count)
+            userPetsList.push({
+                id: petId,
+                count: count,
+                ...petDef
+            });
         }
     });
 
     if (userPetsList.length === 0) {
-        grid.innerHTML = '<p style="grid-column: 1/-1; color: var(--text-secondary);">У вас нет доступных питомцев для апгрейда (стартовые не учитываются).</p>';
+        grid.innerHTML = '<p style="grid-column: 1/-1; color: var(--text-secondary);">У вас нет повторок для апгрейда (стартовые не учитываются).</p>';
         return;
     }
 
-    // Если первый питомец уже выбран, фильтруем остальных по типу и редкости
     if (baseCraftTarget) {
         userPetsList = userPetsList.filter(pet => 
             pet.type === baseCraftTarget.type && pet.rarity === baseCraftTarget.rarity
         );
         if (instruction) {
-            instruction.textContent = `Выбрано: ${baseCraftTarget.name} (${baseCraftTarget.rarity}, ${baseCraftTarget.type}). Выберите еще 4 таких же!`;
+            instruction.textContent = `Выбран: ${baseCraftTarget.name}. Нужно 5 штук (доступно: ${baseCraftTarget.count} шт.)`;
         }
     } else {
         if (instruction) {
-            instruction.textContent = 'Выбери первого питомца для апгрейда (стартовые не участвуют):';
+            instruction.textContent = 'Выбери питомца для апгрейда (учитываются все накопленные копии):';
         }
     }
 
     userPetsList.forEach(pet => {
-        const isSelected = selectedCraftPets.some(p => p.uid === pet.uid);
+        const isSelected = baseCraftTarget && baseCraftTarget.id === pet.id;
         const card = document.createElement('button');
         card.type = 'button';
         card.className = `pet-choice-card ${isSelected ? 'selected-for-craft' : ''}`;
@@ -2756,10 +2784,21 @@ function renderCraftPetChoices() {
         card.innerHTML = `
             <img src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}" alt="${escapeHtml(pet.name)}" class="pet-choice-img">
             <span class="pet-choice-name">${escapeHtml(pet.name)}</span>
-            <small style="font-size: 10px; color: var(--text-secondary);">${escapeHtml(pet.rarity || 'Common')}</small>
+            <small style="font-size: 11px; color: #f2c14e; font-weight: 700;">Кол-во: ${pet.count} шт.</small>
         `;
 
-        card.onclick = () => togglePetForCraft(pet);
+        // Клик сразу выбирает этого питомца для апгрейда, если у пользователя накопилось >= 5 штук
+        card.onclick = () => {
+            if (pet.count < 5) {
+                tg?.showAlert?.(`Недостаточно копий! У вас ${pet.count} из 5 необходимых.`);
+                return;
+            }
+            baseCraftTarget = pet;
+            // Автоматически набираем 5 штук для отправки в крафт
+            selectedCraftPets = Array(5).fill(pet);
+            updateCraftButtonState();
+            renderCraftPetChoices();
+        };
         grid.appendChild(card);
     });
 }
@@ -2809,14 +2848,20 @@ async function executeCraft() {
             body: JSON.stringify({ pet_id: baseCraftTarget.id })
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error("Ответ сервера не является JSON:", text);
+            throw new Error("Ошибка сервера: получен некорректный ответ");
+        }
+
         if (!response.ok || !data.success) {
             throw new Error(data.error || 'Ошибка апгрейда');
         }
 
-        // Запускаем рулетку/вывод созданного питомца
         startRouletteAnimation(data.won_pet);
-        
         await fetchUserData();
         resetCraftSelection();
     } catch (error) {

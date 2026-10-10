@@ -3914,7 +3914,18 @@ async def api_buy_pet_pack(request):
             won_id, won_def = random.choice(rarity_matches)
 
             owned_pets = user_data.setdefault("owned_pets", {})
-            owned_pets[won_id] = {"custom_name": won_def.get("name", won_id)}
+            if won_id in owned_pets:
+                current_c = (
+                    owned_pets[won_id].get("count", 1)
+                    if isinstance(owned_pets[won_id], dict)
+                    else 1
+                )
+                owned_pets[won_id]["count"] = current_c + 1
+            else:
+                owned_pets[won_id] = {
+                    "custom_name": won_def.get("name", won_id),
+                    "count": 1,
+                }
 
             connection.execute(
                 """
@@ -4062,8 +4073,8 @@ async def api_craft_pet(request):
             user_data = _decode_sql_json(user_row["data_json"])
             owned_pets = user_data.setdefault("owned_pets", {})
 
-            # Списываем 5 штук выбранного питомца
             pet_entry = owned_pets.get(pet_id, {})
+            # Поддерживаем как старый формат (просто объект), так и новый с полем count
             current_count = (
                 pet_entry.get("count", 1) if isinstance(pet_entry, dict) else 1
             )
@@ -4078,7 +4089,6 @@ async def api_craft_pet(request):
             else:
                 del owned_pets[pet_id]
 
-            # Выбираем случайного питомца следующего уровня редкости
             won_id, won_def = random.choice(possible_outputs)
             target_entry = owned_pets.setdefault(
                 won_id, {"custom_name": won_def.get("name", won_id), "count": 0}
@@ -4102,9 +4112,65 @@ async def api_craft_pet(request):
                 },
             }
         )
-    except sqlite3.Error as error:
+    except Exception as error:
         print(f"Ошибка апгрейда: {error}")
-        return web.json_response({"error": "Could not craft pet"}, status=500)
+        return web.json_response(
+            {"error": f"Internal server error: {str(error)}"}, status=500
+        )
+
+
+async def api_keep_duplicate_pet(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = await read_json_object(request)
+    if not payload:
+        return web.json_response({"error": "Invalid payload"}, status=400)
+
+    pet_id = payload.get("pet_id")
+    if not pet_id:
+        return web.json_response({"error": "pet_id is required"}, status=400)
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user_row = connection.execute(
+                "SELECT data_json FROM users WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
+                (str(username),),
+            ).fetchone()
+
+            if not user_row:
+                return web.json_response({"error": "User not found"}, status=404)
+
+            user_data = _decode_sql_json(user_row["data_json"])
+            owned_pets = user_data.setdefault("owned_pets", {})
+
+            pets_data = load_pets_data()
+            pet_def = pets_data.get(pet_id, {})
+
+            if pet_id in owned_pets:
+                c = (
+                    owned_pets[pet_id].get("count", 1)
+                    if isinstance(owned_pets[pet_id], dict)
+                    else 1
+                )
+                owned_pets[pet_id]["count"] = c + 1
+            else:
+                owned_pets[pet_id] = {
+                    "custom_name": pet_def.get("name", pet_id),
+                    "count": 1,
+                }
+
+            connection.execute(
+                "UPDATE users SET data_json = ? WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
+                (_encode_sql_json(user_data), str(username)),
+            )
+
+        return web.json_response({"success": True})
+    except Exception as error:
+        print(f"Ошибка сохранения дубликата: {error}")
+        return web.json_response({"error": "Could not keep duplicate"}, status=500)
 
 
 # ============================================================
@@ -4119,6 +4185,12 @@ async def start_webapp_api():
     app.router.add_post(
         "/api/craft-pet",
         api_craft_pet,
+    )
+
+    # Сохранение повторок
+    app.router.add_post(
+        "/api/keep-duplicate-pet", 
+        api_keep_duplicate_pet
     )
 
     # Mini App
