@@ -170,6 +170,8 @@ def init_db():
                 hunger INTEGER DEFAULT 100,
                 happiness INTEGER DEFAULT 100,
                 energy INTEGER DEFAULT 100,
+                last_stat_update REAL DEFAULT 0,
+                is_sleeping INTEGER DEFAULT 0,
                 PRIMARY KEY (chat_id, user_id, pet_id)
             );
 
@@ -198,6 +200,8 @@ def init_db():
             },
             "pets": {
                 "pet_id": "TEXT NOT NULL DEFAULT 'default_pet'",
+                "last_stat_update": "REAL DEFAULT 0",
+                "is_sleeping": "INTEGER DEFAULT 0",
             },
             "inventory": {
                 "record_type": "TEXT NOT NULL DEFAULT 'item'",
@@ -4044,11 +4048,6 @@ async def api_craft_pet(request):
     if not source_pet or not isinstance(source_pet, dict):
         return web.json_response({"error": "Pet not found"}, status=404)
 
-    if source_pet.get("is_starter"):
-        return web.json_response(
-            {"error": "Стартовые питомцы не участвуют в апгрейде!"}, status=400
-        )
-
     current_rarity = source_pet.get("rarity", "Common")
     pet_type = source_pet.get("type")
 
@@ -4091,15 +4090,26 @@ async def api_craft_pet(request):
             owned_pets = user_data.setdefault("owned_pets", {})
 
             pet_entry = owned_pets.get(pet_id, {})
-            # Поддерживаем как старый формат (просто объект), так и новый с полем count
             current_count = (
                 pet_entry.get("count", 1) if isinstance(pet_entry, dict) else 1
             )
 
-            if current_count < 5:
-                return web.json_response(
-                    {"error": "Недостаточно питомцев (нужно 5)"}, status=400
-                )
+            # Если это стартовый питомец, проверяем, оставляем ли мы оригинал (1 штуку) в покое
+            if source_pet.get("is_starter"):
+                # Для стартовых питомцев для крафта нужно 5 дубликатов, при этом основной (1 шт) не трогаем,
+                # либо если у игрока есть 5 копий сверх основного.
+                # Проверим, что общее количество count >= 5 (или 6, если считать оригинал).
+                # Удобнее считать, что count хранит количество дубликатов. Требуем 5 штук.
+                if current_count < 5:
+                    return web.json_response(
+                        {"error": "Недостаточно копий стартового питомца (нужно 5)"},
+                        status=400,
+                    )
+            else:
+                if current_count < 5:
+                    return web.json_response(
+                        {"error": "Недостаточно питомцев (нужно 5)"}, status=400
+                    )
 
             if current_count - 5 > 0:
                 pet_entry["count"] = current_count - 5
@@ -4190,6 +4200,37 @@ async def api_keep_duplicate_pet(request):
         return web.json_response({"error": "Could not keep duplicate"}, status=500)
 
 
+async def api_pet_sleep(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = await read_json_object(request) or {}
+    action = payload.get("action")  # 'toggle' или установить конкретный статус
+
+    user_id = str(telegram_user["id"])
+    data = load_inventory_data()
+    pet = data["users_pets"].get(user_id)
+
+    if not pet:
+        return web.json_response({"error": "Pet not found"}, status=404)
+
+    # Сначала актуализируем статы по времени
+    pet, _ = update_pet_stats_with_time(pet)
+
+    current_sleeping = bool(pet.get("is_sleeping", 0))
+
+    # Если питомец уже спит при 100% энергии, он не может лечь снова, пока не проснется
+    if current_sleeping and pet.get("energy", 100) >= 100:
+        pet["is_sleeping"] = 0
+    else:
+        pet["is_sleeping"] = 0 if current_sleeping else 1
+
+    save_inventory_data(data)
+
+    return web.json_response({"success": True, "pet": pet})
+
+
 # ============================================================
 # MINI APP SERVER
 # ============================================================
@@ -4224,6 +4265,8 @@ async def start_webapp_api():
         "/api/sell-duplicate-pet",
         api_sell_duplicate_pet,
     )
+
+    app.router.add_post("/api/pet/sleep", api_pet_sleep)
 
     app.router.add_get(
         "/style.css",
@@ -5208,3 +5251,57 @@ if __name__ == "__main__":
         print("\n[!] ОШИБКА:\n" f"{e}")
 
 RARITY_ORDER = ["Common", "Epic", "Legendary", "Bo$$"]
+
+
+def update_pet_stats_with_time(pet_data, now=None):
+    if now is None:
+        now = time.time()
+
+    last_update = pet_data.get("last_stat_update", now)
+    elapsed_hours = (now - last_update) / 3600.0
+
+    if elapsed_hours <= 0.01:  # меньше ~36 секунд — пропускаем
+        return pet_data, False
+
+    health = pet_data.get("health", 100)
+    hunger = pet_data.get("hunger", 100)
+    happiness = pet_data.get("happiness", 100)
+    energy = pet_data.get("energy", 100)
+    is_sleeping = bool(pet_data.get("is_sleeping", 0))
+
+    if is_sleeping:
+        # Во время сна энергия восстанавливается (+20 в час), голод падает медленнее
+        energy_gain = int(elapsed_hours * 20)
+        energy = min(100, energy + energy_gain)
+
+        hunger_loss = int(elapsed_hours * 2)  # голодает медленнее во сне
+        hunger = max(0, hunger - hunger_loss)
+
+        # Если энергия дошла до 100%, сон автоматически завершается!
+        if energy >= 100:
+            is_sleeping = False
+    else:
+        # Обычное падение статов при бодрствовании
+        hunger_loss = int(elapsed_hours * 5)  # -5 голода в час
+        hunger = max(0, hunger - hunger_loss)
+
+        happiness_decay = 8 if hunger < 30 else 3
+        happiness_loss = int(elapsed_hours * happiness_decay)
+        happiness = max(0, happiness - happiness_loss)
+
+        energy_loss = int(elapsed_hours * 4)  # -4 энергии в час
+        energy = max(0, energy - energy_loss)
+
+    # Если голод 0, здоровье начинает падать
+    if hunger == 0:
+        health_loss = int(elapsed_hours * 8)
+        health = max(0, health - health_loss)
+
+    pet_data["health"] = health
+    pet_data["hunger"] = hunger
+    pet_data["happiness"] = happiness
+    pet_data["energy"] = energy
+    pet_data["is_sleeping"] = 1 if is_sleeping else 0
+    pet_data["last_stat_update"] = now
+
+    return pet_data, True

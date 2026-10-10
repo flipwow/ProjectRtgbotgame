@@ -1464,6 +1464,21 @@ async function savePetName(event) {
 
 
 function updatePetView() {
+
+    const sleepBtnText = document.getElementById('sleepBtnText');
+    const sleepBtnIcon = document.getElementById('sleepBtnIcon');
+    const isSleeping = Boolean(userData.pet?.is_sleeping);
+
+    if (sleepBtnText && sleepBtnIcon) {
+        if (isSleeping) {
+            sleepBtnText.textContent = 'Разбудить';
+            sleepBtnIcon.textContent = '⏰';
+        } else {
+            sleepBtnText.textContent = 'Уложить спать';
+            sleepBtnIcon.textContent = '💤';
+        }
+    }
+
     const petDisplay = document.getElementById('petDisplay');
     if (!petDisplay) return;
 
@@ -2977,5 +2992,29 @@ function switchPlaySubTab(subTab) {
 
     if (subTab === 'leaderboard') {
         fetchLeaderboard();
+    }
+}
+
+async function togglePetSleep() {
+    try {
+        const response = await fetchWithTimeout('/api/pet/sleep', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ action: 'toggle' })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error);
+
+        userData.pet = normalizePetData(data.pet);
+        updatePetView();
+
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+    } catch (error) {
+        console.error('Ошибка переключения сна:', error);
     }
 }

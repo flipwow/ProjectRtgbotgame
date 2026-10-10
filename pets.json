@@ -83,6 +83,11 @@
     "max_level": 10,
     "description": "",
     "rarity": "Bo$$",
+    "passive_skill": {
+    "id": "boss_aura",
+    "name": "Аура босса",
+    "description": "Увеличивает урон на 10% и шанс выпадения редких сундуков."
+  },
     "is_starter": true,
     "stats": {
       "health": 100,
