@@ -3012,3 +3012,10 @@ async function togglePetSleep() {
         console.error('Ошибка переключения сна:', error);
     }
 }
+
+// Автоматическое обновление данных каждые 15 секунд, если приложение открыто
+setInterval(() => {
+    if (!document.hidden) {
+        fetchUserData();
+    }
+}, 15000);
