@@ -3848,8 +3848,16 @@ async def api_buy_pet_pack(request):
     if pack_id not in PET_PACKS:
         return web.json_response({"error": "Pack not found"}, status=404)
 
+    # Получаем количество кейсов из запроса (по умолчанию 1, максимум 5)
+    try:
+        count = int(payload.get("count", 1))
+        count = max(1, min(count, 5))
+    except (TypeError, ValueError):
+        count = 1
+
     pack_info = PET_PACKS[pack_id]
-    price = pack_info["price"]
+    base_price = pack_info["price"]
+    total_price = base_price * count
     target_type = pack_info["type"]
 
     pets_data = load_pets_data()
@@ -3882,50 +3890,64 @@ async def api_buy_pet_pack(request):
                 return web.json_response({"error": "User not found"}, status=404)
 
             balance = float(user_row["balance_r"] or 0)
-            if balance < price:
+            if balance < total_price:
                 return web.json_response(
                     {"error": "Not enough R$", "balance": balance}, status=400
                 )
 
-            new_balance = balance - price
+            new_balance = balance - total_price
             user_data = _decode_sql_json(user_row["data_json"])
             if not isinstance(user_data, dict):
                 user_data = {}
             user_data["r_currency"] = new_balance
 
             chances = pack_info["chances"]
-            roll = random.random()
-            cumulative = 0.0
-            chosen_rarity = "Common"
-            for rarity, chance in chances.items():
-                cumulative += chance
-                if roll <= cumulative:
-                    chosen_rarity = rarity
-                    break
-
-            rarity_matches = [
-                p
-                for p in available_pets
-                if p[1].get("rarity", "Common") == chosen_rarity
-            ]
-            if not rarity_matches:
-                rarity_matches = available_pets
-
-            won_id, won_def = random.choice(rarity_matches)
-
+            won_pets = []
             owned_pets = user_data.setdefault("owned_pets", {})
-            if won_id in owned_pets:
-                current_c = (
-                    owned_pets[won_id].get("count", 1)
-                    if isinstance(owned_pets[won_id], dict)
-                    else 1
+
+            # Ролим для каждого кейса в пачке
+            for _ in range(count):
+                roll = random.random()
+                cumulative = 0.0
+                chosen_rarity = "Common"
+                for rarity, chance in chances.items():
+                    cumulative += chance
+                    if roll <= cumulative:
+                        chosen_rarity = rarity
+                        break
+
+                rarity_matches = [
+                    p
+                    for p in available_pets
+                    if p[1].get("rarity", "Common") == chosen_rarity
+                ]
+                if not rarity_matches:
+                    rarity_matches = available_pets
+
+                won_id, won_def = random.choice(rarity_matches)
+
+                if won_id in owned_pets:
+                    current_c = (
+                        owned_pets[won_id].get("count", 1)
+                        if isinstance(owned_pets[won_id], dict)
+                        else 1
+                    )
+                    owned_pets[won_id]["count"] = current_c + 1
+                else:
+                    owned_pets[won_id] = {
+                        "custom_name": won_def.get("name", won_id),
+                        "count": 1,
+                    }
+
+                won_pets.append(
+                    {
+                        "id": won_id,
+                        "name": won_def.get("name", won_id),
+                        "rarity": won_def.get("rarity", "Common"),
+                        "image": won_def.get("image", "/Pets/Slava.png"),
+                        "type": target_type,
+                    }
                 )
-                owned_pets[won_id]["count"] = current_c + 1
-            else:
-                owned_pets[won_id] = {
-                    "custom_name": won_def.get("name", won_id),
-                    "count": 1,
-                }
 
             connection.execute(
                 """
@@ -3940,13 +3962,8 @@ async def api_buy_pet_pack(request):
             {
                 "success": True,
                 "balance": new_balance,
-                "won_pet": {
-                    "id": won_id,
-                    "name": won_def.get("name", won_id),
-                    "rarity": won_def.get("rarity", "Common"),
-                    "image": won_def.get("image", "/Pets/Slava.png"),
-                    "type": target_type,
-                },
+                "won_pets": won_pets,
+                "won_pet": won_pets[0] if won_pets else None,
             }
         )
     except sqlite3.Error as error:
@@ -4188,10 +4205,7 @@ async def start_webapp_api():
     )
 
     # Сохранение повторок
-    app.router.add_post(
-        "/api/keep-duplicate-pet", 
-        api_keep_duplicate_pet
-    )
+    app.router.add_post("/api/keep-duplicate-pet", api_keep_duplicate_pet)
 
     # Mini App
     app.router.add_get(
