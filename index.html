@@ -125,191 +125,76 @@
 
             </div>
 
-            <!-- Таблица лидеров -->
-            <div id="tab-leaderboard" class="tab-content">
-
-                                <div class="section-heading leaderboard-heading">
-                    <h3>👑 Таблица лидеров</h3>
-                    <div class="subtitle">Общий рейтинг и очки по игровым режимам</div>
-                </div>
-
-                <section class="leaderboard-section" aria-labelledby="overall-leaderboard-title">
-                    <h4 id="overall-leaderboard-title" class="leaderboard-section-title">Общий рейтинг · за всё время</h4>
-                    <div id="overallLeaderboardList" class="leaderboard-list" aria-live="polite"></div>
-                </section>
-
-                <section class="leaderboard-section" aria-labelledby="mode-leaderboard-title">
-                    <h4 id="mode-leaderboard-title" class="leaderboard-section-title">Очки по режимам</h4>
-                                        <button id="leaderboardGamePicker" class="category-tab leaderboard-game-picker" type="button" aria-haspopup="dialog" aria-controls="leaderboardGameModal">
-                        <span id="leaderboardGameName">Крестики-нолики</span>
-                        <span aria-hidden="true">⌄</span>
-                    </button>
-                    <div class="category-tabs leaderboard-tabs" id="leaderboardTypeTabs" role="tablist" aria-label="Тип игры"></div>
-                    <div id="leaderboardList" class="leaderboard-list" aria-live="polite"></div>
-                </section>
-
-            </div>
-
-            <!-- Игры -->
+            <!-- Игры и Лидеры -->
             <div id="tab-play" class="tab-content">
 
-                <div class="section-heading">
-                    <h3>🎮 Мини-игры</h3>
-
-                    <div class="subtitle">
-                        Сразись с другими пешками
-                    </div>
+                <!-- Переключатель внутри вкладки Игры -->
+                <div class="category-tabs" id="playSubTabs" style="margin-bottom: 14px;">
+                    <button class="category-tab active" type="button" onclick="switchPlaySubTab('games')">🎮 Мини-игры</button>
+                    <button class="category-tab" type="button" onclick="switchPlaySubTab('leaderboard')">👑 Лидеры</button>
                 </div>
 
-                <div
-                    id="games-menu"
-                    style="display: flex; flex-direction: column; gap: 10px;"
-                >
-
-                    <div
-                        class="glass-card"
-                        style="
-                            padding: 16px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            cursor: pointer;
-                        "
-                        onclick="openGameMenu('tictactoe')"
-                    >
-                        <div>
-                            <h4 style="font-size: 15px; margin-bottom: 4px;">
-                                ❌ Крестики-нолики ⭕️
-                            </h4>
-
-                            <p
-                                style="
-                                    font-size: 12px;
-                                    color: var(--text-secondary);
-                                "
-                            >
-                                Играй с ботом или устрой дуэль с другом
-                            </p>
+                <!-- Раздел МИНИ-ИГРЫ -->
+                <div id="gamesSection">
+                    <div id="games-menu" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="glass-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="openGameMenu('tictactoe')">
+                            <div>
+                                <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕️</h4>
+                                <p style="font-size: 12px; color: var(--text-secondary);">Играй с ботом или устрой дуэль с другом</p>
+                            </div>
+                            <span style="font-size: 18px; color: #ec4899;">→</span>
                         </div>
-
-                        <span
-                            style="
-                                font-size: 18px;
-                                color: #ec4899;
-                            "
-                        >
-                            →
-                        </span>
                     </div>
 
+                    <!-- Режимы -->
+                    <div id="tictactoe-modes" style="display: none; flex-direction: column; gap: 10px;">
+                        <button class="wardrobe-shortcut-btn" onclick="startTttGame('solo')">🤖 Играть с ботом</button>
+                        <button class="wardrobe-shortcut-btn" onclick="startTttGame('local')" style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);">👥 Играть с другом (на одном телефоне)</button>
+                        <div class="info-card game-duel-note">
+                            Чтобы вызвать друга на дуэль онлайн, отправь боту команду <strong>/duel</strong> в чате.
+                        </div>
+                        <button class="category-tab" style="padding: 12px; text-align: center; margin-top: 4px;" onclick="closeGame()">◀️ Назад к играм</button>
+                    </div>
+
+                    <!-- Поле игры -->
+                    <div id="game-tictactoe" style="display: none; flex-direction: column; align-items: center; gap: 14px;">
+                        <div id="ttt-status" style="font-weight: 600; font-size: 14px; color: #c4b5fd;">Ходит: X</div>
+                        <div class="glass-card" style="padding: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px;">
+                            <button class="glass-card ttt-cell" onclick="makeMove(0)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(1)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(2)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(3)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(4)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(5)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(6)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(7)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(8)"></button>
+                        </div>
+                        <button class="category-tab" style="padding: 10px 20px;" onclick="backTttModes()">Сдаться / Назад</button>
+                    </div>
                 </div>
 
-                <!-- Режимы -->
-                <div
-                    id="tictactoe-modes"
-                    style="
-                        display: none;
-                        flex-direction: column;
-                        gap: 10px;
-                    "
-                >
-
-                    <button
-                        class="wardrobe-shortcut-btn"
-                        onclick="startTttGame('solo')"
-                    >
-                        🤖 Играть с ботом
-                    </button>
-
-                    <button
-                        class="wardrobe-shortcut-btn"
-                        onclick="startTttGame('local')"
-                        style="
-                            background:
-                            linear-gradient(
-                                135deg,
-                                #3b82f6 0%,
-                                #8b5cf6 100%
-                            );
-                        "
-                    >
-                        👥 Играть с другом (на одном телефоне)
-                    </button>
-
-                    <div class="info-card game-duel-note">
-                        Чтобы вызвать друга на дуэль онлайн, отправь боту команду <strong>/duel</strong> в чате.
+                <!-- Раздел ЛИДЕРБОРДА -->
+                <div id="playLeaderboardSection" style="display: none;">
+                    <div class="section-heading leaderboard-heading">
+                        <h3>👑 Таблица лидеров</h3>
+                        <div class="subtitle">Общий рейтинг и очки по игровым режимам</div>
                     </div>
 
-                    <button
-                        class="category-tab"
-                        style="
-                            padding: 12px;
-                            text-align: center;
-                            margin-top: 4px;
-                        "
-                        onclick="closeGame()"
-                    >
-                        ◀️ Назад к играм
-                    </button>
+                    <section class="leaderboard-section" aria-labelledby="overall-leaderboard-title">
+                        <h4 id="overall-leaderboard-title" class="leaderboard-section-title">Общий рейтинг · за всё время</h4>
+                        <div id="overallLeaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                    </section>
 
-                </div>
-
-                <!-- Игра -->
-                <div
-                    id="game-tictactoe"
-                    style="
-                        display: none;
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 14px;
-                    "
-                >
-
-                    <div
-                        id="ttt-status"
-                        style="
-                            font-weight: 600;
-                            font-size: 14px;
-                            color: #c4b5fd;
-                        "
-                    >
-                        Ходит: X
-                    </div>
-
-                    <div
-                        class="glass-card"
-                        style="
-                            padding: 12px;
-                            display: grid;
-                            grid-template-columns: repeat(3, 1fr);
-                            gap: 8px;
-                            width: 100%;
-                            max-width: 320px;
-                        "
-                    >
-
-                        <button class="glass-card ttt-cell" onclick="makeMove(0)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(1)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(2)"></button>
-
-                        <button class="glass-card ttt-cell" onclick="makeMove(3)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(4)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(5)"></button>
-
-                        <button class="glass-card ttt-cell" onclick="makeMove(6)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(7)"></button>
-                        <button class="glass-card ttt-cell" onclick="makeMove(8)"></button>
-
-                    </div>
-
-                    <button
-                        class="category-tab"
-                        style="padding: 10px 20px;"
-                        onclick="backTttModes()"
-                    >
-                        Сдаться / Назад
-                    </button>
-
+                    <section class="leaderboard-section" aria-labelledby="mode-leaderboard-title">
+                        <h4 id="mode-leaderboard-title" class="leaderboard-section-title">Очки по режимам</h4>
+                        <button id="leaderboardGamePicker" class="category-tab leaderboard-game-picker" type="button" aria-haspopup="dialog" aria-controls="leaderboardGameModal">
+                            <span id="leaderboardGameName">Крестики-нолики</span>
+                            <span aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="category-tabs leaderboard-tabs" id="leaderboardTypeTabs" role="tablist" aria-label="Тип игры"></div>
+                        <div id="leaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                    </section>
                 </div>
 
             </div>
@@ -434,47 +319,27 @@
 
         </div>
 
-        <!-- Нижняя навигация -->
+        <!-- Нижняя навигация (4 кнопки вместо 5) -->
         <div class="glass-card bottom-nav">
-
-                        <button
-                class="nav-item active"
-                onclick="switchTab('home')"
-            >
+            <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
                 <span>Питомец</span>
             </button>
 
-            <button
-                class="nav-item"
-                onclick="switchTab('leaderboard')"
-            >
-                <span class="nav-icon">👑</span>
-                <span>Лидеры</span>
-            </button>
-
-            <button
-                class="nav-item"
-                onclick="switchTab('play')"
-            >
+            <button class="nav-item" onclick="switchTab('play')">
                 <span class="nav-icon">🎮</span>
                 <span>Игры</span>
             </button>
 
-            <!-- Замена в нижней навигации -->
             <button class="nav-item" onclick="switchTab('shop')">
                 <span class="nav-icon">🛍️</span>
                 <span>Магазин</span>
             </button>
 
-            <button
-                class="nav-item"
-                onclick="switchTab('profile')"
-            >
+            <button class="nav-item" onclick="switchTab('profile')">
                 <span class="nav-icon">⚙️</span>
                 <span>Профиль</span>
             </button>
-
         </div>
 
     </div>

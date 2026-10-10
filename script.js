@@ -1097,10 +1097,9 @@ function switchTab(tabName) {
 
     const indexes = {
         home: 0,
-        leaderboard: 1,
-        play: 2,
-        shop: 3,
-        profile: 4
+        play: 1,
+        shop: 2,
+        profile: 3
     };
 
     const index = indexes[tabName];
@@ -2958,4 +2957,25 @@ function showAppAlert(message, title = 'Информация') {
 function closeAppAlert() {
     const modal = document.getElementById('appAlertModal');
     if (modal) modal.style.display = 'none';
+}
+
+let currentPlaySubTab = 'games';
+
+function switchPlaySubTab(subTab) {
+    currentPlaySubTab = subTab;
+    const btns = document.querySelectorAll('#playSubTabs .category-tab');
+    if (btns.length >= 2) {
+        btns[0].classList.toggle('active', subTab === 'games');
+        btns[1].classList.toggle('active', subTab === 'leaderboard');
+    }
+
+    const gamesSec = document.getElementById('gamesSection');
+    const lbSec = document.getElementById('playLeaderboardSection');
+
+    if (gamesSec) gamesSec.style.display = subTab === 'games' ? 'block' : 'none';
+    if (lbSec) lbSec.style.display = subTab === 'leaderboard' ? 'block' : 'none';
+
+    if (subTab === 'leaderboard') {
+        fetchLeaderboard();
+    }
 }
