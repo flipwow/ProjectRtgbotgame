@@ -4342,33 +4342,31 @@ async def start_rules_callback(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.message(Command("menu", "start"))
-async def cmd_menu(
-    message: Message,
-):
-
+@router.message(Command("start"))
+async def cmd_start(message: Message):
     user = message.from_user
     username = (user.username or f"id_{user.id}").lower()
+    
+    # Регистрируем пользователя в глобальной базе, если его еще не было
     username, user_info = get_or_create_user(username, user.id)
-    command_name = (message.text or "").split(maxsplit=1)[0].split("@", 1)[0].lower()
-
-    if command_name == "/start" and not user_info.get("started"):
+    
+    # Фиксируем запуск бота
+    if not user_info.get("started"):
         user_info["started"] = True
-        user_info["started_at"] = datetime.datetime.now(
-            datetime.timezone.utc
-        ).isoformat()
+        user_info["started_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         users = load_users()
         users[username] = user_info
         save_users(users)
 
+    # Клавиатура с кнопкой Mini App и Правилами
+    keyboard = get_start_keyboard(message.chat.type, message.chat.id, message.from_user.id)
+
+    # Короткий и бодрый зазывающий текст
     await message.answer(
-        "✨ **Привет... Это я, " "RitushkaVIPai 👑**\n\n" "Выбирай раздел:",
-        reply_markup=get_main_hub_keyboard(
-            message.chat.type,
-            message.chat.id,
-            message.from_user.id,
-        ),
-        parse_mode="Markdown",
+        "🎮 <b>Твой пушистый друг уже заждался!</b>\n\n"
+        "Заходи в игру, чтобы покормить питомца, сыграть в мини-игры и забрать свои награды 🐾",
+        reply_markup=keyboard,
+        parse_mode="HTML",
     )
 
 
