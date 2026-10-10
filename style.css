@@ -2112,3 +2112,62 @@ body {
     transform: scale(0.98);
     background: rgba(239, 68, 68, 0.3);
 }
+
+/* Круглая центральная кнопка крафта */
+.craft-center-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.craft-circle-btn {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    color: #10201b;
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(120, 218, 186, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.craft-circle-btn span:first-child {
+    font-size: 28px;
+}
+
+.craft-circle-btn small {
+    font-size: 10px;
+    color: #15332a;
+    font-weight: 700;
+}
+
+.craft-circle-btn:not(:disabled):hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 35px rgba(120, 218, 186, 0.6);
+}
+
+.craft-circle-btn:disabled {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border-color: var(--card-border);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.craft-circle-btn:disabled small {
+    color: var(--text-secondary);
+}
+
+.pet-choice-card.selected-for-craft {
+    border-color: #f2c14e !important;
+    background: rgba(242, 193, 78, 0.2) !important;
+    box-shadow: 0 0 12px rgba(242, 193, 78, 0.4);
+}

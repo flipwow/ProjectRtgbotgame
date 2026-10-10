@@ -2664,3 +2664,163 @@ function closeRouletteModal() {
     const modal = document.getElementById('gachaRouletteModal');
     if (modal) modal.style.display = 'none';
 }
+
+// Глобальные переменные для крафта
+let selectedCraftPets = [];
+let baseCraftTarget = null; // Первый выбранный питомец (определяет тип и редкость)
+
+function switchShopSubTab(subTab) {
+    currentShopSubTab = subTab;
+    
+    const foodBtn = document.querySelectorAll('#mainShopSubTabs .category-tab')[0];
+    const petsBtn = document.querySelectorAll('#mainShopSubTabs .category-tab')[1];
+    const craftBtn = document.querySelectorAll('#mainShopSubTabs .category-tab')[2];
+
+    if (foodBtn) foodBtn.classList.toggle('active', subTab === 'food');
+    if (petsBtn) petsBtn.classList.toggle('active', subTab === 'pets');
+    if (craftBtn) craftBtn.classList.toggle('active', subTab === 'craft');
+
+    const foodSec = document.getElementById('foodShopSection');
+    const petsSec = document.getElementById('petsShopSection');
+    const craftSec = document.getElementById('craftShopSection');
+    
+    if (foodSec) foodSec.style.display = subTab === 'food' ? 'block' : 'none';
+    if (petsSec) petsSec.style.display = subTab === 'pets' ? 'block' : 'none';
+    if (craftSec) craftSec.style.display = subTab === 'craft' ? 'block' : 'none';
+
+    if (subTab === 'pets') {
+        renderPetPacksShop();
+    } else if (subTab === 'craft') {
+        resetCraftSelection();
+    }
+}
+
+function resetCraftSelection() {
+    selectedCraftPets = [];
+    baseCraftTarget = null;
+    updateCraftButtonState();
+    renderCraftPetChoices();
+}
+
+function renderCraftPetChoices() {
+    const grid = document.getElementById('craftPetsGrid');
+    const instruction = document.getElementById('craftInstruction');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const ownedPets = userData.owned_pets || {};
+    const catalog = userData.petCatalog || [];
+
+    // Получаем список питомцев пользователя (исключая стартовых: is_starter)
+    let userPetsList = [];
+    Object.keys(ownedPets).forEach(petId => {
+        const petDef = catalog.find(p => p.id === petId);
+        if (petDef && !petDef.is_starter) {
+            const count = ownedPets[petId].count || 1;
+            // Каждая копия — отдельный вариант выбора
+            for (let i = 0; i < count; i++) {
+                userPetsList.push({
+                    uid: `${petId}_${i}`,
+                    id: petId,
+                    ...petDef
+                });
+            }
+        }
+    });
+
+    if (userPetsList.length === 0) {
+        grid.innerHTML = '<p style="grid-column: 1/-1; color: var(--text-secondary);">У вас нет доступных питомцев для апгрейда (стартовые не учитываются).</p>';
+        return;
+    }
+
+    // Если первый питомец уже выбран, фильтруем остальных по типу и редкости
+    if (baseCraftTarget) {
+        userPetsList = userPetsList.filter(pet => 
+            pet.type === baseCraftTarget.type && pet.rarity === baseCraftTarget.rarity
+        );
+        if (instruction) {
+            instruction.textContent = `Выбрано: ${baseCraftTarget.name} (${baseCraftTarget.rarity}, ${baseCraftTarget.type}). Выберите еще 4 таких же!`;
+        }
+    } else {
+        if (instruction) {
+            instruction.textContent = 'Выбери первого питомца для апгрейда (стартовые не участвуют):';
+        }
+    }
+
+    userPetsList.forEach(pet => {
+        const isSelected = selectedCraftPets.some(p => p.uid === pet.uid);
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `pet-choice-card ${isSelected ? 'selected-for-craft' : ''}`;
+
+        card.innerHTML = `
+            <img src="${escapeHtml(pet.image || '/Pets/SnowLeopard.png')}" alt="${escapeHtml(pet.name)}" class="pet-choice-img">
+            <span class="pet-choice-name">${escapeHtml(pet.name)}</span>
+            <small style="font-size: 10px; color: var(--text-secondary);">${escapeHtml(pet.rarity || 'Common')}</small>
+        `;
+
+        card.onclick = () => togglePetForCraft(pet);
+        grid.appendChild(card);
+    });
+}
+
+function togglePetForCraft(pet) {
+    const index = selectedCraftPets.findIndex(p => p.uid === pet.uid);
+
+    if (index >= 0) {
+        // Снимаем выбор
+        selectedCraftPets.splice(index, 1);
+        if (selectedCraftPets.length === 0) {
+            baseCraftTarget = null;
+        }
+    } else {
+        // Добавляем выбор (максимум 5 шт)
+        if (selectedCraftPets.length >= 5) return;
+
+        if (selectedCraftPets.length === 0) {
+            baseCraftTarget = pet;
+        }
+        selectedCraftPets.push(pet);
+    }
+
+    updateCraftButtonState();
+    renderCraftPetChoices();
+}
+
+function updateCraftButtonState() {
+    const btn = document.getElementById('mainCraftButton');
+    const note = document.getElementById('craftProgressNote');
+    const count = selectedCraftPets.length;
+
+    if (note) note.textContent = `Выбери 5 питомцев (${count}/5)`;
+    if (btn) btn.disabled = count !== 5;
+}
+
+async function executeCraft() {
+    if (selectedCraftPets.length !== 5 || !baseCraftTarget) return;
+
+    try {
+        const response = await fetchWithTimeout('/api/craft-pet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ pet_id: baseCraftTarget.id })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Ошибка апгрейда');
+        }
+
+        // Запускаем рулетку/вывод созданного питомца
+        startRouletteAnimation(data.won_pet);
+        
+        await fetchUserData();
+        resetCraftSelection();
+    } catch (error) {
+        console.error('Ошибка апгрейда:', error);
+        tg?.showAlert?.(error.message || 'Не удалось выполнить апгрейд.');
+    }
+}

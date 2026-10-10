@@ -314,30 +314,46 @@
 
             </div>
 
-            <!-- Магазин -->
-            <div id="tab-shop" class="tab-content">
-                <div class="section-heading">
-                    <h3>🛒 Магазин</h3>
-                    <div class="subtitle">Покупай еду и открывай кейсы с питомцами за R$</div>
-                </div>
+            <!-- Вкладка Магазин -->
+<div id="tab-shop" class="tab-content">
+    <div class="section-heading">
+        <h3>🛒 Магазин и Алхимия</h3>
+        <div class="subtitle">Покупай еду, открывай паки и улучшай питомцев за R$</div>
+    </div>
 
-                <!-- Переключатель магазинов -->
-                <div class="category-tabs" id="mainShopSubTabs">
-                    <button class="category-tab active" type="button" onclick="switchShopSubTab('food')">🥣 Магазин еды</button>
-                    <button class="category-tab" type="button" onclick="switchShopSubTab('pets')">📦 Магазин питомцев</button>
-                </div>
+    <!-- Переключатель магазинов -->
+    <div class="category-tabs" id="mainShopSubTabs">
+        <button class="category-tab active" type="button" onclick="switchShopSubTab('food')">🥣 Магазин еды</button>
+        <button class="category-tab" type="button" onclick="switchShopSubTab('pets')">📦 Магазин питомцев</button>
+        <button class="category-tab" type="button" onclick="switchShopSubTab('craft')">✨ Апгрейд</button>
+    </div>
 
-                <!-- Контейнер для еды -->
-                <div id="foodShopSection">
-                    <div class="category-tabs" id="shopCategoryTabs"></div>
-                    <div class="items-grid" id="shopItemsGrid"></div>
-                </div>
+    <!-- Контейнер для еды -->
+    <div id="foodShopSection">
+        <div class="category-tabs" id="shopCategoryTabs"></div>
+        <div class="items-grid" id="shopItemsGrid"></div>
+    </div>
 
-                <!-- Контейнер для паков питомцев -->
-                <div id="petsShopSection" style="display: none;">
-                    <div class="items-grid" id="petPacksGrid"></div>
-                </div>
-            </div>
+    <!-- Контейнер для паков питомцев -->
+    <div id="petsShopSection" style="display: none;">
+        <div class="items-grid" id="petPacksGrid"></div>
+    </div>
+
+    <!-- Контейнер для Апгрейда (Крафта) -->
+    <div id="craftShopSection" style="display: none; text-align: center;">
+        <div class="craft-center-wrapper" style="margin: 20px 0;">
+            <button id="mainCraftButton" class="craft-circle-btn" type="button" onclick="executeCraft()" disabled>
+                <span>✨</span>
+                <span>Сделать апгрейд</span>
+                <small id="craftProgressNote">Выбери 5 питомцев (0/5)</small>
+            </button>
+        </div>
+        <p id="craftInstruction" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            Выбери первого питомца для апгрейда (стартовые не участвуют):
+        </p>
+        <div class="pet-choices-grid" id="craftPetsGrid"></div>
+    </div>
+</div>
 
             <!-- Профиль -->
             <div id="tab-profile" class="tab-content">

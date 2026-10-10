@@ -4009,6 +4009,8 @@ async def start_webapp_api():
 
     app = web.Application(middlewares=[webapp_cors])
 
+    app.router.add_post("/api/craft-pet", api_craft_pet)
+
     # Mini App
     app.router.add_get(
         "/",
@@ -5008,3 +5010,112 @@ if __name__ == "__main__":
     except Exception as e:
 
         print("\n[!] ОШИБКА:\n" f"{e}")
+
+RARITY_ORDER = ["Common", "Epic", "Legendary", "Bo$$"]
+
+
+async def api_craft_pet(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = await read_json_object(request)
+    if not payload:
+        return web.json_response({"error": "Invalid payload"}, status=400)
+
+    pet_id = payload.get("pet_id")
+    pets_data = load_pets_data()
+    source_pet = pets_data.get(pet_id)
+
+    if not source_pet or not isinstance(source_pet, dict):
+        return web.json_response({"error": "Pet not found"}, status=404)
+
+    if source_pet.get("is_starter"):
+        return web.json_response(
+            {"error": "Стартовые питомцы не участвуют в апгрейде!"}, status=400
+        )
+
+    current_rarity = source_pet.get("rarity", "Common")
+    pet_type = source_pet.get("type")
+
+    rarity_index = (
+        RARITY_ORDER.index(current_rarity) if current_rarity in RARITY_ORDER else 0
+    )
+    if rarity_index >= len(RARITY_ORDER) - 1:
+        return web.json_response(
+            {"error": "Максимальная редкость (Bo$$) не подлежит апгрейду!"}, status=400
+        )
+
+    next_rarity = RARITY_ORDER[rarity_index + 1]
+
+    possible_outputs = [
+        (p_id, p_def)
+        for p_id, p_def in pets_data.items()
+        if p_id != "users_pets"
+        and isinstance(p_def, dict)
+        and p_def.get("type") == pet_type
+        and p_def.get("rarity") == next_rarity
+    ]
+
+    if not possible_outputs:
+        return web.json_response(
+            {"error": f"Нет доступных питомцев с редкостью {next_rarity}"}, status=400
+        )
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user_row = connection.execute(
+                "SELECT data_json FROM users WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
+                (str(username),),
+            ).fetchone()
+
+            if not user_row:
+                return web.json_response({"error": "User not found"}, status=404)
+
+            user_data = _decode_sql_json(user_row["data_json"])
+            owned_pets = user_data.setdefault("owned_pets", {})
+
+            # Списываем 5 штук выбранного питомца
+            pet_entry = owned_pets.get(pet_id, {})
+            current_count = (
+                pet_entry.get("count", 1) if isinstance(pet_entry, dict) else 1
+            )
+
+            if current_count < 5:
+                return web.json_response(
+                    {"error": "Недостаточно питомцев (нужно 5)"}, status=400
+                )
+
+            if current_count - 5 > 0:
+                pet_entry["count"] = current_count - 5
+            else:
+                del owned_pets[pet_id]
+
+            # Выбираем случайного питомца следующего уровня редкости
+            won_id, won_def = random.choice(possible_outputs)
+            target_entry = owned_pets.setdefault(
+                won_id, {"custom_name": won_def.get("name", won_id), "count": 0}
+            )
+            target_entry["count"] = target_entry.get("count", 0) + 1
+
+            connection.execute(
+                "UPDATE users SET data_json = ? WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
+                (_encode_sql_json(user_data), str(username)),
+            )
+
+        return web.json_response(
+            {
+                "success": True,
+                "won_pet": {
+                    "id": won_id,
+                    "name": won_def.get("name", won_id),
+                    "rarity": won_def.get("rarity", next_rarity),
+                    "image": won_def.get("image", "/Pets/Slava.png"),
+                    "type": pet_type,
+                },
+            }
+        )
+    except sqlite3.Error as error:
+        print(f"Ошибка апгрейда: {error}")
+        return web.json_response({"error": "Could not craft pet"}, status=500)
