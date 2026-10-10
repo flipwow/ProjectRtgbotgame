@@ -748,5 +748,16 @@
     </div>
 </div>
 
+<!-- Кастомное модальное окно уведомлений в стиле приложения -->
+<div id="appAlertModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true">
+    <div class="pet-modal-content" style="max-width: 320px; text-align: center;">
+        <div class="pet-modal-header" style="justify-content: center; margin-bottom: 12px;">
+            <h3 id="appAlertTitle" style="color: var(--accent-color); font-size: 16px;">Внимание</h3>
+        </div>
+        <p id="appAlertMessage" style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 20px;"></p>
+        <button type="button" class="primary-action" onclick="closeAppAlert()" style="width: 100%;">Понятно</button>
+    </div>
+</div>
+
 </body>
 </html>

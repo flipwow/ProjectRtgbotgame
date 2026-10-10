@@ -2790,7 +2790,7 @@ function renderCraftPetChoices() {
         // Клик сразу выбирает этого питомца для апгрейда, если у пользователя накопилось >= 5 штук
         card.onclick = () => {
             if (pet.count < 5) {
-                tg?.showAlert?.(`Недостаточно копий! У вас ${pet.count} из 5 необходимых.`);
+                showAppAlert(`Недостаточно копий! У вас ${pet.count} из 5 необходимых для апгрейда.`, 'Апгрейд');
                 return;
             }
             baseCraftTarget = pet;
@@ -2868,4 +2868,29 @@ async function executeCraft() {
         console.error('Ошибка апгрейда:', error);
         tg?.showAlert?.(error.message || 'Не удалось выполнить апгрейд.');
     }
+}
+
+function showAppAlert(message, title = 'Информация') {
+    const modal = document.getElementById('appAlertModal');
+    const msgEl = document.getElementById('appAlertMessage');
+    const titleEl = document.getElementById('appAlertTitle');
+    
+    if (!modal || !msgEl) {
+        // Фолбек, если модалка не найдена
+        alert(message);
+        return;
+    }
+
+    if (titleEl) titleEl.textContent = title;
+    msgEl.textContent = message;
+    modal.style.display = 'flex';
+    
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('warning');
+    }
+}
+
+function closeAppAlert() {
+    const modal = document.getElementById('appAlertModal');
+    if (modal) modal.style.display = 'none';
 }
