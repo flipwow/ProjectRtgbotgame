@@ -2717,16 +2717,53 @@ async def api_profile(request):
 
     if not isinstance(pet_stats, dict):
         pet_stats = {}
+    # Собираем словарь питомца для проверки времени
     pet = {
         "id": current_pet_id,
         "type": pet_definition.get("type", current_pet_id),
         "level": pet_definition.get("level", 1),
         "experience": 0,
-        "health": pet_stats.get("health", 100),
-        "hunger": pet_stats.get("hunger", 100),
-        "happiness": pet_stats.get("happiness", 100),
-        "energy": pet_stats.get("energy", 100),
+        "health": pet_row["health"] if pet_row else pet_stats.get("health", 100),
+        "hunger": pet_row["hunger"] if pet_row else pet_stats.get("hunger", 100),
+        "happiness": (
+            pet_row["happiness"] if pet_row else pet_stats.get("happiness", 100)
+        ),
+        "energy": pet_row["energy"] if pet_row else pet_stats.get("energy", 100),
+        "last_stat_update": (
+            pet_row["last_stat_update"]
+            if (pet_row and pet_row["last_stat_update"])
+            else time.time()
+        ),
+        "is_sleeping": (
+            pet_row["is_sleeping"]
+            if (pet_row and pet_row["is_sleeping"] is not None)
+            else 0
+        ),
     }
+
+    # Пересчитываем статы на основе прошедшего времени
+    pet, stats_changed = update_pet_stats_with_time(pet)
+
+    if stats_changed and pet_row is not None:
+        # Сохраняем обновленные статы в базу
+        connection.execute(
+            """
+            UPDATE pets
+            SET health = ?, hunger = ?, happiness = ?, energy = ?, last_stat_update = ?, is_sleeping = ?
+            WHERE chat_id = ? AND user_id = ? AND pet_id = ?
+            """,
+            (
+                pet["health"],
+                pet["hunger"],
+                pet["happiness"],
+                pet["energy"],
+                pet["last_stat_update"],
+                pet["is_sleeping"],
+                query_chat_id,
+                pet_row["user_id"],
+                current_pet_id,
+            ),
+        )
 
     # Получаем кастомные имена с учетом разделения
     json_custom_name = None
