@@ -2536,7 +2536,8 @@ function startRouletteAnimation(wonPet, packPrice = 100) {
     if (!modal || !track) return;
 
     // Сохраняем информацию о текущем выпадении
-    const isDuplicate = userData.inventory?.some(pet => pet.id === wonPet.id) || false;
+    const ownedPets = userData.owned_pets || {};
+    const isDuplicate = Object.prototype.hasOwnProperty.call(ownedPets, wonPet.id);
     const refundAmount = Math.floor((packPrice || 100) * 0.6); // 60% от стоимости кейса
 
     currentGachaResult = {

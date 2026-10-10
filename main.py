@@ -3943,6 +3943,63 @@ async def api_buy_pet_pack(request):
         return web.json_response({"error": "Could not complete purchase"}, status=500)
 
 
+async def api_sell_duplicate_pet(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = await read_json_object(request)
+    if not payload:
+        return web.json_response({"error": "Invalid payload"}, status=400)
+
+    pet_id = payload.get("pet_id")
+    refund_amount = payload.get("refund_amount")
+
+    if not pet_id or not isinstance(refund_amount, (int, float)) or refund_amount <= 0:
+        return web.json_response({"error": "Invalid parameters"}, status=400)
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user_row = connection.execute(
+                """
+                SELECT balance_r, data_json
+                FROM users
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (str(username),),
+            ).fetchone()
+
+            if user_row is None:
+                return web.json_response({"error": "User not found"}, status=404)
+
+            balance = float(user_row["balance_r"] or 0)
+            user_data = _decode_sql_json(user_row["data_json"])
+            if not isinstance(user_data, dict):
+                user_data = {}
+
+            owned_pets = user_data.get("owned_pets", {})
+            if pet_id not in owned_pets:
+                return web.json_response({"error": "Pet not owned"}, status=400)
+
+            new_balance = balance + float(refund_amount)
+            user_data["r_currency"] = new_balance
+
+            connection.execute(
+                """
+                UPDATE users
+                SET balance_r = ?, data_json = ?
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (new_balance, _encode_sql_json(user_data), str(username)),
+            )
+
+        return web.json_response({"success": True, "balance": new_balance})
+    except sqlite3.Error as error:
+        print(f"Ошибка продажи повторного питомца: {error}")
+        return web.json_response({"error": "Could not sell duplicate pet"}, status=500)
+
+
 # ============================================================
 # MINI APP SERVER
 # ============================================================
@@ -3962,6 +4019,12 @@ async def start_webapp_api():
     app.router.add_post(
         "/api/buy-pet-pack",
         api_buy_pet_pack,
+    )
+
+    # 60% от повторки
+    app.router.add_post(
+        "/api/sell-duplicate-pet",
+        api_sell_duplicate_pet,
     )
 
     app.router.add_get(
