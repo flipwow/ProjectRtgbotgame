@@ -316,34 +316,27 @@
 
             <!-- Магазин -->
             <div id="tab-shop" class="tab-content">
-
                 <div class="section-heading">
-                    <h3>🥣 Магазин питомца</h3>
-
-                    <div class="subtitle">
-                        Покупай еду за R$ и пополняй холодильник
-                    </div>
+                    <h3>🛒 Магазин</h3>
+                    <div class="subtitle">Покупай еду и открывай кейсы с питомцами за R$</div>
                 </div>
 
-                <div
-                    class="category-tabs"
-                    id="shopCategoryTabs"
-                >
-
-                    <button
-                        class="category-tab active"
-                        data-shopcat="all"
-                    >
-                        Еда
-                    </button>
-
+                <!-- Переключатель магазинов -->
+                <div class="category-tabs" id="mainShopSubTabs">
+                    <button class="category-tab active" type="button" onclick="switchShopSubTab('food')">🥣 Магазин еды</button>
+                    <button class="category-tab" type="button" onclick="switchShopSubTab('pets')">📦 Магазин питомцев</button>
                 </div>
 
-                <div
-                    class="items-grid"
-                    id="shopItemsGrid"
-                ></div>
+                <!-- Контейнер для еды -->
+                <div id="foodShopSection">
+                    <div class="category-tabs" id="shopCategoryTabs"></div>
+                    <div class="items-grid" id="shopItemsGrid"></div>
+                </div>
 
+                <!-- Контейнер для паков питомцев -->
+                <div id="petsShopSection" style="display: none;">
+                    <div class="items-grid" id="petPacksGrid"></div>
+                </div>
             </div>
 
             <!-- Профиль -->
@@ -436,15 +429,13 @@
                 <span>Игры</span>
             </button>
 
-            <button
-                class="nav-item"
-                onclick="switchTab('shop')"
-            >
+            <!-- Замена в нижней навигации -->
+            <button class="nav-item" onclick="switchTab('shop')">
                 <span class="nav-icon">🛍️</span>
-                <span>Еда</span>
+                <span>Магазин</span>
             </button>
 
-                        <button
+            <button
                 class="nav-item"
                 onclick="switchTab('profile')"
             >

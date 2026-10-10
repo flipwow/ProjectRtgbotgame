@@ -3816,6 +3816,12 @@ async def start_webapp_api():
         index_handler,
     )
 
+    # Гача
+    app.router.add_post(
+        "/api/buy-pet-pack",
+        api_buy_pet_pack,
+    )
+
     app.router.add_get(
         "/style.css",
         css_handler,
@@ -4346,20 +4352,24 @@ async def start_rules_callback(callback: CallbackQuery):
 async def cmd_start(message: Message):
     user = message.from_user
     username = (user.username or f"id_{user.id}").lower()
-    
+
     # Регистрируем пользователя в глобальной базе, если его еще не было
     username, user_info = get_or_create_user(username, user.id)
-    
+
     # Фиксируем запуск бота
     if not user_info.get("started"):
         user_info["started"] = True
-        user_info["started_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        user_info["started_at"] = datetime.datetime.now(
+            datetime.timezone.utc
+        ).isoformat()
         users = load_users()
         users[username] = user_info
         save_users(users)
 
     # Клавиатура с кнопкой Mini App и Правилами
-    keyboard = get_start_keyboard(message.chat.type, message.chat.id, message.from_user.id)
+    keyboard = get_start_keyboard(
+        message.chat.type, message.chat.id, message.from_user.id
+    )
 
     # Короткий и бодрый зазывающий текст
     await message.answer(
@@ -4785,3 +4795,148 @@ if __name__ == "__main__":
     except Exception as e:
 
         print("\n[!] ОШИБКА:\n" f"{e}")
+
+# Конфигурация паков (кейсов) питомцев с шансами выпадения по редкости
+PET_PACKS = {
+    "human_pack": {
+        "name": "👤 Пак людей",
+        "price": 100,
+        "type": "Human",
+        "chances": {
+            "Common": 0.60,
+            "Epic": 0.35,
+            "Legendary": 0.04,
+            "Bo$$": 0.01,
+        },
+    },
+    "animal_pack": {
+        "name": "🐾 Пак животных",
+        "price": 75,
+        "type": "Animal",
+        "chances": {
+            "Common": 0.70,
+            "Epic": 0.25,
+            "Legendary": 0.04,
+            "Bo$$": 0.01,
+        },
+    },
+    "robot_pack": {
+        "name": "🤖 Пак роботов",
+        "price": 120,
+        "type": "Robot",
+        "chances": {
+            "Common": 0.50,
+            "Epic": 0.40,
+            "Legendary": 0.08,
+            "Bo$$": 0.02,
+        },
+    },
+}
+
+
+async def api_buy_pet_pack(request):
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    payload = await read_json_object(request)
+    pack_id = payload.get("pack_id") if payload else None
+    if pack_id not in PET_PACKS:
+        return web.json_response({"error": "Pack not found"}, status=404)
+
+    pack_info = PET_PACKS[pack_id]
+    price = pack_info["price"]
+    target_type = pack_info["type"]
+
+    pets_data = load_pets_data()
+    # Фильтруем питомцев нужного типа (исключая служебные ключи)
+    available_pets = [
+        (p_id, p_def)
+        for p_id, p_def in pets_data.items()
+        if p_id != "users_pets"
+        and isinstance(p_def, dict)
+        and p_def.get("type") == target_type
+    ]
+
+    if not available_pets:
+        return web.json_response(
+            {"error": "No pets available in this pack"}, status=400
+        )
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user_row = connection.execute(
+                """
+                SELECT balance_r, data_json
+                FROM users
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (str(username),),
+            ).fetchone()
+
+            if user_row is None:
+                return web.json_response({"error": "User not found"}, status=404)
+
+            balance = float(user_row["balance_r"] or 0)
+            if balance < price:
+                return web.json_response(
+                    {"error": "Not enough R$", "balance": balance}, status=400
+                )
+
+            new_balance = balance - price
+            user_data = _decode_sql_json(user_row["data_json"])
+            if not isinstance(user_data, dict):
+                user_data = {}
+            user_data["r_currency"] = new_balance
+
+            # Розыгрыш по редкости (рулетка шансов)
+            chances = pack_info["chances"]
+            roll = random.random()
+            cumulative = 0.0
+            chosen_rarity = "Common"
+            for rarity, chance in chances.items():
+                cumulative += chance
+                if roll <= cumulative:
+                    chosen_rarity = rarity
+                    break
+
+            # Выбираем питомца выпавшей редкости, если такого нет — берем любого из пака
+            rarity_matches = [
+                p
+                for p in available_pets
+                if p[1].get("rarity", "Common") == chosen_rarity
+            ]
+            if not rarity_matches:
+                rarity_matches = available_pets
+
+            won_id, won_def = random.choice(rarity_matches)
+
+            owned_pets = user_data.setdefault("owned_pets", {})
+            owned_pets[won_id] = {"custom_name": won_def.get("name", won_id)}
+
+            connection.execute(
+                """
+                UPDATE users
+                SET balance_r = ?, data_json = ?
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+                """,
+                (new_balance, _encode_sql_json(user_data), str(username)),
+            )
+
+        return web.json_response(
+            {
+                "success": True,
+                "balance": new_balance,
+                "won_pet": {
+                    "id": won_id,
+                    "name": won_def.get("name", won_id),
+                    "rarity": won_def.get("rarity", "Common"),
+                    "image": won_def.get("image", "/Pets/Slava.png"),
+                    "type": target_type,
+                },
+            }
+        )
+    except sqlite3.Error as error:
+        print(f"Ошибка покупки пака питомцев: {error}")
+        return web.json_response({"error": "Could not complete purchase"}, status=500)

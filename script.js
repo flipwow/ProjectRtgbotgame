@@ -1545,6 +1545,12 @@ function renderShop() {
 
     if (!grid) return;
 
+    // Если открыта вкладка паков питомцев — рендерим их и прерываем выполнение
+    if (typeof currentShopSubTab !== 'undefined' && currentShopSubTab === 'pets') {
+        renderPetPacksShop();
+        return;
+    }
+
     if (typeof currentShopTab === 'undefined') {
         window.currentShopTab = userData.pet?.type || 'Human';
     }
@@ -2444,4 +2450,76 @@ function openFirstPetSelector() {
 
         grid.appendChild(card);
     });
+}
+
+// === ЛОГИКА ПОДВКЛАДОК МАГАЗИНА И ГАЧА-ПАКОВ ===
+let currentShopSubTab = 'food';
+
+function switchShopSubTab(subTab) {
+    currentShopSubTab = subTab;
+    document.querySelectorAll('#mainShopSubTabs .category-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(subTab === 'food' ? 'Магазин еды' : 'Магазин питомцев'));
+    });
+
+    const foodSec = document.getElementById('foodShopSection');
+    const petsSec = document.getElementById('petsShopSection');
+    
+    if (foodSec) foodSec.style.display = subTab === 'food' ? 'block' : 'none';
+    if (petsSec) petsSec.style.display = subTab === 'pets' ? 'block' : 'none';
+
+    if (subTab === 'pets') {
+        renderPetPacksShop();
+    }
+}
+
+const PET_PACKS_CLIENT = [
+    { id: 'human_pack', name: '👤 Пак людей', price: 100, desc: 'Шанс на редких персонажей-людей' },
+    { id: 'animal_pack', name: '🐾 Пак животных', price: 75, desc: 'Милые и забавные питомцы' },
+    { id: 'robot_pack', name: '🤖 Пак роботов', price: 120, desc: 'Технологичные и кибернетические существа' },
+];
+
+function renderPetPacksShop() {
+    const grid = document.getElementById('petPacksGrid');
+    if (!grid) return;
+
+    grid.innerHTML = PET_PACKS_CLIENT.map(pack => `
+        <article class="item-card food-item-card">
+            <div class="item-art">📦</div>
+            <div class="item-name">${escapeHtml(pack.name)}</div>
+            <div class="food-item-effect">${escapeHtml(pack.desc)}</div>
+            <button class="food-buy-button" type="button" onclick="buyPetPack('${pack.id}')" ${userData.currency < pack.price ? 'disabled' : ''}>
+                Открыть · ${pack.price} R$
+            </button>
+        </article>
+    `).join('');
+}
+
+async function buyPetPack(packId) {
+    try {
+        const response = await fetchWithTimeout('/api/buy-pet-pack', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ pack_id: packId })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Не удалось открыть пак');
+        }
+
+        userData.currency = data.balance;
+        const balanceEl = document.getElementById('user-balance');
+        if (balanceEl) balanceEl.textContent = userData.currency;
+
+        const won = data.won_pet;
+        tg?.showAlert?.(`🎉 Поздравляем! Вам выпал питомец: ${won.name} (${won.rarity})!`);
+        
+        await fetchUserData();
+        renderPetPacksShop();
+    } catch (error) {
+        console.error('Ошибка покупки пака:', error);
+        tg?.showAlert?.('Недостаточно R$ или ошибка сервера.');
+    }
 }
