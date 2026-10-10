@@ -729,21 +729,24 @@
 
 <!-- Модальное окно с анимацией рулетки и пачкой результатов -->
 <div id="gachaRouletteModal" class="pet-modal-overlay" style="display: none;">
-    <div class="roulette-container" style="max-width: 420px;">
+    <div class="roulette-container" style="max-width: 440px;">
         <div class="roulette-header">
             <h3 id="rouletteModalTitle">Открытие пака...</h3>
         </div>
         
-        <!-- Окно рулетки со стрелкой-указателем (для медленного режима) -->
-        <div class="roulette-window" id="rouletteWindowContainer">
+        <!-- Одиночная рулетка (для 1 кейса) -->
+        <div class="roulette-window" id="rouletteWindowContainer" style="display: none;">
             <div class="roulette-pointer">▼</div>
             <div class="roulette-track" id="rouletteTrack"></div>
         </div>
 
-        <!-- Сетка для быстрого открытия или итогов пачки -->
+        <!-- Множественные рулетки (для 2-5 кейсов в медленном режиме) -->
+        <div id="multiRouletteContainer" class="multi-roulette-wrapper" style="display: none;"></div>
+
+        <!-- Сетка для быстрого открытия -->
         <div id="batchResultsContainer" style="display: none; max-height: 280px; overflow-y: auto; gap: 8px; margin-bottom: 12px; grid-template-columns: repeat(2, 1fr);"></div>
 
-        <!-- Карточка выигранного персонажа (для медленного режима) -->
+        <!-- Карточка выигранного персонажа (для одиночного режима) -->
         <div class="roulette-result" id="rouletteResult" style="display: none;">
             <div id="rouletteResultTitle" class="result-title">🎉 Новый персонаж!</div>
             <img id="rouletteResultImg" src="" alt="Pet" class="result-pet-img">
@@ -752,7 +755,7 @@
         </div>
 
         <!-- Кнопки управления модалкой -->
-        <div id="rouletteActionButtons" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+        <div id="rouletteActionButtons" style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px;">
             <button type="button" id="nextRouletteItemBtn" class="primary-action" style="display: none;" onclick="showNextInBatch()">Далее ➔</button>
             <button type="button" id="closeRouletteFinalBtn" class="primary-action" onclick="closeRouletteModal()">Забрать в инвентарь</button>
         </div>

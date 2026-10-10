@@ -2582,8 +2582,8 @@ async function buyPetPack(packId) {
         if (selectedPackMode === 'fast') {
             startFastBatchAnimation(currentBatchPets);
         } else {
-            // В медленном режиме запускаем рулетку по очереди для каждого кейса
-            startRouletteAnimation(currentBatchPets[0]);
+            // Если выбран медленный режим, запускаем одновременную прокрутку всех кейсов
+            startMultiRouletteAnimation(currentBatchPets);
         }
         
         await fetchUserData();
@@ -2594,86 +2594,85 @@ async function buyPetPack(packId) {
     }
 }
 
-// Переменная для хранения контекста текущего выбитого питомца
-let currentGachaResult = null;
-
-// Медленное открытие рулеткой (по одному)
-function startRouletteAnimation(wonPet) {
+// Функция одновременной прокрутки нескольких рулеток в медленном режиме
+function startMultiRouletteAnimation(wonPets) {
     const modal = document.getElementById('gachaRouletteModal');
-    const track = document.getElementById('rouletteTrack');
-    const resultSec = document.getElementById('rouletteResult');
-    const windowContainer = document.getElementById('rouletteWindowContainer');
+    const singleWindow = document.getElementById('rouletteWindowContainer');
+    const multiContainer = document.getElementById('multiRouletteContainer');
     const batchContainer = document.getElementById('batchResultsContainer');
+    const resultSec = document.getElementById('rouletteResult');
     const titleEl = document.getElementById('rouletteModalTitle');
     const nextBtn = document.getElementById('nextRouletteItemBtn');
     const finalBtn = document.getElementById('closeRouletteFinalBtn');
     
-    if (!modal || !track) return;
+    if (!modal || !multiContainer) return;
 
     modal.style.display = 'flex';
-    titleEl.textContent = currentBatchPets.length > 1 
-        ? `Открытие кейса ${currentBatchIndex + 1} из ${currentBatchPets.length}...`
-        : 'Открытие пака...';
+    titleEl.textContent = `🎁 Открытие кейсов (${wonPets.length} шт.)...`;
 
+    singleWindow.style.display = 'none';
     batchContainer.style.display = 'none';
     resultSec.style.display = 'none';
-    windowContainer.style.display = 'block';
     nextBtn.style.display = 'none';
-    finalBtn.style.display = 'block';
+    finalBtn.style.display = 'none'; // Скрываем кнопку пока идет анимация
 
-    track.style.transition = 'none';
-    track.style.transform = 'translateX(0px)';
+    multiContainer.style.display = 'flex';
+    multiContainer.innerHTML = '';
 
     const catalog = userData.petCatalog || [];
-    const items = [];
     const totalCards = 25;
     const winnerIndex = 20;
 
-    for (let i = 0; i < totalCards; i++) {
-        if (i === winnerIndex) {
-            items.push(wonPet);
-        } else {
-            const randomPet = catalog[Math.floor(Math.random() * catalog.length)] || wonPet;
-            items.push(randomPet);
-        }
-    }
+    wonPets.forEach((wonPet, idx) => {
+        const row = document.createElement('div');
+        row.className = 'single-roulette-row';
+        row.innerHTML = `
+            <div class="roulette-pointer">▼</div>
+            <div class="roulette-track" id="multiTrack-${idx}"></div>
+        `;
+        multiContainer.appendChild(row);
 
-    track.innerHTML = items.map(pet => `
-        <div class="roulette-card rarity-${pet.rarity || 'Common'}">
-            <img src="${pet.image || '/Pets/Slava.png'}" alt="${escapeHtml(pet.name)}">
-            <div class="roulette-card-name">${escapeHtml(pet.name)}</div>
-        </div>
-    `).join('');
+        const track = document.getElementById(`multiTrack-${idx}`);
+        const items = [];
 
-    const cardWidth = 100;
-    const windowWidth = windowContainer.offsetWidth || 320;
-    const targetOffset = (winnerIndex * cardWidth) - (windowWidth / 2) + (cardWidth / 2);
-
-    setTimeout(() => {
-        track.style.transition = 'transform 6.0s cubic-bezier(0.15, 0.9, 0.2, 1)';
-        track.style.transform = `translateX(-${targetOffset}px)`;
-    }, 50);
-
-    setTimeout(() => {
-        windowContainer.style.display = 'none';
-        
-        document.getElementById('rouletteResultImg').src = wonPet.image || '/Pets/Slava.png';
-        document.getElementById('rouletteResultName').textContent = wonPet.name;
-        document.getElementById('rouletteResultRarity').textContent = `Редкость: ${wonPet.rarity || 'Common'}`;
-        
-        resultSec.style.display = 'flex';
-
-        // Если открываем пачку по одному и есть еще не открытые кейсы
-        if (currentBatchIndex < currentBatchPets.length - 1) {
-            nextBtn.style.display = 'block';
-            finalBtn.style.display = 'none';
+        for (let i = 0; i < totalCards; i++) {
+            if (i === winnerIndex) {
+                items.push(wonPet);
+            } else {
+                const randomPet = catalog[Math.floor(Math.random() * catalog.length)] || wonPet;
+                items.push(randomPet);
+            }
         }
 
+        track.innerHTML = items.map(pet => `
+            <div class="roulette-card rarity-${pet.rarity || 'Common'}">
+                <img src="${pet.image || '/Pets/Slava.png'}" alt="${escapeHtml(pet.name)}">
+                <div class="roulette-card-name">${escapeHtml(pet.name)}</div>
+            </div>
+        `).join('');
+
+        const cardWidth = 83; // ширина карточки (75px + 2*4px отступы)
+        const windowWidth = multiContainer.offsetWidth || 340;
+        const targetOffset = (winnerIndex * cardWidth) - (windowWidth / 2) + (cardWidth / 2);
+
+        // Запускаем анимацию с небольшой задержкой для каждого ряда для красивого эффекта каскада
+        setTimeout(() => {
+            track.style.transition = 'transform 6.0s cubic-bezier(0.15, 0.9, 0.2, 1)';
+            track.style.transform = `translateX(-${targetOffset}px)`;
+        }, 100 + (idx * 150));
+    });
+
+    // Когда все рулетки докрутились, показываем кнопку «Забрать в инвентарь»
+    setTimeout(() => {
+        finalBtn.style.display = 'block';
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
-    }, 6200);
+    }, 6500 + (wonPets.length * 150));
 }
+
+// Переменная для хранения контекста текущего выбитого питомца
+let currentGachaResult = null;
 
 function showNextInBatch() {
     currentBatchIndex++;
