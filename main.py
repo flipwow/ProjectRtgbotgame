@@ -4849,7 +4849,6 @@ async def api_buy_pet_pack(request):
     target_type = pack_info["type"]
 
     pets_data = load_pets_data()
-    # Фильтруем питомцев нужного типа (исключая служебные ключи)
     available_pets = [
         (p_id, p_def)
         for p_id, p_def in pets_data.items()
@@ -4890,7 +4889,6 @@ async def api_buy_pet_pack(request):
                 user_data = {}
             user_data["r_currency"] = new_balance
 
-            # Розыгрыш по редкости (рулетка шансов)
             chances = pack_info["chances"]
             roll = random.random()
             cumulative = 0.0
@@ -4901,7 +4899,6 @@ async def api_buy_pet_pack(request):
                     chosen_rarity = rarity
                     break
 
-            # Выбираем питомца выпавшей редкости, если такого нет — берем любого из пака
             rarity_matches = [
                 p
                 for p in available_pets
