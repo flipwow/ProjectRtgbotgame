@@ -2579,9 +2579,10 @@ async function buyPetPack(packId) {
         currentBatchPets = data.won_pets || [data.won_pet];
         currentBatchIndex = 0;
 
-        if (selectedPackMode === 'fast' || currentBatchPets.length > 1) {
+        if (selectedPackMode === 'fast') {
             startFastBatchAnimation(currentBatchPets);
         } else {
+            // В медленном режиме запускаем рулетку по очереди для каждого кейса
             startRouletteAnimation(currentBatchPets[0]);
         }
         
