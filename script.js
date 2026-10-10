@@ -680,8 +680,9 @@ function applyChatProfile(data) {
     userData.rp = Number(profile.relationship_rp ?? data.relationship_rp ?? 0);
     userData.convertibleRp = Number(profile.convertible_rp ?? data.convertible_rp ?? 0);
     
-    // Добавьте эту строку в самый конец функции:
+    // Сохраняем каталог питомцев и купленных питомцев для режима чата
     userData.owned_pets = data.owned_pets && typeof data.owned_pets === 'object' ? data.owned_pets : {};
+    userData.petCatalog = Array.isArray(data.pet_catalog) ? data.pet_catalog : (userData.petCatalog || []);
 }
 
 async function fetchLeaderboard() {

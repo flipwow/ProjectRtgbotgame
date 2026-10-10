@@ -2300,7 +2300,7 @@ async def api_chat_profile(request):
             "image": definition.get("image", "/Pets/Снежный барсик.png"),
             "rarity": definition.get("rarity", "Обычный"),
             "description": definition.get("description", ""),
-            "is_starter": definition.get("is_starter", False),  # Добавлено поле
+            "is_starter": definition.get("is_starter", False),
         }
         for p_id, definition in pets_data.items()
         if p_id != "users_pets" and isinstance(definition, dict)
@@ -2327,6 +2327,7 @@ async def api_chat_profile(request):
             },
             "pet": pet,
             "pet_catalog": pet_catalog,
+            "owned_pets": owned_pets,  # <-- Передаем купленных питомцев
             "food_catalog": build_food_catalog((pet or {}).get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
