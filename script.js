@@ -2513,13 +2513,83 @@ async function buyPetPack(packId) {
         const balanceEl = document.getElementById('user-balance');
         if (balanceEl) balanceEl.textContent = userData.currency;
 
-        const won = data.won_pet;
-        tg?.showAlert?.(`🎉 Поздравляем! Вам выпал питомец: ${won.name} (${won.rarity})!`);
+        // Вместо showAlert запускаем анимацию рулетки
+        startRouletteAnimation(data.won_pet);
         
         await fetchUserData();
         renderPetPacksShop();
     } catch (error) {
         console.error('Ошибка покупки пака:', error);
-        tg?.showAlert?.('Недостаточно R$ или ошибка сервера.');
+        tg?.showAlert?.(error.message || 'Недостаточно R$ или ошибка сервера.');
     }
+}
+
+function startRouletteAnimation(wonPet) {
+    const modal = document.getElementById('gachaRouletteModal');
+    const track = document.getElementById('rouletteTrack');
+    const resultSec = document.getElementById('rouletteResult');
+    const windowEl = document.querySelector('.roulette-window');
+    
+    if (!modal || !track) return;
+
+    // Сбрасываем прошлые состояния
+    modal.style.display = 'flex';
+    resultSec.style.display = 'none';
+    windowEl.style.display = 'block';
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0px)';
+
+    // Формируем список карточек для рулетки (25 случайных + победный на 20 позиции)
+    const catalog = userData.petCatalog || [];
+    const items = [];
+    const totalCards = 25;
+    const winnerIndex = 20;
+
+    for (let i = 0; i < totalCards; i++) {
+        if (i === winnerIndex) {
+            items.push(wonPet);
+        } else {
+            const randomPet = catalog[Math.floor(Math.random() * catalog.length)] || wonPet;
+            items.push(randomPet);
+        }
+    }
+
+    // Рендерим ленту элементов
+    track.innerHTML = items.map(pet => `
+        <div class="roulette-card rarity-${pet.rarity || 'Common'}">
+            <img src="${pet.image || '/Pets/Slava.png'}" alt="${pet.name}">
+            <div class="roulette-card-name">${pet.name}</div>
+        </div>
+    `).join('');
+
+    // Рассчитываем смещение до победной карточки
+    const cardWidth = 100; // 90px карточка + 10px margins
+    const windowWidth = windowEl.offsetWidth;
+    const targetOffset = (winnerIndex * cardWidth) - (windowWidth / 2) + (cardWidth / 2);
+
+    // Запускаем прокрутку через небольшой таймаут
+    setTimeout(() => {
+        track.style.transition = 'transform 4.5s cubic-bezier(0.15, 0.9, 0.2, 1)';
+        track.style.transform = `translateX(-${targetOffset}px)`;
+    }, 50);
+
+    // По завершении прокрутки показываем карточку выпавшего персонажа
+    setTimeout(() => {
+        windowEl.style.display = 'none';
+        
+        document.getElementById('rouletteResultImg').src = wonPet.image || '/Pets/Slava.png';
+        document.getElementById('rouletteResultName').textContent = wonPet.name;
+        document.getElementById('rouletteResultRarity').textContent = `Редкость: ${wonPet.rarity || 'Common'}`;
+        
+        resultSec.style.display = 'flex';
+
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+    }, 4800);
+}
+
+function closeRouletteModal() {
+    const modal = document.getElementById('gachaRouletteModal');
+    if (modal) modal.style.display = 'none';
 }
