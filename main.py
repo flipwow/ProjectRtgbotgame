@@ -5258,10 +5258,15 @@ def update_pet_stats_with_time(pet_data, now=None):
         now = time.time()
 
     last_update = pet_data.get("last_stat_update", now)
-    elapsed_hours = (now - last_update) / 3600.0
 
-    if elapsed_hours <= 0.01:  # меньше ~36 секунд — пропускаем
+    # ДЛЯ ТЕСТА: Считаем, что 1 секунда реального времени = 1 минута игрового (ускорение в 60 раз)
+    # Или сделаем еще быстрее: 1 секунда реального = 2 минуты игрового времени
+    elapsed_seconds = now - last_update
+    if elapsed_seconds <= 1:
         return pet_data, False
+
+    # Переводим прошедшие секунды в часы с учетом коэффициента ускорения (например, в 120 раз быстрее)
+    elapsed_hours = (elapsed_seconds * 120) / 3600.0
 
     health = pet_data.get("health", 100)
     hunger = pet_data.get("hunger", 100)
@@ -5270,31 +5275,29 @@ def update_pet_stats_with_time(pet_data, now=None):
     is_sleeping = bool(pet_data.get("is_sleeping", 0))
 
     if is_sleeping:
-        # Во время сна энергия восстанавливается (+20 в час), голод падает медленнее
-        energy_gain = int(elapsed_hours * 20)
+        # Во сне энергия быстро растет (чтобы вы могли протестировать авто-пробуждение при 100%)
+        energy_gain = int(elapsed_hours * 50)
         energy = min(100, energy + energy_gain)
 
-        hunger_loss = int(elapsed_hours * 2)  # голодает медленнее во сне
+        hunger_loss = int(elapsed_hours * 2)
         hunger = max(0, hunger - hunger_loss)
 
-        # Если энергия дошла до 100%, сон автоматически завершается!
         if energy >= 100:
             is_sleeping = False
     else:
-        # Обычное падение статов при бодрствовании
-        hunger_loss = int(elapsed_hours * 5)  # -5 голода в час
+        # Ускоренный голод для теста: питомец будет стремительно хотеть есть
+        hunger_loss = int(elapsed_hours * 20)  # -20 голода в час (в тестовом режиме)
         hunger = max(0, hunger - hunger_loss)
 
-        happiness_decay = 8 if hunger < 30 else 3
+        happiness_decay = 15 if hunger < 30 else 5
         happiness_loss = int(elapsed_hours * happiness_decay)
         happiness = max(0, happiness - happiness_loss)
 
-        energy_loss = int(elapsed_hours * 4)  # -4 энергии в час
+        energy_loss = int(elapsed_hours * 15)
         energy = max(0, energy - energy_loss)
 
-    # Если голод 0, здоровье начинает падать
     if hunger == 0:
-        health_loss = int(elapsed_hours * 8)
+        health_loss = int(elapsed_hours * 10)
         health = max(0, health - health_loss)
 
     pet_data["health"] = health

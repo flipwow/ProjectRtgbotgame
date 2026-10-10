@@ -1528,25 +1528,19 @@ function updatePetView() {
         }
     }
 
-
-
-
-
-
-
-
-
         const statValues = {
-            'pet-level-value': `${level} / ${maxLevel}`,
-            'pet-health-value': `${health} / 100`,
-            'pet-hunger-value': `${hunger} / 100`,
-        'pet-happiness-value': `${happiness} / 100`
+        'pet-level-value': `${level} / ${maxLevel}`,
+        'pet-health-value': `${health} / 100`,
+        'pet-hunger-value': `${hunger} / 100`,
+        'pet-happiness-value': `${happiness} / 100`,
+        'pet-energy-value': `${Number(userData.pet?.energy ?? 100)} / 100` // <-- Добавлено
     };
     const statProgress = {
         'pet-level-bar': { value: level, max: maxLevel, width: Math.min(level / maxLevel * 100, 100) },
         'pet-health-bar': { value: health, max: 100, width: health },
         'pet-hunger-bar': { value: hunger, max: 100, width: hunger },
-        'pet-happiness-bar': { value: happiness, max: 100, width: happiness }
+        'pet-happiness-bar': { value: happiness, max: 100, width: happiness },
+        'pet-energy-bar': { value: Number(userData.pet?.energy ?? 100), max: 100, width: Number(userData.pet?.energy ?? 100) } // <-- Добавлено
     };
 
     Object.entries(statValues).forEach(([id, value]) => {
