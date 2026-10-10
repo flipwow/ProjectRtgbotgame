@@ -2524,7 +2524,10 @@ async function buyPetPack(packId) {
     }
 }
 
-function startRouletteAnimation(wonPet) {
+// Переменная для хранения контекста текущего выбитого питомца
+let currentGachaResult = null;
+
+function startRouletteAnimation(wonPet, packPrice = 100) {
     const modal = document.getElementById('gachaRouletteModal');
     const track = document.getElementById('rouletteTrack');
     const resultSec = document.getElementById('rouletteResult');
@@ -2532,14 +2535,24 @@ function startRouletteAnimation(wonPet) {
     
     if (!modal || !track) return;
 
-    // Сбрасываем прошлые состояния
+    // Сохраняем информацию о текущем выпадении
+    const isDuplicate = userData.inventory?.some(pet => pet.id === wonPet.id) || false;
+    const refundAmount = Math.floor((packPrice || 100) * 0.6); // 60% от стоимости кейса
+
+    currentGachaResult = {
+        pet: wonPet,
+        isDuplicate: isDuplicate,
+        refundAmount: refundAmount
+    };
+
+    // Сброс состояний
     modal.style.display = 'flex';
     resultSec.style.display = 'none';
     windowEl.style.display = 'block';
     track.style.transition = 'none';
     track.style.transform = 'translateX(0px)';
 
-    // Формируем список карточек для рулетки (25 случайных + победный на 20 позиции)
+    // Формируем рулетку
     const catalog = userData.petCatalog || [];
     const items = [];
     const totalCards = 25;
@@ -2554,7 +2567,6 @@ function startRouletteAnimation(wonPet) {
         }
     }
 
-    // Рендерим ленту элементов
     track.innerHTML = items.map(pet => `
         <div class="roulette-card rarity-${pet.rarity || 'Common'}">
             <img src="${pet.image || '/Pets/Slava.png'}" alt="${pet.name}">
@@ -2562,31 +2574,89 @@ function startRouletteAnimation(wonPet) {
         </div>
     `).join('');
 
-    // Рассчитываем смещение до победной карточки
-    const cardWidth = 100; // 90px карточка + 10px margins
+    const cardWidth = 100;
     const windowWidth = windowEl.offsetWidth;
     const targetOffset = (winnerIndex * cardWidth) - (windowWidth / 2) + (cardWidth / 2);
 
-    // Запускаем прокрутку через небольшой таймаут
+    // Анимация на 8 секунд
     setTimeout(() => {
-        track.style.transition = 'transform 4.5s cubic-bezier(0.15, 0.9, 0.2, 1)';
+        track.style.transition = 'transform 8.0s cubic-bezier(0.15, 0.9, 0.2, 1)';
         track.style.transform = `translateX(-${targetOffset}px)`;
     }, 50);
 
-    // По завершении прокрутки показываем карточку выпавшего персонажа
+    // По завершении 8 секунд показать карточку и варианты
     setTimeout(() => {
         windowEl.style.display = 'none';
         
         document.getElementById('rouletteResultImg').src = wonPet.image || '/Pets/Slava.png';
         document.getElementById('rouletteResultName').textContent = wonPet.name;
         document.getElementById('rouletteResultRarity').textContent = `Редкость: ${wonPet.rarity || 'Common'}`;
+
+        const titleEl = document.getElementById('rouletteResultTitle');
+        const normalActions = document.getElementById('normalResultActions');
+        const duplicateActions = document.getElementById('duplicateResultActions');
+
+        if (isDuplicate) {
+            titleEl.textContent = '🔄 Выпал дубликат!';
+            normalActions.style.display = 'none';
+            duplicateActions.style.display = 'flex';
+            document.getElementById('sellRefundAmount').textContent = refundAmount;
+        } else {
+            titleEl.textContent = '🎉 Новый персонаж!';
+            normalActions.style.display = 'block';
+            duplicateActions.style.display = 'none';
+        }
         
         resultSec.style.display = 'flex';
 
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
-    }, 4800);
+    }, 8200);
+}
+
+// Оставить повторку в инвентаре
+function keepDuplicatePet() {
+    closeRouletteModal();
+}
+
+// Продать повторку за 60% стоимости кейса
+async function sellDuplicatePet() {
+    if (!currentGachaResult || !currentGachaResult.pet) return;
+
+    try {
+        const response = await fetchWithTimeout('/api/sell-duplicate-pet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({
+                pet_id: currentGachaResult.pet.id,
+                refund_amount: currentGachaResult.refundAmount
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Ошибка при продаже повторки');
+        }
+
+        // Обновляем баланс пользователя на клиенте
+        userData.currency = data.balance;
+        const balanceEl = document.getElementById('user-balance');
+        if (balanceEl) balanceEl.textContent = userData.currency;
+
+        if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        closeRouletteModal();
+        await fetchUserData();
+    } catch (error) {
+        console.error('Ошибка продажи повторки:', error);
+        tg?.showAlert?.(error.message || 'Не удалось обменять повторку.');
+    }
 }
 
 function closeRouletteModal() {

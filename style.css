@@ -2012,7 +2012,7 @@ body {
     position: absolute;
     left: 0;
     will-change: transform;
-    transition: transform 4.5s cubic-bezier(0.15, 0.9, 0.2, 1);
+    transition: transform 8s cubic-bezier(0.15, 0.9, 0.2, 1);
 }
 
 .roulette-card {
@@ -2085,4 +2085,30 @@ body {
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.1);
     margin-bottom: 12px;
+}
+
+.duplicate-badge {
+    font-size: 13px;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    padding: 6px 12px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+.secondary-action {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #f87171;
+    font-weight: 700;
+    padding: 10px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.secondary-action:active {
+    transform: scale(0.98);
+    background: rgba(239, 68, 68, 0.3);
 }

@@ -710,11 +710,24 @@
 
         <!-- Карточка выигранного персонажа (появляется после прокрутки) -->
         <div class="roulette-result" id="rouletteResult" style="display: none;">
-            <div class="result-title">🎉 Новый персонаж!</div>
+            <div id="rouletteResultTitle" class="result-title">🎉 Новый персонаж!</div>
             <img id="rouletteResultImg" src="" alt="Pet" class="result-pet-img">
             <div id="rouletteResultName" class="result-pet-name"></div>
             <div id="rouletteResultRarity" class="result-pet-rarity"></div>
-            <button type="button" class="primary-action" onclick="closeRouletteModal()">Отлично!</button>
+
+            <!-- Блок действий для нового персонажа -->
+            <div id="normalResultActions">
+                <button type="button" class="primary-action" onclick="closeRouletteModal()">Отлично!</button>
+            </div>
+
+            <!-- Блок действий, если выпал дубликат (повторка) -->
+            <div id="duplicateResultActions" style="display: none; flex-direction: column; gap: 8px; width: 100%;">
+                <div class="duplicate-badge">⚠️ У вас уже есть этот персонаж</div>
+                <button type="button" class="primary-action" onclick="keepDuplicatePet()">Оставить в инвентаре</button>
+                <button type="button" class="secondary-action" id="sellDuplicateBtn" onclick="sellDuplicatePet()">
+                    Продать за <span id="sellRefundAmount">0</span> R$ (60%)
+                </button>
+            </div>
         </div>
     </div>
 </div>
