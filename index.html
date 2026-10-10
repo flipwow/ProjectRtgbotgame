@@ -65,78 +65,80 @@
                     </div>
 
                     <div class="pet-stats" aria-label="Характеристики питомца">
-                        <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Уровень</span>
-                                <span id="pet-level-value">1 / 10</span>
-                            </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Уровень питомца">
-                                <div id="pet-level-bar" class="pet-stat-fill level-fill"></div>
-                            </div>
-                        </div>
-                        <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Здоровье</span>
-                                <span id="pet-health-value">100 / 100</span>
-                            </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Здоровье питомца">
-                                <div id="pet-health-bar" class="pet-stat-fill health-fill"></div>
-                            </div>
-                        </div>
-                        <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Голод</span>
-                                <span id="pet-hunger-value">100 / 100</span>
-                            </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Сытость питомца">
-                                <div id="pet-hunger-bar" class="pet-stat-fill hunger-fill"></div>
-                            </div>
-                        </div>
-                        <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Счастье</span>
-                                <span id="pet-happiness-value">100 / 100</span>
-                            </div>
-                            <div class="pet-stat">
-                            <div class="pet-stat-heading">
-                                <span>Энергия</span>
-                                <span id="pet-energy-value">100 / 100</span>
-                            </div>
-                            <div class="pet-stat-track" role="progressbar" aria-label="Энергия питомца">
-                                <div id="pet-energy-bar" class="pet-stat-fill energy-fill"></div>
-                            </div>
-                        </div>
-                                                        <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
-                                <div id="pet-happiness-bar" class="pet-stat-fill happiness-fill"></div>
-                            </div>
-                        </div>
-                    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Уровень</span>
+            <span id="pet-level-value">1 / 10</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Уровень питомца">
+            <div id="pet-level-bar" class="pet-stat-fill level-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Здоровье</span>
+            <span id="pet-health-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Здоровье питомца">
+            <div id="pet-health-bar" class="pet-stat-fill health-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Голод</span>
+            <span id="pet-hunger-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Сытость питомца">
+            <div id="pet-hunger-bar" class="pet-stat-fill hunger-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Счастье</span>
+            <span id="pet-happiness-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
+            <div id="pet-happiness-bar" class="pet-stat-fill happiness-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Энергия</span>
+            <span id="pet-energy-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Энергия питомца">
+            <div id="pet-energy-bar" class="pet-stat-fill energy-fill"></div>
+        </div>
+    </div>
+</div>
 
                 </div>
 
                 <div class="pet-actions">
-                    <button
-                        class="wardrobe-shortcut-btn pet-action-btn"
-                        onclick="openPetSelector()"
-                    >
-                        <span>🐾</span>
-                        <span>Сменить питомца</span>
-                    </button>
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="openPetSelector()"
+    >
+        <span>🐾</span>
+        <span>Сменить</span>
+    </button>
 
-                    <button
-                        class="wardrobe-shortcut-btn pet-action-btn"
-                        onclick="openFeedMenuModal()"
-                    >
-                        <span>🥣</span>
-                        <span>Покормить питомца</span>
-                    </button>
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="openFeedMenuModal()"
+    >
+        <span>🥣</span>
+        <span>Покормить</span>
+    </button>
 
-                    <button class="wardrobe-shortcut-btn pet-action-btn" onclick="togglePetSleep()">
-                        <span id="sleepBtnIcon">💤</span>
-                        <span id="sleepBtnText">Уложить спать</span>
-                    </button>
-
-                </div>
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="putPetToSleep()"
+    >
+        <span>💤</span>
+        <span>Спать</span>
+    </button>
+</div>
 
             </div>
 

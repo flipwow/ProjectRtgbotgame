@@ -2262,3 +2262,30 @@ body {
     text-overflow: ellipsis;
     width: 100%;
 }
+
+/* Блок с действиями питомца в один ряд */
+.pet-actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+/* Компактные кнопки на одной высоте */
+.pet-actions .pet-action-btn {
+    flex: 1;
+    padding: 10px 4px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+/* Размер иконок в кнопках */
+.pet-actions .pet-action-btn span:first-child {
+    font-size: 16px;
+}
