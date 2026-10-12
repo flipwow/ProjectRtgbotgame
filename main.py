@@ -1399,9 +1399,9 @@ async def give_money_handler(message: Message) -> None:
     try:
         with db_connection() as connection:
             connection.execute(
-                "UPDATE users SET r_currency = r_currency + ? WHERE user_id = ?",
-                (amount, str(user_id)),
-            )
+    "UPDATE users SET balance_r = balance_r + ? WHERE chat_id = '' AND user_id = ?",
+    (amount, str(user_id)),
+)
     except Exception as e:
         print(f"Ошибка SQLite в /give: {e}")
         await message.answer("❌ Произошла ошибка при начислении средств.")
