@@ -539,7 +539,6 @@ def ensure_chat_pet(chat_id, user_id):
             user_info = candidate
             break
 
-    # Do not assign a default pet before the user explicitly chooses a starter.
     if (
         not isinstance(user_info, dict)
         or user_info.get("starter_pet_selected") is not True
@@ -610,7 +609,6 @@ def ensure_pet_for_user(telegram_id):
     user_id = str(telegram_id)
     pet = users_pets.get(user_id)
 
-    # Отсутствие питомца здесь штатно: новый пользователь ещё не сделал выбор.
     if not isinstance(pet, dict) or not pet.get("pet_id"):
         return None
 
@@ -884,7 +882,6 @@ def get_or_create_user(username, telegram_id=None):
 
     found_key = None
 
-    # Сначала ищем по Telegram ID.
     if telegram_id is not None:
         telegram_id_str = str(telegram_id)
 
@@ -893,7 +890,6 @@ def get_or_create_user(username, telegram_id=None):
                 found_key = uname
                 break
 
-    # Если не нашли — используем username.
     if found_key is None:
         found_key = username
 
@@ -911,7 +907,7 @@ def get_or_create_user(username, telegram_id=None):
         "started": False,
         "started_at": None,
         "pet_id": DEFAULT_PET_ID,
-        "owned_pets": {DEFAULT_PET_ID: {"custom_name": None}},  # ИСПРАВЛЕНО ТУТ
+        "owned_pets": {DEFAULT_PET_ID: {"custom_name": None}},
     }
 
     changed = False
@@ -930,12 +926,7 @@ def get_or_create_user(username, telegram_id=None):
 
     users[found_key] = user_data
 
-    if changed or found_key not in users:
-        save_users(users)
-    else:
-        # Если пользователь только что был создан,
-        # сохраняем его.
-        save_users(users)
+    save_users(users)
 
     return found_key, user_data
 
@@ -994,7 +985,6 @@ def validate_telegram_init_data(init_data: str):
         if auth_date <= 0:
             return None
 
-        # Данные старше суток не принимаем.
         if time.time() - auth_date > 86400:
             return None
 
@@ -1177,8 +1167,6 @@ def find_chat_companion(chat_id, sender_id, text):
         definition = pets_data.get(pet_id, {})
         companions.append((owner_id, pet, definition))
 
-    # Support legacy pets.json entries named user_id_<id> when they are
-    # explicitly scoped to this chat, or when the conversation is private.
     for key, pet in pets_data.items():
         if key == "users_pets" or not isinstance(pet, dict):
             continue
@@ -1219,7 +1207,6 @@ def get_chat_relationship(chat_id, user_id):
     if isinstance(profile, dict):
         return profile
 
-    # Accept the legacy per-chat shape while requiring an explicit matching chat.
     for section in (profiles, document.get("users", {})):
         candidate = (
             section.get(f"user_id_{user_id}") if isinstance(section, dict) else None
@@ -1288,7 +1275,7 @@ def build_companion_system_prompt(chat_id, sender_id, companion):
         f"Показатели питомца (факты): здоровье {pet.get('health', 100)}/100, "
         f"сытость {pet.get('hunger', 100)}/100, счастье {pet.get('happiness', 100)}/100, "
         f"энергия {pet.get('energy', 100)}/100. "
-        "При сытости ниже 30 органично скажи, что проголодался, и предложи покормить "
+        "При сытости ниже 30 ненавязчиво скажи, что проголодался, и предложи покормить "
         "в Mini App. Не утверждай, что кормление уже произошло.\n"
         f"{status_instruction}"
     )
@@ -1399,9 +1386,9 @@ async def give_money_handler(message: Message) -> None:
     try:
         with db_connection() as connection:
             connection.execute(
-    "UPDATE users SET balance_r = balance_r + ? WHERE chat_id = '' AND user_id = ?",
-    (amount, str(user_id)),
-)
+                "UPDATE users SET balance_r = balance_r + ? WHERE chat_id = '' AND user_id = ?",
+                (amount, str(user_id)),
+            )
     except Exception as e:
         print(f"Ошибка SQLite в /give: {e}")
         await message.answer("❌ Произошла ошибка при начислении средств.")
@@ -1482,7 +1469,6 @@ async def pet_status_command(
             profile_button = InlineKeyboardButton(
                 text="👤 Открыть профиль",
                 web_app=WebAppInfo(
-                    # Personal Mini App launch: never pass the private chat ID as chat context.
                     url=WEBAPP_ORIGIN,
                 ),
             )
@@ -1567,7 +1553,6 @@ async def cmd_chat_profile(message: Message):
                     InlineKeyboardButton(
                         text="👤 Открыть профиль",
                         web_app=WebAppInfo(
-                            # Personal Mini App launch: never pass the private chat ID as chat context.
                             url=WEBAPP_ORIGIN,
                         ),
                     )
@@ -1999,7 +1984,7 @@ def resolve_chat_api_context(request, payload=None):
         )
 
     raw_chat_id = payload.get("chat_id") or request.query.get("chat_id")
-    if raw_chat_id is None:
+    if not raw_chat_id or raw_chat_id in ("None", "0", ""):
         start_param = request.query.get("start_param", "")
         if not start_param:
             init_data = request.headers.get("X-Telegram-Init-Data", "")
@@ -2021,14 +2006,13 @@ def resolve_chat_api_context(request, payload=None):
                         ),
                     )
 
+    if not raw_chat_id or raw_chat_id in ("None", "0", ""):
+        return "", telegram_user, None
+
     try:
         chat_id = str(int(raw_chat_id))
     except (TypeError, ValueError):
-        return (
-            None,
-            None,
-            web.json_response({"error": "Valid chat_id is required"}, status=400),
-        )
+        return "", telegram_user, None
 
     return chat_id, telegram_user, None
 
@@ -2151,7 +2135,6 @@ LEADERBOARD_MODES = {
 
 
 def _get_mode_scores(scores_document, user_id):
-    """Return the recorded points for each tic-tac-toe mode."""
     game_scores = scores_document.get("tictactoe", {})
     raw_score = game_scores.get(str(user_id), 0) if isinstance(game_scores, dict) else 0
     if isinstance(raw_score, dict):
@@ -2295,7 +2278,6 @@ async def api_chat_profile(request):
     if profile is None:
         return web.json_response({"error": "Could not save chat member"}, status=500)
 
-    # Достаем owned_pets из общей базы пользователей
     users = load_users()
     user_info = users.get(f"id_{user_id}")
     for candidate in users.values():
@@ -2348,7 +2330,7 @@ async def api_chat_profile(request):
             },
             "pet": pet,
             "pet_catalog": pet_catalog,
-            "owned_pets": owned_pets,  # <-- Передаем купленных питомцев
+            "owned_pets": owned_pets,
             "food_catalog": build_food_catalog((pet or {}).get("inventory", {})),
             "members": member_profiles,
             "leaderboard": leaderboard,
@@ -2395,7 +2377,6 @@ async def api_pet_rename(request):
         return web.json_response({"error": "Pet ID not found"}, status=404)
 
     try:
-        # 1. Обновляем имя в SQLite (для групп и ЛС точечно по pet_id)
         with db_connection() as connection:
             cursor = connection.execute(
                 """
@@ -2408,7 +2389,6 @@ async def api_pet_rename(request):
             if cursor.rowcount == 0:
                 return web.json_response({"error": "Pet not found"}, status=404)
 
-        # 2. Синхронизируем с JSON-файлом для кэша профиля
         users = load_users()
         user_info = users.get(f"id_{user_id}")
 
@@ -2490,8 +2470,6 @@ async def api_avatar(request):
     try:
         image_bytes = await asyncio.wait_for(download_profile_photo(), timeout=10)
     except Exception:
-        # The default avatar is rendered by the client whenever Telegram has no photo
-        # or its file service is temporarily unavailable.
         return web.Response(status=404, headers={"Cache-Control": "no-store"})
 
     expiry = time.monotonic() + AVATAR_CACHE_TTL_SECONDS
@@ -2514,7 +2492,6 @@ async def api_avatar(request):
 
 
 async def api_profile(request):
-    # Пытаемся достать chat_id из query-параметров, затем из JSON payload.
     chat_id = request.rel_url.query.get("chat_id", "")
     if not chat_id:
         try:
@@ -2533,13 +2510,11 @@ async def api_profile(request):
     role = user_info.get("role", "noob")
     telegram_id = str(telegram_user["id"])
 
-    # РАЗДЕЛЕНИЕ КОНТЕКСТОВ (ЛС vs Группа)
     is_group_context = bool(chat_id and chat_id != "None" and chat_id != "0")
 
     current_pet_id = None
 
     if is_group_context:
-        # 1. Групповой контекст: вычисляем pet_id строго из SQLite для конкретной группы
         with db_connection() as connection:
             db_active_pet = connection.execute(
                 """
@@ -2554,11 +2529,9 @@ async def api_profile(request):
             if db_active_pet and db_active_pet["pet_id"]:
                 current_pet_id = db_active_pet["pet_id"]
 
-        # Если в SQLite для группы ничего не нашлось, берем дефолтный, но НЕ из глобального JSON ЛС!
         if not current_pet_id:
             current_pet_id = DEFAULT_PET_ID
     else:
-        # 2. Контекст ЛС: берем pet_id строго из личного JSON-профиля
         current_pet_id = user_info.get("pet_id", DEFAULT_PET_ID)
 
     pets_data = load_pets_data()
@@ -2580,8 +2553,6 @@ async def api_profile(request):
         if pet_id != "users_pets" and isinstance(definition, dict)
     ]
 
-    # Existing user records may contain a fallback pet written before the
-    # starter-choice flow existed. Only the explicit marker proves a choice.
     if not is_group_context and user_info.get("starter_pet_selected") is not True:
         current_pet_id = None
     elif not is_group_context and current_pet_id:
@@ -2589,7 +2560,6 @@ async def api_profile(request):
         if not isinstance(owned_pets, dict) or current_pet_id not in owned_pets:
             current_pet_id = None
 
-    # A new personal profile must stay petless until the user chooses a starter.
     if not is_group_context and not current_pet_id:
         food_catalog = build_food_catalog({})
         return web.json_response(
@@ -2635,8 +2605,6 @@ async def api_profile(request):
                 DEFAULT_PET_ID,
             )
         )
-
-    # Загружаем данные питомца и инвентаря только из текущего контекста.
 
     with db_connection() as connection:
         query_chat_id = chat_id if is_group_context else ""
@@ -2692,12 +2660,10 @@ async def api_profile(request):
     if not isinstance(pet_definition, dict):
         pet_definition = {}
 
-    # Строим объект с нуля, чтобы ensure_chat_pet не подмешивал данные ЛС.
     pet_stats = pet_definition.get("stats", {})
 
     if not isinstance(pet_stats, dict):
         pet_stats = {}
-    # Собираем словарь питомца для проверки времени
     pet = {
         "id": current_pet_id,
         "type": pet_definition.get("type", current_pet_id),
@@ -2721,11 +2687,9 @@ async def api_profile(request):
         ),
     }
 
-    # Пересчитываем статы на основе прошедшего времени
     pet, stats_changed = update_pet_stats_with_time(pet)
 
     if stats_changed and pet_row is not None:
-        # Сохраняем обновленные статы в базу
         connection.execute(
             """
             UPDATE pets
@@ -2745,7 +2709,6 @@ async def api_profile(request):
             ),
         )
 
-    # Получаем кастомные имена с учетом разделения
     json_custom_name = None
     if not is_group_context:
         owned_pets = (
@@ -2776,8 +2739,6 @@ async def api_profile(request):
 
     db_name = pet_row["name"] if (pet_row is not None and pet_row["name"]) else None
 
-    # Custom names are authoritative; the database may still contain the
-    # catalog default (for example, "Snow Leopard") from the initial insert.
     if is_group_context:
         final_name = (
             chat_custom_name or db_name or pet_definition.get("name", current_pet_id)
@@ -3104,7 +3065,6 @@ async def api_save_profile(request):
     if not isinstance(user_info, dict):
         return web.json_response({"error": "User not found"}, status=404)
 
-    # Запрос без pet_id — это чтение текущего выбора, а не создание питомца.
     if pet_id is None:
         return web.json_response(
             {"success": True, "pet": ensure_pet_for_user(telegram_user["id"])}
@@ -3119,8 +3079,6 @@ async def api_save_profile(request):
 
     pet_definition = pet_catalog[pet_id]
 
-    # Before the first explicit choice, only a starter is selectable.
-    # Afterwards, the user may select only a pet already in owned_pets.
     starter_selected = user_info.get("starter_pet_selected") is True
     owned_pets = user_info.get("owned_pets")
     if not isinstance(owned_pets, dict):
@@ -3174,7 +3132,6 @@ async def api_save_profile(request):
         "energy": stats.get("energy", 100),
     }
 
-    # Инициализируем словарь и запись: их может не быть у нового пользователя.
     data = load_inventory_data()
     users_pets = data.get("users_pets")
     if not isinstance(users_pets, dict):
@@ -3184,8 +3141,6 @@ async def api_save_profile(request):
     user_id = str(telegram_user["id"])
     old_pet = users_pets.get(user_id)
 
-    # При повторном сохранении того же питомца не сбрасываем его статы
-    # и инвентарь. Для нового выбранного питомца используем стартовые значения.
     if isinstance(old_pet, dict) and old_pet.get("pet_id") == pet_id:
         pet = old_pet
     else:
@@ -3214,7 +3169,6 @@ async def api_save_profile(request):
 
     users_pets[user_id] = pet
 
-    # Сохраняем также в SQLite. При повторном выборе обновляем существующую строку.
     with db_connection() as connection:
         connection.execute(
             """
@@ -3545,7 +3499,6 @@ async def leaderboard_ui_handler(request):
 
 
 async def pet_image_handler(request):
-    """Serve a pet PNG by filename, restricted to the Pets directory."""
     filename = request.match_info.get("filename", "Снежный барсик.png")
     if os.path.basename(filename) != filename or not filename.lower().endswith(".png"):
         return web.Response(text="Invalid pet image", status=400)
@@ -3869,7 +3822,6 @@ async def api_buy_pet_pack(request):
     if pack_id not in PET_PACKS:
         return web.json_response({"error": "Pack not found"}, status=404)
 
-    # Получаем количество кейсов из запроса (по умолчанию 1, максимум 5)
     try:
         count = int(payload.get("count", 1))
         count = max(1, min(count, 5))
@@ -3926,7 +3878,6 @@ async def api_buy_pet_pack(request):
             won_pets = []
             owned_pets = user_data.setdefault("owned_pets", {})
 
-            # Ролим для каждого кейса в пачке
             for _ in range(count):
                 roll = random.random()
                 cumulative = 0.0
@@ -4111,12 +4062,7 @@ async def api_craft_pet(request):
                 pet_entry.get("count", 1) if isinstance(pet_entry, dict) else 1
             )
 
-            # Если это стартовый питомец, проверяем, оставляем ли мы оригинал (1 штуку) в покое
             if source_pet.get("is_starter"):
-                # Для стартовых питомцев для крафта нужно 5 дубликатов, при этом основной (1 шт) не трогаем,
-                # либо если у игрока есть 5 копий сверх основного.
-                # Проверим, что общее количество count >= 5 (или 6, если считать оригинал).
-                # Удобнее считать, что count хранит количество дубликатов. Требуем 5 штук.
                 if current_count < 5:
                     return web.json_response(
                         {"error": "Недостаточно копий стартового питомца (нужно 5)"},
@@ -4223,7 +4169,7 @@ async def api_pet_sleep(request):
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     payload = await read_json_object(request) or {}
-    action = payload.get("action")  # 'toggle' или установить конкретный статус
+    action = payload.get("action")
 
     user_id = str(telegram_user["id"])
     data = load_inventory_data()
@@ -4232,12 +4178,10 @@ async def api_pet_sleep(request):
     if not pet:
         return web.json_response({"error": "Pet not found"}, status=404)
 
-    # Сначала актуализируем статы по времени
     pet, _ = update_pet_stats_with_time(pet)
 
     current_sleeping = bool(pet.get("is_sleeping", 0))
 
-    # Если питомец уже спит при 100% энергии, он не может лечь снова, пока не проснется
     if current_sleeping and pet.get("energy", 100) >= 100:
         pet["is_sleeping"] = 0
     else:
@@ -4262,22 +4206,18 @@ async def start_webapp_api():
         api_craft_pet,
     )
 
-    # Сохранение повторок
     app.router.add_post("/api/keep-duplicate-pet", api_keep_duplicate_pet)
 
-    # Mini App
     app.router.add_get(
         "/",
         index_handler,
     )
 
-    # Гача
     app.router.add_post(
         "/api/buy-pet-pack",
         api_buy_pet_pack,
     )
 
-    # 60% от повторки
     app.router.add_post(
         "/api/sell-duplicate-pet",
         api_sell_duplicate_pet,
@@ -4300,7 +4240,6 @@ async def start_webapp_api():
         leaderboard_ui_handler,
     )
 
-    # Совместимый старый URL и отдельная безопасная раздача PNG из Pets/.
     app.router.add_get(
         "/Barsichela.png",
         pet_image_handler,
@@ -4310,7 +4249,6 @@ async def start_webapp_api():
         pet_image_handler,
     )
 
-    # API
     app.router.add_get(
         "/api/ping",
         api_ping,
@@ -4396,7 +4334,6 @@ async def start_webapp_api():
         api_create_game,
     )
 
-    # WebSocket
     app.router.add_get(
         "/ws/game/{room_id}",
         websocket_game_handler,
@@ -4457,7 +4394,6 @@ def get_main_hub_keyboard(
         game_button = InlineKeyboardButton(
             text="🎮 RituhaGame",
             web_app=WebAppInfo(
-                # Personal Mini App launch: never pass the private chat ID as chat context.
                 url=WEBAPP_ORIGIN,
             ),
         )
@@ -4489,7 +4425,6 @@ def get_start_keyboard(chat_type="private", chat_id=None, user_id=None):
         app_button = InlineKeyboardButton(
             text="🎮 Запустить Mini App",
             web_app=WebAppInfo(
-                # Personal Mini App launch: never pass the private chat ID as chat context.
                 url=WEBAPP_ORIGIN,
             ),
         )
@@ -4589,7 +4524,6 @@ async def menu_profile(
         game_button = InlineKeyboardButton(
             text="🎮 Открыть игру",
             web_app=WebAppInfo(
-                # Personal Mini App launch: never pass the private chat ID as chat context.
                 url=WEBAPP_ORIGIN,
             ),
         )
@@ -4806,10 +4740,8 @@ async def cmd_start(message: Message):
     user = message.from_user
     username = (user.username or f"id_{user.id}").lower()
 
-    # Регистрируем пользователя в глобальной базе, если его еще не было
     username, user_info = get_or_create_user(username, user.id)
 
-    # Фиксируем запуск бота
     if not user_info.get("started"):
         user_info["started"] = True
         user_info["started_at"] = datetime.datetime.now(
@@ -4819,19 +4751,16 @@ async def cmd_start(message: Message):
         users[username] = user_info
         save_users(users)
 
-    # Клавиатура с кнопкой Mini App и Правилами
     keyboard = get_start_keyboard(
         message.chat.type, message.chat.id, message.from_user.id
     )
 
-    # Добавляем пояснение про активацию в чатах
     activation_note = (
         "\n\n📌 <i>Чтобы участвовать в рейтинге, таблице лидеров и показывать своего питомца в групповых чатах, обязательно пропишите команду</i> <code>/pet activate</code> <i>в каждом новом чате!</i>"
         if message.chat.type != "private"
         else ""
     )
 
-    # Короткий и бодрый зазывающий текст с подсказкой
     await message.answer(
         "🎮 <b>Твой друг уже заждался!</b>\n\n"
         "Заходи в игру, чтобы следить за состоянием питомца, сыграть в мини-игры и забрать свои награды 🐾"
@@ -5183,7 +5112,6 @@ async def game_room_cleanup_loop():
                 now,
             )
 
-            # Комната живёт максимум час.
             if now - created_at > 3600:
 
                 expired_rooms.append(room_id)
@@ -5266,13 +5194,10 @@ def update_pet_stats_with_time(pet_data, now=None):
 
     last_update = pet_data.get("last_stat_update", now)
 
-    # ДЛЯ ТЕСТА: Считаем, что 1 секунда реального времени = 1 минута игрового (ускорение в 60 раз)
-    # Или сделаем еще быстрее: 1 секунда реального = 2 минуты игрового времени
     elapsed_seconds = now - last_update
     if elapsed_seconds <= 1:
         return pet_data, False
 
-    # Переводим прошедшие секунды в часы с учетом коэффициента ускорения (например, в 120 раз быстрее)
     elapsed_hours = (elapsed_seconds * 120) / 3600.0
 
     health = pet_data.get("health", 100)
@@ -5282,7 +5207,6 @@ def update_pet_stats_with_time(pet_data, now=None):
     is_sleeping = bool(pet_data.get("is_sleeping", 0))
 
     if is_sleeping:
-        # Во сне энергия быстро растет (чтобы вы могли протестировать авто-пробуждение при 100%)
         energy_gain = int(elapsed_hours * 50)
         energy = min(100, energy + energy_gain)
 
@@ -5292,8 +5216,7 @@ def update_pet_stats_with_time(pet_data, now=None):
         if energy >= 100:
             is_sleeping = False
     else:
-        # Ускоренный голод для теста: питомец будет стремительно хотеть есть
-        hunger_loss = int(elapsed_hours * 20)  # -20 голода в час (в тестовом режиме)
+        hunger_loss = int(elapsed_hours * 20)
         hunger = max(0, hunger - hunger_loss)
 
         happiness_decay = 15 if hunger < 30 else 5

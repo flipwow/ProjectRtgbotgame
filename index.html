@@ -286,16 +286,13 @@
         </div>
     </div>
 
-    <section class="profile-metrics" aria-label="Баланс и отношения">
-        <article class="metric-tile balance-tile">
-            <span class="metric-label">Баланс</span>
-            <strong><span id="profile-currency">0</span><small>R$</small></strong>
-        </article>
-        <article class="metric-tile relationship-tile">
-            <span class="metric-label">Отношения</span>
-            <strong><span id="profile-rp">0</span><small>RP</small></strong>
-        </article>
-    </section>
+    <!-- Оставляем только баланс R$ в шапке профиля или метриках -->
+<section class="profile-metrics" aria-label="Баланс">
+    <article class="metric-tile balance-tile" style="grid-column: span 2;">
+        <span class="metric-label">Баланс</span>
+        <strong><span id="profile-currency">0</span><small>R$</small></strong>
+    </article>
+</section>
 
     <button class="settings-open-button" type="button" onclick="openSettings()">⚙️ Настройки</button>
 
@@ -386,10 +383,10 @@
             <div class="rules-copy">
                 <p><strong>Основные команды бота</strong></p>
                 <p><code>/start</code> — запустить бота и открыть приложение.</p>
-                <p><code>/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат.</p>
+                <p><code>/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат (Запускайте дуэль по очереди).</p>
                 <p><code>/menu</code> — открыть меню; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.</p>
-                <p>В онлайн-дуэли ходи только в свой ход. Победитель получает 30–60 RP, ничья не награждается.</p>
-                <p>Заботься о питомце, покупай еду за R$ и используй RP для обмена на валюту.</p>
+                <p>Побеждайте в дуэлях и получайте 30–60 R$, ничья не награждается.</p>
+                <p>Заботься о питомце, покупай еду за R$.</p>
                 <p class="rules-note">Играйте честно и уважайте других участников чата.</p>
             </div>
             <button class="settings-rules-button" type="button" onclick="closeRules()">Готово</button>
