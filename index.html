@@ -275,64 +275,44 @@
 
             <!-- Профиль -->
             <div id="tab-profile" class="tab-content">
-                <div class="profile-page-header">
-                    <div class="profile-kicker">ПРОФИЛЬ ЧАТА</div>
-                    <div class="profile-title-row">
-                        <div>
-                            <h1 id="profile-username">Загрузка...</h1>
-                            <p id="profile-chat-title" class="subtitle">Telegram Mini App</p>
-                        </div>
-                        <span id="profile-status" class="profile-status">Загрузка</span>
-                    </div>
-                </div>
-
-                <section class="profile-metrics" aria-label="Баланс и отношения">
-                    <article class="metric-tile balance-tile">
-                        <span class="metric-label">Баланс</span>
-                        <strong><span id="profile-currency">0</span><small>R$</small></strong>
-                    </article>
-                    <article class="metric-tile relationship-tile">
-                        <span class="metric-label">Отношения</span>
-                        <strong><span id="profile-rp">0</span><small>RP</small></strong>
-                                            </article>
-                </section>
-
-                <section class="conversion-panel" aria-labelledby="conversion-title">
-                    <div class="panel-heading">
-                        <div>
-                            <h2 id="conversion-title">Обмен RP на R$</h2>
-                            <p>Курс: 100 RP = 10 R$</p>
-                        </div>
-                        <span class="conversion-mark" aria-hidden="true">↗</span>
-                    </div>
-                    <div class="conversion-controls">
-                        <label class="amount-field" for="convert-rp-amount">
-                            <span>Сумма RP</span>
-                            <input id="convert-rp-amount" type="number" min="100" step="100" value="100" inputmode="numeric">
-                        </label>
-                        <button id="convert-rp-button" class="primary-action" type="button" onclick="convertRp()">
-                            Обменять RP на R$
-                        </button>
-                    </div>
-                    <p id="convert-preview" class="conversion-preview">Будет начислено 10 R$</p>
-                </section>
-
-                <button class="settings-open-button" type="button" onclick="openSettings()">⚙️ Настройки</button>
-
-                <section class="members-section" aria-labelledby="members-title">
-                    <div class="members-heading">
-                        <div>
-                            <span class="panel-eyebrow">СООБЩЕСТВО</span>
-                            <h2 id="members-title">Участники чата</h2>
-                        </div>
-                        <span id="members-count" class="members-count">0</span>
-                    </div>
-                    <div id="profileUsersList" class="profile-users-list" aria-live="polite">
-                        <p class="list-state">Загрузка участников...</p>
-                    </div>
-                </section>
-                <p id="profile-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+    <div class="profile-page-header">
+        <div class="profile-kicker">ПРОФИЛЬ ЧАТА</div>
+        <div class="profile-title-row">
+            <div>
+                <h1 id="profile-username">Загрузка...</h1>
+                <p id="profile-chat-title" class="subtitle">Telegram Mini App</p>
             </div>
+            <span id="profile-status" class="profile-status">Загрузка</span>
+        </div>
+    </div>
+
+    <section class="profile-metrics" aria-label="Баланс и отношения">
+        <article class="metric-tile balance-tile">
+            <span class="metric-label">Баланс</span>
+            <strong><span id="profile-currency">0</span><small>R$</small></strong>
+        </article>
+        <article class="metric-tile relationship-tile">
+            <span class="metric-label">Отношения</span>
+            <strong><span id="profile-rp">0</span><small>RP</small></strong>
+        </article>
+    </section>
+
+    <button class="settings-open-button" type="button" onclick="openSettings()">⚙️ Настройки</button>
+
+    <section class="members-section" aria-labelledby="members-title">
+        <div class="members-heading">
+            <div>
+                <span class="panel-eyebrow">СООБЩЕСТВО</span>
+                <h2 id="members-title">Участники чата</h2>
+            </div>
+            <span id="members-count" class="members-count">0</span>
+        </div>
+        <div id="profileUsersList" class="profile-users-list" aria-live="polite">
+            <p class="list-state">Загрузка участников...</p>
+        </div>
+    </section>
+    <p id="profile-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+</div>
 
         </div>
 

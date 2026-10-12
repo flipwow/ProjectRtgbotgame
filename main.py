@@ -35,45 +35,45 @@ import google.generativeai as genai
 
 SHOP_ITEMS = {
     "meat": {
-        "name": "🥩 Сочный стейк",
-        "price": 15,
+        "name": "🥩 стейк",
+        "price": 30,
         "compatible_with": "Human",
         "hunger_restore": 30,
         "happiness_restore": 5,
     },
     "milk": {
         "name": "🥛 Молоко",
-        "price": 5,
+        "price": 25,
         "compatible_with": "Human",
-        "hunger_restore": 10,
+        "hunger_restore": 15,
         "happiness_restore": 3,
     },
     "bone": {
         "name": "🦴 Косточка",
-        "price": 8,
+        "price": 20,
         "compatible_with": "Animal",
-        "hunger_restore": 10,
+        "hunger_restore": 15,
         "happiness_restore": 15,
     },
     "pet_food": {
         "name": "🐾 Корм",
-        "price": 12,
+        "price": 30,
         "compatible_with": "Animal",
-        "hunger_restore": 30,
+        "hunger_restore": 25,
         "happiness_restore": 5,
     },
     "battery": {
         "name": "🔋 Батарейка",
-        "price": 10,
+        "price": 35,
         "compatible_with": "Robot",
-        "hunger_restore": 30,
+        "hunger_restore": 25,
         "happiness_restore": 5,
     },
     "microchip": {
         "name": "💾 Микросхема",
-        "price": 20,
+        "price": 40,
         "compatible_with": "Robot",
-        "hunger_restore": 5,
+        "hunger_restore": 30,
         "happiness_restore": 20,
     },
 }
@@ -82,7 +82,7 @@ SHOP_ITEMS = {
 PET_PACKS = {
     "human_pack": {
         "name": "👤 Набор с челиками",
-        "price": 100,
+        "price": 750,
         "type": "Human",
         "chances": {
             "Common": 0.60,
@@ -93,7 +93,7 @@ PET_PACKS = {
     },
     "animal_pack": {
         "name": "🐾 Набор с рофланами",
-        "price": 75,
+        "price": 300,
         "type": "Animal",
         "chances": {
             "Common": 0.70,
@@ -104,7 +104,7 @@ PET_PACKS = {
     },
     "robot_pack": {
         "name": "🤖 Набор с роботами",
-        "price": 120,
+        "price": 600,
         "type": "Robot",
         "chances": {
             "Common": 0.50,
@@ -1385,11 +1385,9 @@ async def send_pet_selection(message: Message):
 async def give_money_handler(message: Message) -> None:
     user_id = message.from_user.id
 
-    # Жесткая проверка вашего ID
     if str(user_id) != "8990488378":
         return
 
-    # Безопасный разбор текста без CommandObject
     text_parts = message.text.split() if message.text else []
     amount = 5000
     if len(text_parts) > 1:
@@ -1398,7 +1396,6 @@ async def give_money_handler(message: Message) -> None:
         except (ValueError, IndexError):
             amount = 5000
 
-    # 1. Запись в SQLite
     try:
         with db_connection() as connection:
             connection.execute(
@@ -1406,27 +1403,10 @@ async def give_money_handler(message: Message) -> None:
                 (amount, str(user_id)),
             )
     except Exception as e:
-        print(f"Ошибка SQLite: {e}")
+        print(f"Ошибка SQLite в /give: {e}")
+        await message.answer("❌ Произошла ошибка при начислении средств.")
+        return
 
-    # 2. Обновление JSON-кэша игры (сразу три поля для надежности)
-    users = load_users()
-    user_info = users.get(f"id_{user_id}")
-
-    if not isinstance(user_info, dict):
-        for candidate in users.values():
-            if isinstance(candidate, dict) and str(
-                candidate.get("telegram_id", "")
-            ) == str(user_id):
-                user_info = candidate
-                break
-
-    if isinstance(user_info, dict):
-        user_info["r_currency"] = user_info.get("r_currency", 0) + amount
-        user_info["currency"] = user_info.get("currency", 0) + amount
-        user_info["balance_r"] = user_info.get("balance_r", 0) + amount
-        save_users(users)
-
-    # 3. Ответ в чат
     await message.answer(f"💰 Успешно начислено {amount} R$!")
 
 
@@ -4364,16 +4344,6 @@ async def start_webapp_api():
     app.router.add_get(
         "/api/leaderboard",
         api_leaderboard,
-    )
-
-    app.router.add_post(
-        "/api/convert",
-        api_chat_convert,
-    )
-
-    app.router.add_post(
-        "/api/chat/convert",
-        api_chat_convert,
     )
 
     app.router.add_post(

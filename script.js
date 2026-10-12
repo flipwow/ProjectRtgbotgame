@@ -764,7 +764,6 @@ function renderProfile() {
     if (relationshipRp) relationshipRp.textContent = userData.rp;
 
     renderProfilePet(userData.pet);
-    updateConvertPreview();
 }
 
 
@@ -895,22 +894,6 @@ function showProfileFeedback(message, kind = '') {
     feedback.classList.toggle('is-success', kind === 'success');
 }
 
-
-function updateConvertPreview() {
-    const input = document.getElementById('convert-rp-amount');
-    const preview = document.getElementById('convert-preview');
-    const button = document.getElementById('convert-rp-button');
-    if (!input || !preview || !button) return;
-
-    const amount = Number(input.value);
-    const valid = Number.isInteger(amount) && amount >= 100 && amount % 100 === 0 && amount <= userData.convertibleRp;
-    preview.textContent = Number.isInteger(amount) && amount > 0
-        ? `Будет начислено ${Math.floor(amount / 100) * 10} R$`
-        : 'Укажи сумму от 100 RP';
-    button.disabled = !valid;
-}
-
-
 async function postChatAction(path, payload) {
     const response = await fetchWithTimeout(path, {
         method: 'POST',
@@ -924,29 +907,6 @@ async function postChatAction(path, payload) {
     if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
     return data;
 }
-
-
-async function convertRp() {
-    const amount = Number(document.getElementById('convert-rp-amount')?.value);
-    if (!Number.isInteger(amount) || amount < 100 || amount % 100 !== 0 || amount > userData.convertibleRp) {
-        showProfileFeedback('Проверь сумму RP для обмена.', 'error');
-        return;
-    }
-
-    const button = document.getElementById('convert-rp-button');
-    if (button) button.disabled = true;
-    try {
-        await postChatAction('/api/chat/convert', { rp_amount: amount });
-        await fetchUserData();
-        showProfileFeedback(`Обмен завершён: ${amount} RP → ${amount / 10} R$.`, 'success');
-        tg?.HapticFeedback?.notificationOccurred('success');
-    } catch (error) {
-        showProfileFeedback(error.message || 'Не удалось выполнить обмен.', 'error');
-    } finally {
-        updateConvertPreview();
-    }
-}
-
 
 function openGiftModal(member) {
     if (!member || member.user_id == null) return;
@@ -2238,6 +2198,13 @@ function connectToRoom(roomId) {
             );
         }
     };
+
+    if (isWin && Number(data.reward) > 0) {
+    // Небольшая задержка, чтобы БД успела зафиксировать транзакцию награды
+    setTimeout(() => {
+        void fetchUserData();
+    }, 400);
+}
 
     socket.onerror = error => {
         console.error(
