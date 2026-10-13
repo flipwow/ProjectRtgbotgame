@@ -1948,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         initializeSafely('настроек', initSettings);
         initializeSafely('данных Telegram', initTelegramUser);
-        initializeSaf(_, 'параметров дуэли', checkDuelParams); // исправлено под чистую инициализацию
+        initializeSafely('параметров дуэли', checkDuelParams);
     } catch (error) {
         console.error('Ошибка запуска интерфейса:', error);
     } finally {
