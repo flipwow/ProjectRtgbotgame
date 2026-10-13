@@ -371,7 +371,8 @@ function resolveChatContext() {
 
     const telegramUserId = tg?.initDataUnsafe?.user?.id;
 
-    if (chatId && telegramUserId && String(chatId) === String(telegramUserId)) {
+    // ЕСЛИ chatId совпадает с ID пользователя или отсутствует — это ЛС!
+    if (!chatId || (telegramUserId && String(chatId) === String(telegramUserId))) {
         chatId = null;
     }
 
@@ -526,7 +527,7 @@ async function fetchUserData() {
         const isChatProfile = Boolean(chatContext.chatId);
         const endpoint = isChatProfile
             ? `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`
-            : '/api/me';
+            : '/api/me'; // В ЛС всегда идет запрос на /api/me
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
         };
