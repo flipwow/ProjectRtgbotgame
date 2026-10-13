@@ -7,7 +7,7 @@
         solo: 'Соло'
     };
     const TYPE_LABELS = { bots: 'Боты', duel: 'Дуэль', solo: 'Соло' };
-    const STORAGE_KEY = 'ritushka-leaderboard-selection-v1';
+    const STORAGE_KEY = 'pawk1ns-leaderboard-selection-v1';
     let rows = [];
     let gameId = '';
     let typeId = '';

@@ -43,7 +43,7 @@ let selectedPackMode = 'slow'; // 'slow' или 'fast'
 let currentBatchPets = [];
 let currentBatchIndex = 0;
 
-const SETTINGS_KEY = 'ritushka-miniapp-settings';
+const SETTINGS_KEY = 'pawk1ns-miniapp-settings';
 const textSourceCache = new WeakMap();
 let appSettings = loadAppSettings();
 
@@ -70,7 +70,7 @@ const englishText = {
     'Твой любимый дерзкий пушистик': 'Your favorite sassy fluffball', 'Питомец участника': 'MEMBER PET', 'Участник': 'Member', 'Участники пока не активировали бота': 'Members have not activated the bot yet',
     'Доступно:': 'Available:', 'Сумма перевода': 'Transfer amount', 'Например, 25': 'For example, 25', 'Отправить подарок': 'Send gift', 'Перевод R$': 'Transfer R$', 'Закрыть': 'Close',
     'Ракурс': 'View', 'Назад': 'Back', 'Уровень питомца': 'Pet level', 'Синхронизация с питомцем... Наш сервер на Render просыпается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾': 'Syncing with your pet... The server is waking up and may take about a minute. Please keep the app open 🐾',
-    'Барсичела': 'Barsichela', 'RITUSHKA PET': 'RITUSHKA PET', 'Переименовать питомца': 'Rename pet', 'Имя питомца': 'Pet name', 'Новое имя': 'New name', 'Отмена': 'Cancel', 'Сохранить': 'Save',
+    'Барсичела': 'Barsichela', 'PAWK1NS PET': 'PAWK1NS PET', 'Переименовать питомца': 'Rename pet', 'Имя питомца': 'Pet name', 'Новое имя': 'New name', 'Отмена': 'Cancel', 'Сохранить': 'Save',
     'Сменить питомца': 'Change pet', 'Покормить питомца': 'Feed pet', 'Сытость': 'Satiety', 'Выбери лакомство из инвентаря:': 'Choose a treat from your inventory:',
     'Очки за победы в онлайн-крестиках-ноликах': 'Points for online tic-tac-toe wins', 'Сразись с другими пешками': 'Challenge other players', 'Играй с ботом или устрой дуэль с другом': 'Play the bot or challenge a friend',
     'Играть с другом (на одном телефоне)': 'Play with a friend (on one phone)', 'Назад к играм': 'Back to games', 'Сдаться / Назад': 'Forfeit / Back', 'Магазин питомца': 'Pet shop',

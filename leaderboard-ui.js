@@ -1,7 +1,7 @@
 (() => {
     const GAME_OPTIONS = [{ id: 'tictactoe', label: 'Крестики-нолики' }];
     const TYPE_LABELS = { bots: 'Боты', duel: 'Дуэль' };
-    const STORAGE_KEY = 'ritushka-leaderboard-selection-v1';
+    const STORAGE_KEY = 'pawk1ns-leaderboard-selection-v1';
     let gameId = GAME_OPTIONS[0].id;
     let typeId = '';
 

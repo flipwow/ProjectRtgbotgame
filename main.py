@@ -276,9 +276,6 @@ PETS_IMAGE_DIR = os.path.join(BASE_DIR, "Pets")
 PET_IMAGE = os.path.join(PETS_IMAGE_DIR, "Slava.png")
 DEFAULT_PET_ID = None
 
-PHOTOS_DIR = os.path.join(BASE_DIR, "RitushkaPhotos")
-
-
 # ============================================================
 # GLOBAL DATA
 # ============================================================
@@ -4921,55 +4918,6 @@ async def cmd_approve_role(
     await message.reply(
         f"✅ Роль пользователя @{target_username} успешно изменена на **{role_name}**!",
         parse_mode="Markdown",
-    )
-
-
-async def cmd_slay(
-    message: Message,
-):
-
-    if not os.path.exists(PHOTOS_DIR):
-
-        await message.reply("Папка с фото не найдена 💅")
-
-        return
-
-    photos = [
-        filename
-        for filename in os.listdir(PHOTOS_DIR)
-        if filename.lower().endswith(
-            (
-                ".png",
-                ".jpg",
-                ".jpeg",
-                ".webp",
-            )
-        )
-    ]
-
-    if not photos:
-
-        await message.reply("Альбом пуст 👑")
-
-        return
-
-    filename = random.choice(photos)
-
-    photo = FSInputFile(
-        os.path.join(
-            PHOTOS_DIR,
-            filename,
-        )
-    )
-
-    await message.reply_photo(
-        photo,
-        caption=random.choice(
-            [
-                "Смотри и учись 💅✨",
-                "Мой аутфит сегодня просто разносит 👑🖤",
-            ]
-        ),
     )
 
 
