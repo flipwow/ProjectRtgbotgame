@@ -288,7 +288,7 @@ BOT_USERNAME = None
 BOT_ID = None
 
 WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = 8080
+WEBAPP_PORT = int(os.getenv("PORT", "8080"))
 
 WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
 
@@ -978,11 +978,12 @@ def validate_telegram_init_data(init_data: str):
             return None
 
         auth_date = int(parsed.get("auth_date", 0))
+        now = int(time.time())
 
-        if auth_date <= 0:
+        if auth_date <= 0 or auth_date > now + 60:
             return None
 
-        if time.time() - auth_date > 86400:
+        if now - auth_date > 86400:
             return None
 
         return user_data
@@ -2355,7 +2356,7 @@ async def api_pet_rename(request):
             {"error": "Activate /pet activate in this chat first"}, status=404
         )
 
-    new_name = payload.get("new_name")
+        new_name = payload.get("new_name")
     if not isinstance(new_name, str):
         return web.json_response({"error": "new_name must be text"}, status=400)
 
@@ -2687,24 +2688,26 @@ async def api_profile(request):
     pet, stats_changed = update_pet_stats_with_time(pet)
 
     if stats_changed and pet_row is not None:
-        connection.execute(
-            """
-            UPDATE pets
-            SET health = ?, hunger = ?, happiness = ?, energy = ?, last_stat_update = ?, is_sleeping = ?
-            WHERE chat_id = ? AND user_id = ? AND pet_id = ?
-            """,
-            (
-                pet["health"],
-                pet["hunger"],
-                pet["happiness"],
-                pet["energy"],
-                pet["last_stat_update"],
-                pet["is_sleeping"],
-                query_chat_id,
-                pet_row["user_id"],
-                current_pet_id,
-            ),
-        )
+        with db_connection() as connection:
+            connection.execute(
+                """
+                UPDATE pets
+                SET health = ?, hunger = ?, happiness = ?, energy = ?,
+                    last_stat_update = ?, is_sleeping = ?
+                WHERE chat_id = ? AND user_id = ? AND pet_id = ?
+                """,
+                (
+                    pet["health"],
+                    pet["hunger"],
+                    pet["happiness"],
+                    pet["energy"],
+                    pet["last_stat_update"],
+                    pet["is_sleeping"],
+                    query_chat_id,
+                    pet_row["user_id"],
+                    current_pet_id,
+                ),
+            )
 
     json_custom_name = None
     if not is_group_context:
@@ -3216,105 +3219,160 @@ async def api_save_profile(request):
     )
 
 
-async def api_pet_feed(request):
+def _get_personal_pet_for_update(connection, username, telegram_id):
+    user_row = connection.execute(
+        """
+        SELECT data_json FROM users
+        WHERE chat_id = '' AND user_id = ? AND record_type = 'user'
+        """,
+        (str(username),),
+    ).fetchone()
+    if user_row is None:
+        return None, None, None
 
-    username, telegram_user = get_webapp_user(request)
+    user_data = _decode_sql_json(user_row["data_json"])
 
-    if not username:
-        return web.json_response(
-            {"error": "Unauthorized"},
-            status=401,
-        )
+    if not isinstance(user_data, dict):
+        return None, None, None
 
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    food_id = body.get("food_id")
-
-    if not food_id:
-        return web.json_response(
-            {"error": "food_id is required"},
-            status=400,
-        )
-
-    user_id = str(telegram_user["id"])
-
-    data = load_inventory_data()
-
-    pet = data["users_pets"].get(user_id)
-
-    if not pet:
-        return web.json_response(
-            {"error": "Pet not found"},
-            status=404,
-        )
-
-    food_info = data["food_items"].get(food_id)
-
-    if not food_info:
-        return web.json_response(
-            {"error": "Food not found"},
-            status=404,
-        )
-
-    inventory = pet.setdefault(
-        "inventory",
-        {},
-    )
-
+    pet_id = user_data.get("pet_id")
+    owned_pets = user_data.get("owned_pets", {})
+    pets_catalog = load_pets_data()
+    definition = pets_catalog.get(pet_id) if isinstance(pet_id, str) else None
     if (
-        inventory.get(
-            food_id,
-            0,
-        )
-        <= 0
+        user_data.get("starter_pet_selected") is not True
+        or not isinstance(owned_pets, dict)
+        or pet_id not in owned_pets
+        or not isinstance(definition, dict)
     ):
-        return web.json_response(
-            {"error": "Food not owned"},
-            status=400,
-        )
+        return None, None, None
 
-    inventory[food_id] -= 1
+    pet_row = connection.execute(
+        """
+        SELECT * FROM pets
+        WHERE chat_id = '' AND user_id IN (?, ?) AND pet_id = ?
+        ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END
+        LIMIT 1
+        """,
+        (str(telegram_id), str(username), pet_id, str(telegram_id)),
+    ).fetchone()
+    if pet_row is None:
+        return None, None, None
 
-    if inventory[food_id] <= 0:
-        del inventory[food_id]
-
-    pet["hunger"] = min(
-        100,
-        pet.get("hunger", 0)
-        + food_info.get(
-            "hunger_restore",
-            0,
-        ),
-    )
-
-    pet["happiness"] = min(
-        100,
-        pet.get("happiness", 0)
-        + food_info.get(
-            "happiness_restore",
-            0,
-        ),
-    )
-
-    save_inventory_data(data)
-
-    return web.json_response(
+    pet = dict(pet_row)
+    pet, _ = update_pet_stats_with_time(pet)
+    pet.update(
         {
-            "success": True,
-            "pet": pet,
+            "id": pet_id,
+            "type": definition.get("type", pet_id),
+            "name": pet_row["name"] or definition.get("name", pet_id),
         }
     )
+    return pet_row, pet, pet_id
 
 
-async def api_buy_food(request):
+async def api_pet_feed(request):
     username, telegram_user = get_webapp_user(request)
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-    food_id = request.match_info.get("food_id")
+        payload = await read_json_object(request)
+    food_id = payload.get("food_id") if payload else None
+    item = SHOP_ITEMS.get(food_id) if isinstance(food_id, str) else None
+    if item is None:
+        return web.json_response({"error": "Food not found"}, status=404)
+
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+
+            pet_row, pet, pet_id = _get_personal_pet_for_update(
+                connection, username, telegram_user["id"]
+            )
+            if pet_row is None:
+                return web.json_response({"error": "Pet not found"}, status=404)
+
+            definition = load_pets_data().get(pet_id, {})
+            if item.get("compatible_with") != definition.get("type"):
+                return web.json_response(
+                    {"error": "Food is not compatible with this pet"}, status=400
+                )
+
+            inventory_row = connection.execute(
+                """
+                SELECT quantity FROM inventory
+                WHERE chat_id = '' AND user_id = ? AND item_id = ?
+                  AND record_type = 'item'
+                """,
+                (str(username), food_id),
+            ).fetchone()
+            if inventory_row is None or int(inventory_row["quantity"] or 0) < 1:
+                return web.json_response({"error": "Food not owned"}, status=400)
+
+            connection.execute(
+                """
+                UPDATE inventory SET quantity = quantity - 1
+                WHERE chat_id = '' AND user_id = ? AND item_id = ?
+                  AND record_type = 'item' AND quantity > 0
+                """,
+                (str(username), food_id),
+            )
+            pet["hunger"] = min(
+                100, int(pet.get("hunger", 0)) + int(item.get("hunger_restore", 0))
+            )
+            pet["happiness"] = min(
+                100,
+                int(pet.get("happiness", 0)) + int(item.get("happiness_restore", 0)),
+            )
+            connection.execute(
+                """
+                UPDATE pets SET health = ?, hunger = ?, happiness = ?, energy = ?,
+                    last_stat_update = ?, is_sleeping = ?
+                WHERE chat_id = '' AND user_id = ? AND pet_id = ?
+                """,
+                (
+                    pet["health"],
+                    pet["hunger"],
+                    pet["happiness"],
+                    pet["energy"],
+                    pet["last_stat_update"],
+                    pet["is_sleeping"],
+                    str(pet_row["user_id"]),
+                    pet_id,
+                ),
+            )
+            inventory_rows = connection.execute(
+                """
+                SELECT item_id, quantity FROM inventory
+                WHERE chat_id = '' AND user_id = ? AND record_type = 'item'
+                """,
+                (str(username),),
+            ).fetchall()
+            food_inventory = {
+                row["item_id"]: max(0, int(row["quantity"] or 0))
+                for row in inventory_rows
+            }
+
+        pet["inventory"] = food_inventory
+        return web.json_response(
+            {
+                "success": True,
+                "pet": pet,
+                "food_catalog": build_food_catalog(food_inventory),
+            }
+        )
+    except (sqlite3.Error, TypeError, ValueError) as error:
+        print(f"Pet feeding failed: {error}")
+        return web.json_response({"error": "Could not feed pet"}, status=500)
+
+
+async def api_buy_food(request):
+
+    username, telegram_user = get_webapp_user(request)
+    if not username or not telegram_user:
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+        food_id = request.match_info.get("food_id")
     if not food_id:
         payload = await read_json_object(request)
         food_id = payload.get("food_id") if payload else None
@@ -3326,7 +3384,7 @@ async def api_buy_food(request):
     if item is None:
         return web.json_response({"error": "Food not found"}, status=404)
 
-    price = item.get("price")
+        price = item.get("price")
     if isinstance(price, bool) or not isinstance(price, (int, float)) or price < 0:
         return web.json_response({"error": "Invalid food price"}, status=500)
 
@@ -3353,6 +3411,7 @@ async def api_buy_food(request):
 
             new_balance = balance - price
             user_data = _decode_sql_json(user_row["data_json"])
+
             if not isinstance(user_data, dict):
                 user_data = {}
             user_data["r_currency"] = new_balance
@@ -3825,7 +3884,7 @@ async def api_buy_pet_pack(request):
     except (TypeError, ValueError):
         count = 1
 
-    pack_info = PET_PACKS[pack_id]
+        pack_info = PET_PACKS[pack_id]
     base_price = pack_info["price"]
     total_price = base_price * count
     target_type = pack_info["type"]
@@ -3867,6 +3926,7 @@ async def api_buy_pet_pack(request):
 
             new_balance = balance - total_price
             user_data = _decode_sql_json(user_row["data_json"])
+
             if not isinstance(user_data, dict):
                 user_data = {}
             user_data["r_currency"] = new_balance
@@ -3972,6 +4032,7 @@ async def api_sell_duplicate_pet(request):
 
             balance = float(user_row["balance_r"] or 0)
             user_data = _decode_sql_json(user_row["data_json"])
+
             if not isinstance(user_data, dict):
                 user_data = {}
 
@@ -4007,6 +4068,10 @@ async def api_craft_pet(request):
         return web.json_response({"error": "Invalid payload"}, status=400)
 
     pet_id = payload.get("pet_id")
+
+    if not isinstance(pet_id, str) or not pet_id or pet_id == "users_pets":
+        return web.json_response({"error": "Invalid pet_id"}, status=400)
+
     pets_data = load_pets_data()
     source_pet = pets_data.get(pet_id)
 
@@ -4043,6 +4108,7 @@ async def api_craft_pet(request):
     try:
         with db_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+
             user_row = connection.execute(
                 "SELECT data_json FROM users WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
                 (str(username),),
@@ -4052,12 +4118,26 @@ async def api_craft_pet(request):
                 return web.json_response({"error": "User not found"}, status=404)
 
             user_data = _decode_sql_json(user_row["data_json"])
-            owned_pets = user_data.setdefault("owned_pets", {})
+            if not isinstance(user_data, dict):
+                return web.json_response(
+                    {"error": "Invalid user inventory"}, status=500
+                )
 
-            pet_entry = owned_pets.get(pet_id, {})
-            current_count = (
-                pet_entry.get("count", 1) if isinstance(pet_entry, dict) else 1
-            )
+            owned_pets = user_data.get("owned_pets", {})
+            if not isinstance(owned_pets, dict) or pet_id not in owned_pets:
+                return web.json_response({"error": "Pet not owned"}, status=400)
+            if source_pet.get("is_starter"):
+                return web.json_response(
+                    {"error": "Starter pets cannot be upgraded"}, status=400
+                )
+
+            pet_entry = owned_pets[pet_id]
+            if not isinstance(pet_entry, dict):
+                pet_entry = {"custom_name": source_pet.get("name", pet_id), "count": 1}
+            try:
+                current_count = max(0, int(pet_entry.get("count", 1)))
+            except (TypeError, ValueError):
+                current_count = 0
 
             if source_pet.get("is_starter"):
                 if current_count < 5:
@@ -4071,16 +4151,23 @@ async def api_craft_pet(request):
                         {"error": "Недостаточно питомцев (нужно 5)"}, status=400
                     )
 
-            if current_count - 5 > 0:
+            if current_count > 5:  # consume five duplicates
                 pet_entry["count"] = current_count - 5
+                owned_pets[pet_id] = pet_entry
             else:
                 del owned_pets[pet_id]
 
             won_id, won_def = random.choice(possible_outputs)
-            target_entry = owned_pets.setdefault(
-                won_id, {"custom_name": won_def.get("name", won_id), "count": 0}
-            )
-            target_entry["count"] = target_entry.get("count", 0) + 1
+            target_entry = owned_pets.get(won_id)
+
+            if not isinstance(target_entry, dict):
+                target_entry = {"custom_name": won_def.get("name", won_id), "count": 0}
+                owned_pets[won_id] = target_entry
+            try:
+                target_count = max(0, int(target_entry.get("count", 0)))
+            except (TypeError, ValueError):
+                target_count = 0
+            target_entry["count"] = target_count + 1
 
             connection.execute(
                 "UPDATE users SET data_json = ? WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
@@ -4122,6 +4209,7 @@ async def api_keep_duplicate_pet(request):
     try:
         with db_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+
             user_row = connection.execute(
                 "SELECT data_json FROM users WHERE chat_id = '' AND user_id = ? AND record_type = 'user'",
                 (str(username),),
@@ -4131,6 +4219,7 @@ async def api_keep_duplicate_pet(request):
                 return web.json_response({"error": "User not found"}, status=404)
 
             user_data = _decode_sql_json(user_row["data_json"])
+
             owned_pets = user_data.setdefault("owned_pets", {})
 
             pets_data = load_pets_data()
@@ -4162,31 +4251,47 @@ async def api_keep_duplicate_pet(request):
 
 async def api_pet_sleep(request):
     username, telegram_user = get_webapp_user(request)
-    if not username:
+    if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-    payload = await read_json_object(request) or {}
-    action = payload.get("action")
+    try:
+        with db_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
 
-    user_id = str(telegram_user["id"])
-    data = load_inventory_data()
-    pet = data["users_pets"].get(user_id)
+            pet_row, pet, pet_id = _get_personal_pet_for_update(
+                connection, username, telegram_user["id"]
+            )
+            if pet_row is None:
+                return web.json_response({"error": "Pet not found"}, status=404)
 
-    if not pet:
-        return web.json_response({"error": "Pet not found"}, status=404)
+            if pet["is_sleeping"] and pet["energy"] >= 100:
+                pet["is_sleeping"] = 0
+            else:
+                pet["is_sleeping"] = 0 if pet["is_sleeping"] else 1
+            pet["last_stat_update"] = time.time()
 
-    pet, _ = update_pet_stats_with_time(pet)
+            connection.execute(
+                """
+                UPDATE pets SET health = ?, hunger = ?, happiness = ?, energy = ?,
+                    last_stat_update = ?, is_sleeping = ?
+                WHERE chat_id = '' AND user_id = ? AND pet_id = ?
+                """,
+                (
+                    pet["health"],
+                    pet["hunger"],
+                    pet["happiness"],
+                    pet["energy"],
+                    pet["last_stat_update"],
+                    pet["is_sleeping"],
+                    str(pet_row["user_id"]),
+                    pet_id,
+                ),
+            )
 
-    current_sleeping = bool(pet.get("is_sleeping", 0))
-
-    if current_sleeping and pet.get("energy", 100) >= 100:
-        pet["is_sleeping"] = 0
-    else:
-        pet["is_sleeping"] = 0 if current_sleeping else 1
-
-    save_inventory_data(data)
-
-    return web.json_response({"success": True, "pet": pet})
+        return web.json_response({"success": True, "pet": pet})
+    except (sqlite3.Error, TypeError, ValueError) as error:
+        print(f"Pet sleep update failed: {error}")
+        return web.json_response({"error": "Could not update pet sleep"}, status=500)
 
 
 # ============================================================
@@ -4203,8 +4308,6 @@ async def start_webapp_api():
         api_craft_pet,
     )
 
-    app.router.add_post("/api/keep-duplicate-pet", api_keep_duplicate_pet)
-
     app.router.add_get(
         "/",
         index_handler,
@@ -4213,11 +4316,6 @@ async def start_webapp_api():
     app.router.add_post(
         "/api/buy-pet-pack",
         api_buy_pet_pack,
-    )
-
-    app.router.add_post(
-        "/api/sell-duplicate-pet",
-        api_sell_duplicate_pet,
     )
 
     app.router.add_post("/api/pet/sleep", api_pet_sleep)
@@ -5119,7 +5217,7 @@ async def main():
 # ENTRY POINT
 # ============================================================
 
-if __name__ == "__main__":
+if False and __name__ == "__main__":
 
     try:
 
@@ -5186,3 +5284,12 @@ def update_pet_stats_with_time(pet_data, now=None):
     pet_data["last_stat_update"] = now
 
     return pet_data, True
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped.")
+    except Exception as error:
+        print(f"Fatal startup error: {error}")

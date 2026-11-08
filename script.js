@@ -1444,19 +1444,8 @@ function renderShop() {
                     return;
                 }
 
-                userData.currency = data.currency;
-                userData.foodCatalog = data.food_catalog;
-                userData.pet = normalizePetData(data.pet);
+                                await fetchUserData();
 
-                const balance = document.getElementById('user-balance');
-                if (balance) balance.textContent = userData.currency;
-
-                const profileCurrency = document.getElementById('profile-currency');
-                if (profileCurrency) profileCurrency.textContent = userData.currency;
-
-                renderShop();
-                renderFoodInventory();
-                updatePetView();
             } catch (error) {
                 console.error('Ошибка при покупке еды:', error);
             }
@@ -1905,7 +1894,8 @@ function closeFeedMenuModal() {
 
 async function feedPet(foodId) {
     try {
-        const response = await fetch('/api/pet/feed', {
+                const response = await fetchWithTimeout('/api/pet/feed', {
+
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2052,25 +2042,30 @@ let currentShopSubTab = 'food';
 
 function switchShopSubTab(subTab) {
     currentShopSubTab = subTab;
+        const tabLabels = { food: 'Магазин еды', pets: 'Бустер Паки', craft: 'Апгрейд' };
     document.querySelectorAll('#mainShopSubTabs .category-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.includes(subTab === 'food' ? 'Магазин еды' : 'Магазин питомцев'));
+        btn.classList.toggle('active', btn.textContent.includes(tabLabels[subTab] || ''));
     });
 
-    const foodSec = document.getElementById('foodShopSection');
+
+        const foodSec = document.getElementById('foodShopSection');
     const petsSec = document.getElementById('petsShopSection');
-    
+    const craftSec = document.getElementById('craftShopSection');
+
     if (foodSec) foodSec.style.display = subTab === 'food' ? 'block' : 'none';
     if (petsSec) petsSec.style.display = subTab === 'pets' ? 'block' : 'none';
+    if (craftSec) craftSec.style.display = subTab === 'craft' ? 'block' : 'none';
 
-    if (subTab === 'pets') {
-        renderPetPacksShop();
-    }
+    if (subTab === 'pets') renderPetPacksShop();
+    if (subTab === 'craft') renderCraftPetChoices();
+
 }
 
 const PET_PACKS_CLIENT = [
-    { id: 'human_pack', name: '👤 Пак людей', price: 100, desc: 'Шанс выбить особенных персонажей' },
-    { id: 'animal_pack', name: '🐾 Пак животных', price: 75, desc: 'Простые, но милые и забавные рофланы' },
-    { id: 'robot_pack', name: '🤖 Пак роботов', price: 120, desc: 'Технологичные и кибернетические особи' },
+        { id: 'human_pack', name: '👤 Пак людей', price: 750, desc: 'Шанс выбить особенных персонажей' },
+    { id: 'animal_pack', name: '🐾 Пак животных', price: 300, desc: 'Простые, но милые и забавные рофланы' },
+    { id: 'robot_pack', name: '🤖 Пак роботов', price: 600, desc: 'Технологичные и кибернетические особи' },
+
 ];
 
 function renderPetPacksShop() {
@@ -2268,14 +2263,16 @@ function renderCraftPetChoices() {
     let userPetsList = [];
     Object.keys(ownedPets).forEach(petId => {
         const petDef = catalog.find(p => p.id === petId);
-        if (petDef) {
-            const count = ownedPets[petId].count || 1;
+                const ownedEntry = ownedPets[petId];
+        if (petDef && !petDef.is_starter) {
+            const count = Math.max(0, Number(ownedEntry?.count ?? 1) || 0);
             userPetsList.push({
                 id: petId,
-                count: count,
+                count,
                 ...petDef
             });
         }
+
     });
 
     if (userPetsList.length === 0) {
@@ -2331,7 +2328,125 @@ function updateCraftButtonState() {
     if (btn) btn.disabled = count !== 5;
 }
 
+async function putPetToSleep() {
+    const button = document.querySelector('.pet-actions button:last-child');
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetchWithTimeout('/api/pet/sleep', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({})
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+
+        userData.pet = normalizePetData(data.pet);
+        updatePetView();
+    } catch (error) {
+        console.error('Pet sleep update failed:', error);
+        showAppAlert(error.message || 'Не удалось изменить режим сна.');
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function executeCraft() {
+    if (!baseCraftTarget || selectedCraftPets.length !== 5) return;
+
+    const button = document.getElementById('mainCraftButton');
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetchWithTimeout('/api/craft-pet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ pet_id: baseCraftTarget.id })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        await fetchUserData();
+        resetCraftSelection();
+        showAppAlert(`Получен питомец: ${data.won_pet?.name || 'новый питомец'}`);
+    } catch (error) {
+        console.error('Pet upgrade failed:', error);
+        showAppAlert(error.message || 'Не удалось улучшить питомца.');
+    } finally {
+        if (button) button.disabled = false;
+        updateCraftButtonState();
+    }
+}
+
+async function putPetToSleep() {
+    const button = document.querySelector('.pet-actions button:last-child');
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetchWithTimeout('/api/pet/sleep', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({})
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+
+        userData.pet = normalizePetData(data.pet);
+        updatePetView();
+    } catch (error) {
+        console.error('Pet sleep update failed:', error);
+        showAppAlert(error.message || 'Не удалось изменить режим сна.');
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function executeCraft() {
+    if (!baseCraftTarget || selectedCraftPets.length !== 5) return;
+
+    const button = document.getElementById('mainCraftButton');
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetchWithTimeout('/api/craft-pet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': tg?.initData || ''
+            },
+            body: JSON.stringify({ pet_id: baseCraftTarget.id })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        await fetchUserData();
+        resetCraftSelection();
+        showAppAlert(`Получен питомец: ${data.won_pet?.name || 'новый питомец'}`);
+    } catch (error) {
+        console.error('Pet upgrade failed:', error);
+        showAppAlert(error.message || 'Не удалось улучшить питомца.');
+    } finally {
+        if (button) button.disabled = false;
+        updateCraftButtonState();
+    }
+}
+
 function showAppAlert(message, title = 'Информация') {
+
+
     const modal = document.getElementById('appAlertModal');
     const msgEl = document.getElementById('appAlertMessage');
     const titleEl = document.getElementById('appAlertTitle');
