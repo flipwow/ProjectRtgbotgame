@@ -3379,7 +3379,7 @@ async def api_buy_food(request):
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-        food_id = request.match_info.get("food_id")
+    food_id = request.match_info.get("food_id")
     if not food_id:
         payload = await read_json_object(request)
         food_id = payload.get("food_id") if payload else None
@@ -3391,7 +3391,7 @@ async def api_buy_food(request):
     if item is None:
         return web.json_response({"error": "Food not found"}, status=404)
 
-        price = item.get("price")
+    price = item.get("price")
     if isinstance(price, bool) or not isinstance(price, (int, float)) or price < 0:
         return web.json_response({"error": "Invalid food price"}, status=500)
 
@@ -3889,7 +3889,7 @@ async def api_buy_pet_pack(request):
     except (TypeError, ValueError):
         count = 1
 
-        pack_info = PET_PACKS[pack_id]
+    pack_info = PET_PACKS[pack_id]
     base_price = pack_info["price"]
     total_price = base_price * count
     target_type = pack_info["type"]
