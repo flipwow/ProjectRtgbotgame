@@ -1382,13 +1382,20 @@ async def give_money_handler(message: Message) -> None:
             amount = 5000
 
     try:
-        with db_connection() as connection:
-            connection.execute(
-                "UPDATE users SET balance_r = balance_r + ? WHERE chat_id = '' AND user_id = ?",
-                (amount, str(user_id)),
-            )
+        # User rows are keyed by username (not Telegram ID), and r_currency in
+        # data_json is the canonical balance used by the bot and web app.
+        user_key, _ = get_or_create_user(message.from_user.username, user_id)
+        users = load_users()
+        user = users.get(user_key)
+        if not isinstance(user, dict):
+            raise RuntimeError(f"Не найдена запись пользователя {user_id}")
+
+        current_balance = float(user.get("r_currency", user.get("balance_r", 0)) or 0)
+        user["r_currency"] = current_balance + amount
+        if not save_users(users):
+            raise RuntimeError("Не удалось сохранить баланс пользователя")
     except Exception as e:
-        print(f"Ошибка SQLite в /give: {e}")
+        print(f"Ошибка при начислении средств через /give: {e}")
         await message.answer("❌ Произошла ошибка при начислении средств.")
         return
 
