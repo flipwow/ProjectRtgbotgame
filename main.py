@@ -290,7 +290,7 @@ BOT_ID = None
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", "8080"))
 
-WEBAPP_ORIGIN = "https://projectrtgbotgame.onrender.com"
+WEBAPP_ORIGIN = "https://pawbot-45eq.onrender.com"
 
 
 # ============================================================
@@ -3491,9 +3491,7 @@ async def api_create_game(request):
             "success": True,
             "room_id": room_id,
             "url": duel_url,
-            "ws_url": (
-                f"wss://" f"projectrtgbotgame.onrender.com" f"/ws/game/{room_id}"
-            ),
+            "ws_url": (f"wss://" f"pawbot-45eq.onrender.com" f"/ws/game/{room_id}"),
         }
     )
 
