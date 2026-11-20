@@ -527,9 +527,10 @@ async function fetchUserData() {
         }
         showProfileFeedback('');
 
-        const isChatProfile = Boolean(chatContext.chatId);
+                        const isChatProfile = Boolean(chatContext.chatId);
         const endpoint = isChatProfile
-            ? `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`
+            ? `/api/me?chat_id=${encodeURIComponent(chatContext.chatId)}`
+
             : '/api/me'; // В ЛС всегда идет запрос на /api/me
         const headers = {
             'X-Telegram-Init-Data': tg?.initData || ''
@@ -544,25 +545,71 @@ async function fetchUserData() {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
 
-        userData.foodCatalog = data.food_catalog || data.catalog || [];
-        userData.petCatalog = data.pet_catalog || [];
-        if (isChatProfile) {
-            if (data.chat?.id) chatContext.chatId = String(data.chat.id);
-            applyChatProfile(data);
-        } else {
-            applyPersonalProfile(data);
+                                        if (
+            !data.user
+
+            || data.currency == null
+            || !Number.isFinite(Number(data.currency))
+            || !Array.isArray(data.food_catalog)
+
+            || !Array.isArray(data.pet_catalog)
+            || !Array.isArray(data.leaderboard)
+            || !Array.isArray(data.inventory)
+            || !data.owned_pets
+            || typeof data.owned_pets !== 'object'
+            || Array.isArray(data.owned_pets)
+
+
+        ) {
+            throw new Error('The personal profile response is incomplete.');
         }
 
-        userData.pet = normalizePetData(data.pet || data.profile?.pet);
+        applyPersonalProfile(data);
+                userData.foodCatalog = data.food_catalog;
+
+        userData.petCatalog = data.pet_catalog;
+
+
+        userData.pet = normalizePetData(data.pet);
+        if (isChatProfile) {
+            try {
+                const chatResponse = await fetchWithTimeout(
+                    `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
+                    { headers }, API_REQUEST_TIMEOUT_MS
+                );
+                                const chatData = await chatResponse.json().catch(() => ({}));
+                if (!chatResponse.ok) {
+                    throw new Error(chatData.error || `HTTP ${chatResponse.status}`);
+                }
+                if (!chatData.chat || !chatData.profile || !Array.isArray(chatData.members)) {
+                    throw new Error('The chat profile response is incomplete.');
+                }
+                userData.chat = chatData.chat;
+                userData.chatProfile = { ...chatData.profile, balance_r: data.currency };
+                userData.registry = chatData.members;
+            } catch (chatError) {
+
+
+
+                console.warn('Group-only profile data is unavailable:', chatError);
+                showProfileFeedback(
+                    'Could not refresh this chat profile. Showing the last available data.',
+                    'error'
+                );
+            }
+
+        }
+
         currentPetId = userData.pet?.id || '';
 
         if (!userData.pet || !userData.pet.id) {
             openFirstPetSelector();
         }
 
-        userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+                userData.leaderboard = data.leaderboard;
         renderLeaderboard();
         renderProfile();
+
 
         updatePetView();
         renderShop();
@@ -571,7 +618,8 @@ async function fetchUserData() {
 
     } catch (error) {
         console.error('Не удалось загрузить данные профиля:', error);
-        showProfileFeedback('Не удалось загрузить профиль чата. Повтори попытку позже.', 'error');
+                showProfileFeedback('Could not load the profile. Please try again later.', 'error');
+
         renderChatRegistry();
     } finally {
         const status = document.getElementById('profile-status');
@@ -615,14 +663,17 @@ function applyPersonalProfile(data) {
         display_name: user.display_name || [user.first_name, user.last_name].filter(Boolean).join(' ')
     };
     userData.owned_pets = data.owned_pets && typeof data.owned_pets === 'object' ? data.owned_pets : {};
-    userData.chat = null;
-    userData.chatProfile = {
-        status: 'Active',
-        balance_r: balance,
-    };
-    userData.registry = [];
+        if (!chatContext.chatId) {
+        userData.chat = null;
+        userData.chatProfile = {
+            status: 'Active',
+            balance_r: balance,
+        };
+        userData.registry = [];
+    }
     userData.currency = balance;
     userData.chatCurrency = balance;
+
     userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
 }
 
@@ -760,8 +811,15 @@ async function submitPetRename(event) {
         return;
     }
 
-    const currentChatId = String(chatContext.chatId || "");
-    const currentUserId = String(chatContext.userId || "");
+                const currentChatId = String(chatContext.chatId || "");
+    const currentUserId = String(
+        chatContext.userId
+
+        || tg?.initDataUnsafe?.user?.id
+        || userData.user?.id
+        || ''
+    );
+
     if (!currentUserId) {
         if (feedback) feedback.textContent = 'Не удалось определить пользователя.';
         return;
@@ -1211,9 +1269,19 @@ function renderPetChoices() {
 async function savePetName(event) {
     const petNameInput = event.currentTarget;
     const petId = currentPetId || userData.pet?.id;
-    if (!petNameInput || !petId) return;
+    const currentUserId = String(
+        chatContext.userId
+        || tg?.initDataUnsafe?.user?.id
+        || userData.user?.id
+        || ''
+    );
+    if (!petNameInput || !petId || !currentUserId) {
+        showAppAlert('Could not identify the current Telegram user or pet.');
+        return;
+    }
 
     try {
+
         if (chatContext.chatId) {
             await postChatAction('/api/pet/rename', {
                 new_name: petNameInput.value
@@ -1520,34 +1588,32 @@ function renderShop() {
             </button>
         `;
 
-        card.querySelector('.food-buy-button').addEventListener('click', async event => {
+                card.querySelector('.food-buy-button').addEventListener('click', async event => {
+
             event.stopPropagation();
 
             try {
-                const response = await fetch(
+                const response = await fetchWithTimeout(
                     `/api/buy-food/${encodeURIComponent(food.id)}`,
+
                     {
                         method: 'POST',
                         headers: {
                             'X-Telegram-Init-Data': tg?.initData || ''
                         }
-                    }
+                    },
+                    API_REQUEST_TIMEOUT_MS
                 );
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    tg?.showAlert?.(data.error === 'Not enough currency'
-                        ? 'Недостаточно R$ для покупки.'
-                        : 'Не удалось купить еду.');
-                    return;
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
                 }
-
-                                await fetchUserData();
-
+                await fetchUserData();
             } catch (error) {
                 console.error('Ошибка при покупке еды:', error);
+                tg?.showAlert?.(error.message || 'Не удалось купить еду.');
             }
+
         });
 
         grid.appendChild(card);
@@ -1993,27 +2059,26 @@ function closeFeedMenuModal() {
 
 async function feedPet(foodId) {
     try {
-                const response = await fetchWithTimeout('/api/pet/feed', {
-
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': tg?.initData || ''
+        const response = await fetchWithTimeout(
+            '/api/pet/feed',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': tg?.initData || ''
+                },
+                body: JSON.stringify({ food_id: foodId })
             },
-            body: JSON.stringify({ food_id: foodId })
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-            tg?.showAlert?.('Не удалось покормить питомца.');
-            return;
+            API_REQUEST_TIMEOUT_MS
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success || !data.pet || !Array.isArray(data.food_catalog)) {
+            throw new Error(data.error || `HTTP ${response.status}`);
         }
 
         userData.pet = normalizePetData(data.pet);
-        userData.foodCatalog = userData.foodCatalog.map(food => ({
-            ...food,
-            count: data.pet.inventory?.[food.id] || 0
-        }));
+        userData.foodCatalog = data.food_catalog;
+
         renderFeedItems();
         renderShop();
         renderFoodInventory();
@@ -2021,10 +2086,12 @@ async function feedPet(foodId) {
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
-    } catch (error) {
+        } catch (error) {
         console.error('Ошибка при кормлении питомца:', error);
+        tg?.showAlert?.(error.message || 'Не удалось покормить питомца.');
     }
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
     const initializeSafely = (name, initialize) => {
@@ -2487,67 +2554,8 @@ async function executeCraft() {
     }
 }
 
-async function putPetToSleep() {
-    const button = document.querySelector('.pet-actions button:last-child');
-    if (button) button.disabled = true;
-
-    try {
-        const response = await fetchWithTimeout('/api/pet/sleep', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': tg?.initData || ''
-            },
-            body: JSON.stringify({
-                is_sleeping: !Boolean(userData.pet?.is_sleeping)
-            })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-
-                userData.pet = normalizePetData(data.pet);
-                updatePetView();
-    } catch (error) {
-                console.error('Pet sleep update failed:', error);
-        showAppAlert(error.message || 'Не удалось изменить режим сна.');
-    } finally {
-        if (button) button.disabled = false;
-    }
-}
-
-async function executeCraft() {
-    if (!baseCraftTarget || selectedCraftPets.length !== 5) return;
-
-    const button = document.getElementById('mainCraftButton');
-    if (button) button.disabled = true;
-
-    try {
-        const response = await fetchWithTimeout('/api/craft-pet', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': tg?.initData || ''
-            },
-            body: JSON.stringify({ pet_id: baseCraftTarget.id })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-
-        await fetchUserData();
-        resetCraftSelection();
-        showAppAlert(`Получен питомец: ${data.won_pet?.name || 'новый питомец'}`);
-    } catch (error) {
-        console.error('Pet upgrade failed:', error);
-        showAppAlert(error.message || 'Не удалось улучшить питомца.');
-    } finally {
-        if (button) button.disabled = false;
-        updateCraftButtonState();
-    }
-}
-
 function showAppAlert(message, title = 'Информация') {
+
 
 
     const modal = document.getElementById('appAlertModal');

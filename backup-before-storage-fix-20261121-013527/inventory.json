@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "food_items": {
+    "fish": {
+      "name": "🐟 Свежая рыбка",
+      "hunger_restore": 35,
+      "happiness_restore": 20,
+      "price": 50
+    },
+    "meat": {
+      "name": "🥩 Сочный стейк",
+      "hunger_restore": 60,
+      "happiness_restore": 40,
+      "price": 100
+    },
+    "milk": {
+      "name": "🥛 Мисочка молока",
+      "hunger_restore": 15,
+      "happiness_restore": 25,
+      "price": 25
+    },
+    "chicken": {
+      "name": "🍗 Куриное филе",
+      "hunger_restore": 45,
+      "happiness_restore": 22,
+      "price": 70
+    },
+    "treat": {
+      "name": "🍪 Печенье для питомца",
+      "hunger_restore": 20,
+      "happiness_restore": 45,
+      "price": 65
+    },
+    "pumpkin": {
+      "name": "🍠 Запечённая тыква",
+      "hunger_restore": 30,
+      "happiness_restore": 15,
+      "price": 35
+    }
+  },
+  "users_pets": {
+    "123456789": {
+      "pet_id": "barsichela",
+      "pet_name": "Барсичела",
+      "pet_type": "barsichela",
+      "level": 1,
+      "experience": 0,
+      "health": 100,
+      "hunger": 50,
+      "happiness": 60,
+      "energy": 100,
+      "inventory": {
+        "fish": 2,
+        "milk": 1
+      }
+    }
+  }
+}

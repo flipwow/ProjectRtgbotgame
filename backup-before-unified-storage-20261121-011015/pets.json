@@ -1,0 +1,299 @@
+{
+  "SnowLeopard": {
+    "id": "SnowLeopard",
+    "name": "Snow Leopard",
+    "type": "Animal",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Common",
+    "is_starter": true,
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/SnowLeopard.png"
+  },
+  "Orange": {
+    "id": "Orange",
+    "name": "Orange",
+    "type": "Animal",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Common",
+    "is_starter": true,
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Orange.png"
+  },
+  "BabyPig": {
+    "id": "BabyPig",
+    "name": "Baby Pig",
+    "type": "Animal",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Common",
+    "is_starter": true,
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/BabyPig.png"
+  },
+  "FreddyFazbear": {
+    "id": "FreddyFazbear",
+    "name": "Freddy Fazbear",
+    "type": "Robot",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Legendary",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Freddy.png"
+  },
+  "Slava": {
+    "id": "Slava",
+    "name": "Slava",
+    "type": "Human",
+    "series": "Original",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Bo$$",
+    "passive_skill": {
+    "id": "boss_aura",
+    "name": "Аура босса",
+    "description": "Увеличивает урон на 10% и шанс выпадения редких сундуков."
+  },
+    "is_starter": true,
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Slava.png"
+  },
+  "Isaak": {
+    "id": "Isaak",
+    "name": "Isaak",
+    "type": "Human",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Isaak.png"
+  },
+  "Satoru": {
+    "id": "Satoru",
+    "name": "Goida Satoru",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "«»",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Satoru.png"
+  },
+  "Eren": {
+    "id": "Eren",
+    "name": "Eren Yeager",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Eren.png"
+  },
+  "chris": {
+    "id": "chris",
+    "name": "Chris",
+    "type": "Human",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Chris.png"
+  },
+  "SpiderGwen": {
+    "id": "SpiderGwen",
+    "name": "SpiderGwen",
+    "type": "Human",
+    "series": "Comics",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/SpiderGwen.png"
+  },
+  "Geralt": {
+    "id": "Geralt",
+    "name": "Geralt",
+    "type": "Human",
+    "series": "VideoGame",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Geralt.png"
+  },
+  "HarryPotter": {
+    "id": "HarryPotter",
+    "name": "Harry Potter",
+    "type": "Human",
+    "series": "Movie",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/HarryPotter.png"
+  },
+  "Miku": {
+    "id": "Miku",
+    "name": "Miku",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Miku.png"
+  },
+  "AI": {
+    "id": "AI",
+    "name": "AI",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/AI.png"
+  },
+  "Mable": {
+    "id": "Mable",
+    "name": "Mable",
+    "type": "Human",
+    "series": "Cartoons",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/Mable.png"
+  },
+  "El": {
+    "id": "El",
+    "name": "El",
+    "type": "Human",
+    "series": "Anime",
+    "level": 1,
+    "max_level": 10,
+    "description": "",
+    "rarity": "Epic",
+    "stats": {
+      "health": 100,
+      "hunger": 100,
+      "happiness": 100,
+      "energy": 100
+    },
+    "bonus": "",
+    "image": "/Pets/El.png"
+  }
+}

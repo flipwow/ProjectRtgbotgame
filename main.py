@@ -19,7 +19,10 @@ import urllib.request
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from aiohttp import web, WSMsgType
+from pathlib import Path
 from dotenv import load_dotenv
+
+import unified_storage
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandObject
@@ -31,6 +34,23 @@ from aiogram.types import (
     Message,
     WebAppInfo,
 )
+
+print("=== DATABASE DIAGNOSTICS ===")
+print("Рабочая директория:", os.getcwd())
+print("Путь к main.py:", Path(__file__).resolve())
+
+db_path = Path("database.db").resolve()
+print("Путь к БД:", db_path)
+print("Существует:", db_path.exists())
+
+if db_path.exists():
+    conn = sqlite3.connect(str(db_path))
+    print(
+        "Таблицы:",
+        conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall(),
+    )
+    print("Подключённая БД:", conn.execute("PRAGMA database_list").fetchall())
+    conn.close()
 
 SHOP_ITEMS = {
     "meat": {
@@ -1340,7 +1360,7 @@ def request_openai_compatible(messages):
         raise RuntimeError("DeepSeek вернул ответ в неожиданном формате.") from error
     if not isinstance(answer, str) or not answer.strip():
         raise RuntimeError("DeepSeek вернул пустой текстовый ответ.")
-        return answer.strip()
+    return answer.strip()
 
 
 async def generate_companion_reply(system_prompt, text):
@@ -3551,8 +3571,10 @@ async def api_pet_feed(request):
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
-        payload = await read_json_object(request)
-    food_id = payload.get("food_id") if payload else None
+    payload = await read_json_object(request)
+    if payload is None:
+        return web.json_response({"error": "JSON object is required"}, status=400)
+    food_id = payload.get("food_id")
     item = SHOP_ITEMS.get(food_id) if isinstance(food_id, str) else None
     if item is None:
         return web.json_response({"error": "Food not found"}, status=404)
@@ -3717,6 +3739,7 @@ async def api_buy_food(request):
                 """
                 SELECT quantity FROM inventory
                 WHERE chat_id = '' AND user_id = ? AND item_id = ?
+                  AND record_type = 'item'
                 """,
                 (str(username), food_id),
             ).fetchone()
@@ -4600,6 +4623,9 @@ async def start_webapp_api():
     )
 
     app.router.add_post("/api/pet/sleep", api_pet_sleep)
+    app.router.add_post("/api/chat/convert", api_chat_convert)
+    app.router.add_post("/api/sell-duplicate-pet", api_sell_duplicate_pet)
+    app.router.add_post("/api/keep-duplicate-pet", api_keep_duplicate_pet)
 
     app.router.add_get(
         "/style.css",
@@ -4658,6 +4684,11 @@ async def start_webapp_api():
     app.router.add_get(
         "/api/leaderboard",
         api_leaderboard,
+    )
+
+    app.router.add_get(
+        "/api/chat/leaderboard",
+        api_chat_leaderboard,
     )
 
     app.router.add_post(
@@ -5052,10 +5083,9 @@ async def do_convert(
         + amount
     )
 
+    user_key, _ = get_or_create_user(username, user.id)
     users = load_users()
-
-    users[username] = user_info
-
+    users[user_key] = user_info
     save_users(users)
 
     await callback.message.edit_text(
@@ -5497,20 +5527,6 @@ async def main():
 # ENTRY POINT
 # ============================================================
 
-if False and __name__ == "__main__":
-
-    try:
-
-        asyncio.run(main())
-
-    except KeyboardInterrupt:
-
-        print("Бот остановлен.")
-
-    except Exception as e:
-
-        print("\n[!] ОШИБКА:\n" f"{e}")
-
 RARITY_ORDER = ["Common", "Epic", "Legendary", "Bo$$"]
 
 
@@ -5576,6 +5592,10 @@ def update_pet_stats_with_time(pet_data, now=None):
 
     return pet_data, True
 
+
+# Install the Telegram-ID keyed personal profile store only after all existing
+# handlers/helpers are defined, but before the web app registers its routes.
+unified_storage.install(globals())
 
 if __name__ == "__main__":
     try:

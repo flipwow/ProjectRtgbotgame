@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pawk1ns Game</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/style.css?v=pet-sleep-indicator-1">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- Шапка профиля -->
+        <div class="glass-card profile-header">
+            <div class="profile-info">
+                <div class="avatar-wrapper">
+                    <img
+                        id="user-avatar"
+                        alt="Avatar"
+                    >
+                    <span id="avatar-fallback" class="avatar-fallback" aria-hidden="true">🐾</span>
+                </div>
+
+                <div>
+                    <h2 id="username">Загрузка...</h2>
+
+                    <div class="balance-badge">
+                        <span>💎</span>
+                        <span id="user-balance">0</span> R$
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основной контент -->
+        <div class="content-area">
+
+            <!-- Приятель -->
+            <div id="tab-home" class="tab-content active">
+
+                <div class="pet-section-header">
+                                                                                <div class="vip-tag">PETS GAME</div>
+
+                    <div class="pet-name-heading">
+                        <div class="pet-name-wrapper">
+                            <input type="text" id="pet-name" name="pet_name" class="pet-name-input" placeholder="Имя питомца" maxlength="20" aria-label="Имя питомца">
+                            <button type="button" id="save-pet-name-btn" class="save-name-inline-btn" title="Сохранить">✓</button>
+                        </div>
+                    </div>
+                    <div class="subtitle">
+                        Твои любимые персонажи
+                    </div>
+                </div>
+
+                                <div class="glass-card pet-card">
+
+                    <div
+                        class="pet-display"
+                        id="petDisplay"
+                        onclick="openPetSelector()"
+                    >
+                        🐾
+                    </div>
+
+                    <div class="pet-stats" aria-label="Характеристики питомца">
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Уровень</span>
+            <span id="pet-level-value">1 / 10</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Уровень питомца">
+            <div id="pet-level-bar" class="pet-stat-fill level-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Здоровье</span>
+            <span id="pet-health-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Здоровье питомца">
+            <div id="pet-health-bar" class="pet-stat-fill health-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Голод</span>
+            <span id="pet-hunger-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Сытость питомца">
+            <div id="pet-hunger-bar" class="pet-stat-fill hunger-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Счастье</span>
+            <span id="pet-happiness-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Счастье питомца">
+            <div id="pet-happiness-bar" class="pet-stat-fill happiness-fill"></div>
+        </div>
+    </div>
+    <div class="pet-stat">
+        <div class="pet-stat-heading">
+            <span>Энергия</span>
+            <span id="pet-energy-value">100 / 100</span>
+        </div>
+        <div class="pet-stat-track" role="progressbar" aria-label="Энергия питомца">
+            <div id="pet-energy-bar" class="pet-stat-fill energy-fill"></div>
+        </div>
+    </div>
+</div>
+
+                </div>
+
+                <div class="pet-actions">
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="openPetSelector()"
+    >
+        <span>🐾</span>
+        <span>Сменить</span>
+    </button>
+
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="openFeedMenuModal()"
+    >
+        <span>🥣</span>
+        <span>Покормить</span>
+    </button>
+
+    <button
+        class="wardrobe-shortcut-btn pet-action-btn"
+        onclick="putPetToSleep()"
+    >
+        <span>💤</span>
+        <span>Спать</span>
+    </button>
+</div>
+
+            </div>
+
+            <!-- Игры и Лидеры -->
+            <div id="tab-play" class="tab-content">
+
+                <!-- Переключатель внутри вкладки Игры -->
+                <div class="category-tabs" id="playSubTabs" style="margin-bottom: 14px;">
+                    <button class="category-tab active" type="button" onclick="switchPlaySubTab('games')">🎮 Мини-игры</button>
+                    <button class="category-tab" type="button" onclick="switchPlaySubTab('leaderboard')">👑 Лидеры</button>
+                </div>
+
+                <!-- Раздел МИНИ-ИГРЫ -->
+                <div id="gamesSection">
+                    <div id="games-menu" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="glass-card" style="padding: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="openGameMenu('tictactoe')">
+                            <div>
+                                <h4 style="font-size: 15px; margin-bottom: 4px;">❌ Крестики-нолики ⭕️</h4>
+                                <p style="font-size: 12px; color: var(--text-secondary);">Играй с ботом или устрой дуэль с другом</p>
+                            </div>
+                            <span style="font-size: 18px; color: #ec4899;">→</span>
+                        </div>
+                    </div>
+
+                    <!-- Режимы -->
+                    <div id="tictactoe-modes" style="display: none; flex-direction: column; gap: 10px;">
+                        <button class="wardrobe-shortcut-btn" onclick="startTttGame('solo')">🤖 Играть с ботом</button>
+                        <button class="wardrobe-shortcut-btn" onclick="startTttGame('local')" style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);">👥 Играть с другом (на одном телефоне)</button>
+                        <div class="info-card game-duel-note">
+                            Чтобы вызвать друга на дуэль онлайн, отправь боту команду <strong>/duel</strong> в чате.
+                        </div>
+                        <button class="category-tab" style="padding: 12px; text-align: center; margin-top: 4px;" onclick="closeGame()">◀️ Назад к играм</button>
+                    </div>
+
+                    <!-- Поле игры -->
+                    <div id="game-tictactoe" style="display: none; flex-direction: column; align-items: center; gap: 14px;">
+                        <div id="ttt-status" style="font-weight: 600; font-size: 14px; color: #c4b5fd;">Ходит: X</div>
+                        <div class="glass-card" style="padding: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px;">
+                            <button class="glass-card ttt-cell" onclick="makeMove(0)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(1)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(2)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(3)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(4)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(5)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(6)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(7)"></button>
+                            <button class="glass-card ttt-cell" onclick="makeMove(8)"></button>
+                        </div>
+                        <button class="category-tab" style="padding: 10px 20px;" onclick="backTttModes()">Сдаться / Назад</button>
+                    </div>
+                </div>
+
+                <!-- Раздел ЛИДЕРБОРДА -->
+                <div id="playLeaderboardSection" style="display: none;">
+                    <div class="section-heading leaderboard-heading">
+                        <h3>👑 Таблица лидеров</h3>
+                        <div class="subtitle">Общий рейтинг и очки по игровым режимам</div>
+                    </div>
+
+                    <section class="leaderboard-section" aria-labelledby="overall-leaderboard-title">
+                        <h4 id="overall-leaderboard-title" class="leaderboard-section-title">Общий рейтинг · за всё время</h4>
+                        <div id="overallLeaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                    </section>
+
+                    <section class="leaderboard-section" aria-labelledby="mode-leaderboard-title">
+                        <h4 id="mode-leaderboard-title" class="leaderboard-section-title">Очки по режимам</h4>
+                        <button id="leaderboardGamePicker" class="category-tab leaderboard-game-picker" type="button" aria-haspopup="dialog" aria-controls="leaderboardGameModal">
+                            <span id="leaderboardGameName">Крестики-нолики</span>
+                            <span aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="category-tabs leaderboard-tabs" id="leaderboardTypeTabs" role="tablist" aria-label="Тип игры"></div>
+                        <div id="leaderboardList" class="leaderboard-list" aria-live="polite"></div>
+                    </section>
+                </div>
+
+            </div>
+
+            <!-- Вкладка Магазин -->
+<div id="tab-shop" class="tab-content">
+    <div class="section-heading">
+        <h3>🛒 Магазин и Алхимия</h3>
+        <div class="subtitle">Покупай еду, открывай паки и улучшай питомцев за R$</div>
+    </div>
+
+    <!-- Переключатель магазинов -->
+    <div class="category-tabs" id="mainShopSubTabs">
+        <button class="category-tab active" type="button" onclick="switchShopSubTab('food')">🥣 Магазин еды</button>
+        <button class="category-tab" type="button" onclick="switchShopSubTab('pets')">📦 Бустер Паки</button>
+        <button class="category-tab" type="button" onclick="switchShopSubTab('craft')">✨ Апгрейд</button>
+    </div>
+
+    <!-- Контейнер для еды -->
+    <div id="foodShopSection">
+        <div class="category-tabs" id="shopCategoryTabs"></div>
+        <div class="items-grid" id="shopItemsGrid"></div>
+    </div>
+
+    <!-- Контейнер для паков питомцев -->
+<div id="petsShopSection" style="display: none;">
+    <!-- Панель выбора количества кейсов -->
+    <div class="glass-card" style="padding: 12px; margin-bottom: 12px; text-align: center;">
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Количество кейсов для открытия:</div>
+        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 10px;" id="packCountSelector">
+            <button type="button" class="category-tab active" onclick="setPackCount(1)">1 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(2)">2 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(3)">3 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(4)">4 шт.</button>
+            <button type="button" class="category-tab" onclick="setPackCount(5)">5 шт.</button>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Режим анимации:</div>
+        <div style="display: flex; justify-content: center; gap: 10px;" id="packModeSelector">
+            <button type="button" class="category-tab active" onclick="setPackMode('slow')">🎡 Медленно (рулетка)</button>
+            <button type="button" class="category-tab" onclick="setPackMode('fast')">⚡ Быстро (мгновенно)</button>
+        </div>
+    </div>
+    <div class="items-grid" id="petPacksGrid"></div>
+</div>
+
+    <!-- Контейнер для Апгрейда (Крафта) -->
+    <div id="craftShopSection" style="display: none; text-align: center;">
+        <div class="craft-center-wrapper" style="margin: 20px 0;">
+            <button id="mainCraftButton" class="craft-circle-btn" type="button" onclick="executeCraft()" disabled>
+                <span>✨</span>
+                <span>Сделать апгрейд</span>
+                <small id="craftProgressNote">Выбери 5 питомцев (0/5)</small>
+            </button>
+        </div>
+        <p id="craftInstruction" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            Выбери первого питомца для апгрейда (стартовые не участвуют):
+        </p>
+        <div class="pet-choices-grid" id="craftPetsGrid"></div>
+    </div>
+</div>
+
+            <!-- Профиль -->
+            <div id="tab-profile" class="tab-content">
+    <div class="profile-page-header">
+        <div class="profile-kicker">ПРОФИЛЬ ЧАТА</div>
+        <div class="profile-title-row">
+            <div>
+                <h1 id="profile-username">Загрузка...</h1>
+                <p id="profile-chat-title" class="subtitle">Telegram Mini App</p>
+            </div>
+            <span id="profile-status" class="profile-status">Загрузка</span>
+        </div>
+    </div>
+
+    <!-- Оставляем только баланс R$ в шапке профиля или метриках -->
+<section class="profile-metrics" aria-label="Баланс">
+    <article class="metric-tile balance-tile" style="grid-column: span 2;">
+        <span class="metric-label">Баланс</span>
+        <strong><span id="profile-currency">0</span><small>R$</small></strong>
+    </article>
+</section>
+
+    <button class="settings-open-button" type="button" onclick="openSettings()">⚙️ Настройки</button>
+
+    <section class="members-section" aria-labelledby="members-title">
+        <div class="members-heading">
+            <div>
+                <span class="panel-eyebrow">СООБЩЕСТВО</span>
+                <h2 id="members-title">Участники чата</h2>
+            </div>
+            <span id="members-count" class="members-count">0</span>
+        </div>
+        <div id="profileUsersList" class="profile-users-list" aria-live="polite">
+            <p class="list-state">Загрузка участников...</p>
+        </div>
+    </section>
+    <p id="profile-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+</div>
+
+        </div>
+
+        <!-- Нижняя навигация (4 кнопки вместо 5) -->
+        <div class="glass-card bottom-nav">
+            <button class="nav-item active" onclick="switchTab('home')">
+                <span class="nav-icon">🐾</span>
+                <span>Приятель</span>
+            </button>
+
+            <button class="nav-item" onclick="switchTab('play')">
+                <span class="nav-icon">🎮</span>
+                <span>Игры</span>
+            </button>
+
+            <button class="nav-item" onclick="switchTab('shop')">
+                <span class="nav-icon">🛍️</span>
+                <span>Магазин</span>
+            </button>
+
+            <button class="nav-item" onclick="switchTab('profile')">
+                <span class="nav-icon">⚙️</span>
+                <span>Профиль</span>
+            </button>
+        </div>
+
+    </div>
+
+        <div id="leaderboardGameModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="leaderboard-game-title">
+        <section class="pet-modal-content leaderboard-game-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="leaderboard-game-title">Выбор игры</h3>
+                <button id="leaderboardGameModalClose" class="close-modal-btn" type="button" aria-label="Закрыть">✕</button>
+            </div>
+            <div id="leaderboardGameOptions" class="leaderboard-game-options"></div>
+        </section>
+    </div>
+
+    <!-- Настройки приложения -->
+    <div id="settingsModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <section class="pet-modal-content settings-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="settings-title">Настройки</h3>
+                <button class="close-modal-btn" type="button" aria-label="Закрыть" onclick="closeSettings()">✕</button>
+            </div>
+            <label class="settings-field" for="language-select">
+                <span>Язык / Language</span>
+                <select id="language-select" onchange="setAppLanguage(this.value)">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                </select>
+            </label>
+            <label class="settings-field" for="theme-select">
+                <span>Тема</span>
+                <select id="theme-select" onchange="setAppTheme(this.value)">
+                    <option value="current">Исходная</option>
+                    <option value="light">Светлая</option>
+                    <option value="dark">Тёмная</option>
+                </select>
+            </label>
+            <button class="settings-rules-button" type="button" onclick="openRules()">📖 Правила</button>
+        </section>
+    </div>
+
+    <div id="rulesModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="rules-title">
+        <section class="pet-modal-content rules-modal-content">
+            <div class="pet-modal-header">
+                <h3 id="rules-title">Правила</h3>
+                <button class="close-modal-btn" type="button" aria-label="Закрыть" onclick="closeRules()">✕</button>
+            </div>
+            <div class="rules-copy">
+                <p><strong>Основные команды бота</strong></p>
+                <p><code>/start</code> — запустить бота и открыть приложение.</p>
+                <p><code>/duel</code> — создать онлайн-дуэль в крестики-нолики и отправить вызов в чат (Запускайте дуэль по очереди).</p>
+                <p><code>/menu</code> — открыть меню; <code>/balance</code> — проверить баланс; <code>/pet</code> — посмотреть питомца.</p>
+                <p>Побеждайте в дуэлях и получайте 30–60 R$, ничья не награждается.</p>
+                <p>Заботься о питомце, покупай еду за R$.</p>
+                <p class="rules-note">Играйте честно и уважайте других участников чата.</p>
+            </div>
+            <button class="settings-rules-button" type="button" onclick="closeRules()">Готово</button>
+        </section>
+    </div>
+
+    <!-- Выбор питомца -->
+    <div
+        id="petSelectorModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+    >
+        <div class="pet-modal-content">
+
+            <div class="pet-modal-header">
+                <h3>Выбор питомца</h3>
+
+                <button
+                    class="close-modal-btn"
+                    onclick="closePetSelector()"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div
+                class="pet-choices-grid"
+                id="petChoicesGrid"
+            ></div>
+
+        </div>
+    </div>
+
+    <!-- Перевод валюты -->
+    <div
+        id="giftModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+    >
+        <div class="pet-modal-content gift-modal-content">
+            <div class="pet-modal-header">
+                <div>
+                    <span class="panel-eyebrow">ПОДАРОК</span>
+                    <h3 id="gift-recipient-name">Перевод R$</h3>
+                </div>
+                <button
+                    class="close-modal-btn"
+                    type="button"
+                    aria-label="Закрыть"
+                    onclick="closeGiftModal()"
+                >
+                    ✕
+                </button>
+            </div>
+            <p id="gift-balance-note" class="gift-balance-note">Доступно: 0 R$</p>
+            <label class="amount-field gift-amount-field" for="gift-amount">
+                <span>Сумма перевода</span>
+                <input id="gift-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="Например, 25">
+            </label>
+            <p id="gift-feedback" class="profile-feedback" role="status" aria-live="polite"></p>
+            <button id="gift-submit" class="primary-action" type="button" onclick="sendGift()">Отправить подарок</button>
+        </div>
+    </div>
+
+    <div
+        id="memberPetModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="member-pet-owner"
+    >
+        <section class="pet-modal-content member-pet-content">
+            <div class="pet-modal-header">
+                <div>
+                    <span class="panel-eyebrow">ПИТОМЕЦ УЧАСТНИКА</span>
+                    <h3 id="member-pet-owner">Участник</h3>
+                </div>
+                <button
+                    class="close-modal-btn"
+                    type="button"
+                    aria-label="Закрыть"
+                    onclick="closeMemberPetModal()"
+                >
+                    ✕
+                </button>
+            </div>
+            <div class="member-pet-summary">
+                <img id="member-pet-image" src="/Pets/Снежный барсик.png" alt="Приятель">
+                <div>
+                    <strong id="member-pet-name">Приятель</strong>
+                    <span>Уровень <b id="member-pet-level">1</b></span>
+                </div>
+            </div>
+            <div class="profile-pet-stats">
+                <div class="profile-stat-row">
+                    <div><span>Здоровье</span><strong id="member-pet-health-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Здоровье приятеля" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
+                </div>
+                <div class="profile-stat-row">
+                    <div><span>Сытость</span><strong id="member-pet-hunger-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Сытость приятеля" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
+                </div>
+                <div class="profile-stat-row">
+                                        <div><span>Счастье</span><strong id="member-pet-happiness-value">100 / 100</strong></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Счастье приятеля" aria-valuemin="0" aria-valuemax="100" ariavaluenow="100"><span id="member-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Кормление -->
+    <div
+        id="feedMenuModal"
+        class="pet-modal-overlay"
+        style="display: none;"
+    >
+        <div class="pet-modal-content">
+
+            <div class="pet-modal-header">
+
+                <h3>
+                    🥣 Покормить Барсичелу
+                </h3>
+
+                <button
+                    class="close-modal-btn"
+                    onclick="closeFeedMenuModal()"
+                >
+                    ✕
+                </button>
+
+            </div>
+
+            <div
+                style="
+                    font-size: 13px;
+                    color: var(--text-secondary);
+                    margin-bottom: 12px;
+                "
+            >
+                Выбери лакомство из инвентаря:
+            </div>
+
+            <div
+                id="feedItemsGrid"
+                style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    max-height: 250px;
+                    overflow-y: auto;
+                "
+            >
+                <p
+                    style="
+                        text-align: center;
+                        color: var(--text-secondary);
+                        padding: 15px;
+                    "
+                >
+                    Холодильник пока пуст 🛍
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/script.js?v=chat-wallet-sync-1" defer></script>
+    <script src="/leaderboard-ui.js" defer></script>
+
+    <!-- Модальное окно с информацией о питомце -->
+<div id="pet-info-modal" class="pet-modal-overlay" style="display: none;" onclick="closePetInfoModal(event)">
+    <div class="pet-modal-card" onclick="event.stopPropagation()">
+        <button class="modal-close-btn" onclick="closePetInfoModal()">&times;</button>
+        <img id="modal-pet-img" src="" alt="Pet Image" class="modal-pet-image">
+        <h2 id="modal-pet-name"></h2>
+        <div class="modal-pet-badges">
+            <span id="modal-pet-rarity" class="badge-rarity"></span>
+            <span id="modal-pet-series" class="badge-series"></span>
+            <span id="modal-pet-type" class="badge-type"></span>
+        </div>
+        <p id="modal-pet-desc" class="modal-pet-description"></p>
+    </div>
+</div>
+
+<!-- Стартовое модальное окно выбора первого питомца -->
+<div id="firstPetModal" class="pet-modal-overlay" style="display: none;" data-nosclose="true">
+    <div class="pet-modal-content" style="text-align: center;">
+        <div class="pet-modal-header" style="justify-content: center;">
+            <h3 style="color: var(--accent-color);">Выберите своего первого друга</h3>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+            Твой приятель уже ждет тебя! Выбери одного из четырех стартовых друзей:
+        </p>
+        <div class="pet-choices-grid" id="firstPetChoicesGrid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;"></div>
+    </div>
+</div>
+
+<!-- Модальное окно с анимацией рулетки и пачкой результатов -->
+<div id="gachaRouletteModal" class="pet-modal-overlay" style="display: none;">
+    <div class="roulette-container" style="max-width: 440px;">
+        <div class="roulette-header">
+            <h3 id="rouletteModalTitle">Открытие пака...</h3>
+        </div>
+        
+        <!-- Одиночная рулетка (для 1 кейса) -->
+        <div class="roulette-window" id="rouletteWindowContainer" style="display: none;">
+            <div class="roulette-pointer">▼</div>
+            <div class="roulette-track" id="rouletteTrack"></div>
+        </div>
+
+        <!-- Множественные рулетки (для 2-5 кейсов в медленном режиме) -->
+        <div id="multiRouletteContainer" class="multi-roulette-wrapper" style="display: none;"></div>
+
+        <!-- Сетка для быстрого открытия -->
+        <div id="batchResultsContainer" style="display: none; max-height: 280px; overflow-y: auto; gap: 8px; margin-bottom: 12px; grid-template-columns: repeat(2, 1fr);"></div>
+
+        <!-- Карточка выигранного персонажа (для одиночного режима) -->
+        <div class="roulette-result" id="rouletteResult" style="display: none;">
+            <div id="rouletteResultTitle" class="result-title">🎉 Новый персонаж!</div>
+            <img id="rouletteResultImg" src="" alt="Pet" class="result-pet-img">
+            <div id="rouletteResultName" class="result-pet-name"></div>
+            <div id="rouletteResultRarity" class="result-pet-rarity"></div>
+        </div>
+
+        <!-- Кнопки управления модалкой -->
+        <div id="rouletteActionButtons" style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px;">
+            <button type="button" id="nextRouletteItemBtn" class="primary-action" style="display: none;" onclick="showNextInBatch()">Далее ➔</button>
+            <button type="button" id="closeRouletteFinalBtn" class="primary-action" onclick="closeRouletteModal()">Забрать в инвентарь</button>
+        </div>
+    </div>
+</div>
+
+<!-- Кастомное модальное окно уведомлений в стиле приложения -->
+<div id="appAlertModal" class="pet-modal-overlay" style="display: none;" role="dialog" aria-modal="true">
+    <div class="pet-modal-content" style="max-width: 320px; text-align: center;">
+        <div class="pet-modal-header" style="justify-content: center; margin-bottom: 12px;">
+            <h3 id="appAlertTitle" style="color: var(--accent-color); font-size: 16px;">Внимание</h3>
+        </div>
+        <p id="appAlertMessage" style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 20px;"></p>
+        <button type="button" class="primary-action" onclick="closeAppAlert()" style="width: 100%;">Понятно</button>
+    </div>
+</div>
+
+</body>
+</html>
