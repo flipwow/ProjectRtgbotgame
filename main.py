@@ -2424,7 +2424,7 @@ async def api_pet_rename(request):
             {"error": "Activate /pet activate in this chat first"}, status=404
         )
 
-        new_name = payload.get("new_name")
+    new_name = payload.get("new_name")
     if not isinstance(new_name, str):
         return web.json_response({"error": "new_name must be text"}, status=400)
 
