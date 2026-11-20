@@ -286,8 +286,7 @@ BOT_ID = None
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", "8080"))
 
-WEBAPP_ORIGIN = "https://pawbot-45eq.onrender.com"
-
+WEBAPP_ORIGIN = "https://sslip.io"
 
 # ============================================================
 # SCORES
