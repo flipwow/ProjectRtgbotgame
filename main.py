@@ -1363,40 +1363,104 @@ async def send_pet_selection(message: Message):
     )
 
 
+ADMIN_ID = "8990488378"
+
+
+@router.message(Command("players"))
+async def list_players_handler(message: Message) -> None:
+    if str(message.from_user.id) != ADMIN_ID:
+        return
+
+    users = load_users()
+    if not users:
+        await message.answer("📭 В базе пока нет игроков.")
+        return
+
+    lines = ["👥 <b>Список игроков:</b>\n"]
+    for idx, (key, data) in enumerate(users.items(), 1):
+        if not isinstance(data, dict):
+            continue
+        bal = int(float(data.get("r_currency", data.get("balance_r", 0)) or 0))
+        uname = data.get("username") or key
+        lines.append(f"{idx}. <code>@{uname}</code> — <b>{bal} R$</b>")
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
 @router.message(Command("give"))
 async def give_money_handler(message: Message) -> None:
-    user_id = message.from_user.id
-
-    if str(user_id) != "8990488378":
+    if str(message.from_user.id) != ADMIN_ID:
         return
 
     text_parts = message.text.split() if message.text else []
+    target_username = None
     amount = 5000
-    if len(text_parts) > 1:
+
+    # Форматы:
+    # /give                -> +5000 себе
+    # /give 1000           -> +1000 себе
+    # /give @nick 1000     -> +1000 игроку @nick
+    # /give @nick -500     -> -500 у игрока @nick
+    if len(text_parts) == 2:
         try:
             amount = int(text_parts[1])
-        except (ValueError, IndexError):
-            amount = 5000
+        except ValueError:
+            target_username = text_parts[1].lstrip("@")
+    elif len(text_parts) >= 3:
+        target_username = text_parts[1].lstrip("@")
+        try:
+            amount = int(text_parts[2])
+        except ValueError:
+            await message.answer(
+                "❌ Неверная сумма. Пример: <code>/give @username 1000</code>",
+                parse_mode="HTML",
+            )
+            return
 
     try:
-        # User rows are keyed by username (not Telegram ID), and r_currency in
-        # data_json is the canonical balance used by the bot and web app.
-        user_key, _ = get_or_create_user(message.from_user.username, user_id)
         users = load_users()
+        if target_username:
+            # Ищем игрока без учёта регистра букв
+            matched_key = next(
+                (k for k in users.keys() if k.lower() == target_username.lower()),
+                None,
+            )
+            if not matched_key:
+                await message.answer(
+                    f"❌ Игрок <code>@{target_username}</code> не найден в базе.\n"
+                    f"Посмотреть всех игроков: /players",
+                    parse_mode="HTML",
+                )
+                return
+            user_key = matched_key
+        else:
+            user_key, _ = get_or_create_user(
+                message.from_user.username, message.from_user.id
+            )
+            users = load_users()
+
         user = users.get(user_key)
         if not isinstance(user, dict):
-            raise RuntimeError(f"Не найдена запись пользователя {user_id}")
+            raise RuntimeError(f"Не найдена запись пользователя {user_key}")
 
         current_balance = float(user.get("r_currency", user.get("balance_r", 0)) or 0)
-        user["r_currency"] = current_balance + amount
+        new_balance = max(0.0, current_balance + amount)
+        user["r_currency"] = new_balance
+        user["balance_r"] = new_balance
+
         if not save_users(users):
             raise RuntimeError("Не удалось сохранить баланс пользователя")
-    except Exception as e:
-        print(f"Ошибка при начислении средств через /give: {e}")
-        await message.answer("❌ Произошла ошибка при начислении средств.")
-        return
 
-    await message.answer(f"💰 Успешно начислено {amount} R$!")
+        action_word = "Начислено" if amount >= 0 else "Списано"
+        await message.answer(
+            f"💰 <b>{action_word}:</b> {abs(amount)} R$\n"
+            f"👤 <b>Игрок:</b> <code>@{user_key}</code>\n"
+            f"💳 <b>Новый баланс:</b> {int(new_balance)} R$",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        print(f"Ошибка при изменении баланса через /give: {e}")
+        await message.answer("❌ Произошла ошибка при изменении баланса.")
 
 
 async def start_pet_command(message: Message):
