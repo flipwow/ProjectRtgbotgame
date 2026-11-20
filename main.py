@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import hashlib
 import hmac
+import html
 import json
 import os
 import random
@@ -1096,16 +1097,43 @@ def process_chat_message(profile, text, now=None):
 
 
 def get_pet_status_for_chat(chat_id, user_id):
+    pets_data = load_pets_data()
     pet = (
-        load_pets_data()
-        .get("users_pets", {})
-        .get(
+        pets_data.get("users_pets", {}).get(
             chat_member_key(chat_id, user_id),
             {},
         )
+        if isinstance(pets_data.get("users_pets", {}), dict)
+        else {}
     )
+    if not isinstance(pet, dict):
+        pet = {}
+
+    user_info = next(
+        (
+            user
+            for user in load_users().values()
+            if isinstance(user, dict)
+            and str(user.get("telegram_id", "")) == str(user_id)
+        ),
+        {},
+    )
+    selected_pet_id = user_info.get("pet_id") if isinstance(user_info, dict) else None
+    selected_definition = pets_data.get(selected_pet_id, {})
+    owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
+    selected_pet = (
+        owned_pets.get(selected_pet_id, {}) if isinstance(owned_pets, dict) else {}
+    )
+    selected_name = (
+        selected_pet.get("custom_name") if isinstance(selected_pet, dict) else None
+    ) or (
+        selected_definition.get("name")
+        if isinstance(selected_definition, dict)
+        else None
+    )
+
     return {
-        "name": pet.get("name", "Барсичела"),
+        "name": selected_name or pet.get("name", "Приятель"),
         "health": pet.get("health", 100),
         "hunger": pet.get("hunger", 100),
         "happiness": pet.get("happiness", 100),
@@ -1329,37 +1357,64 @@ async def generate_companion_reply(system_prompt, text):
 
 
 async def send_pet_selection(message: Message):
-
-    if not os.path.exists(PET_IMAGE):
-        await message.answer("❌ Файл Снежный барсик.png не найден.")
+    pet = get_pet_for_user(message.from_user.id)
+    if not pet or not pet.get("pet_id"):
+        await message.answer(
+            "Сначала выберите питомца и задайте ему имя в приложении, "
+            "после этого здесь появятся его данные."
+        )
         return
 
-    markup = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🐾 Выбрать Барсичелу",
-                    callback_data="select_pet_barsichela",
-                )
-            ]
-        ]
-    )
+    definition = load_pets_data().get(pet["pet_id"])
+    if not isinstance(definition, dict):
+        await message.answer("Не удалось найти данные выбранного питомца.")
+        return
 
+    name = (
+        pet.get("pet_name")
+        or pet.get("name")
+        or definition.get("name")
+        or pet["pet_id"]
+    )
+    stats = definition.get("stats", {})
+    if not isinstance(stats, dict):
+        stats = {}
+
+    stat_values = {
+        "❤️ Здоровье": pet.get("health", stats.get("health", 100)),
+        "🍖 Сытость": pet.get("hunger", stats.get("hunger", 100)),
+        "😊 Настроение": pet.get("happiness", stats.get("happiness", 100)),
+        "⚡ Энергия": pet.get("energy", stats.get("energy", 100)),
+    }
+    rarity = html.escape(str(definition.get("rarity", "Обычный")))
+    pet_type = html.escape(str(definition.get("type", "Не указан")))
+    bonus = definition.get("bonus")
+    bonus_line = f"▫️ Бонус: {html.escape(str(bonus))}\n" if bonus else ""
+    stats_text = "\n".join(
+        f"▫️ {label}: {value}/100" for label, value in stat_values.items()
+    )
     caption = (
-        "<b>🐾 Знакомьтесь: Барсичела!</b>\n\n"
-        "<i>Милый пушистик, готовый сопровождать "
-        "вас в приключениях!</i>\n\n"
-        "▫️ Редкость: Эпический\n"
-        "▫️ Бонус: +15% к защите профиля"
-    )
+        f"<b>🐾 Ваш питомец: {html.escape(str(name))}</b>\n\n"
+        f"▫️ Редкость: {rarity}\n"
+        f"▫️ Тип: {pet_type}\n"
+        f"▫️ Уровень: {pet.get('level', definition.get('level', 1))}\n"
+        f"{stats_text}\n"
+        f"{bonus_line}"
+    ).strip()
 
-    photo = FSInputFile(PET_IMAGE)
+    image_name = os.path.basename(str(definition.get("image", "")))
+    image_path = os.path.join(PETS_IMAGE_DIR, image_name) if image_name else ""
+    if not image_path or not os.path.isfile(image_path):
+        image_path = PET_IMAGE
+
+    if not os.path.isfile(image_path):
+        await message.answer(caption, parse_mode="HTML")
+        return
 
     await message.answer_photo(
-        photo,
+        FSInputFile(image_path),
         caption=caption,
         parse_mode="HTML",
-        reply_markup=markup,
     )
 
 
@@ -1471,20 +1526,39 @@ async def start_pet_command(message: Message):
 async def set_pet_handler(
     callback: CallbackQuery,
 ):
-
     user_id = callback.from_user.id
+    pet = ensure_pet_for_user(user_id)
 
-    ensure_pet_for_user(user_id)
+    if not pet:
+        await callback.answer(
+            "Сначала выберите питомца.",
+            show_alert=True,
+        )
+        return
+
+    pet_id = pet.get("pet_id")
+    definition = load_pets_data().get(pet_id)
+    if not isinstance(definition, dict):
+        definition = {}
+
+    pet_name = (
+        pet.get("pet_name")
+        or pet.get("name")
+        or definition.get("name")
+        or pet_id
+        or "Питомец"
+    )
+    pet_name = str(pet_name)
+    safe_pet_name = html.escape(pet_name)
 
     await callback.answer(
-        "🎉 Барсичела теперь ваш питомец!",
+        f"🎉 {pet_name} теперь ваш питомец!",
         show_alert=True,
     )
 
     if callback.message:
-
         await callback.message.edit_caption(
-            caption=("✅ <b>Барсичела теперь " "ваш официальный питомец!</b>"),
+            caption=f"✅ <b>{safe_pet_name} теперь ваш официальный питомец!</b>",
             parse_mode="HTML",
         )
 
@@ -1569,9 +1643,15 @@ async def pet_status_command(
         )
         return
 
+    pet_name = (
+        pet.get("pet_name")
+        or pet.get("name")
+        or pet.get("pet_id")
+        or pet.get("pet_type")
+        or "Питомец"
+    )
     status_text = (
-        f"🐾 <b>Ваш питомец: "
-        f"{pet.get('name', pet.get('pet_name', 'Барсичела'))}</b>\n\n"
+        f"🐾 <b>Ваш питомец: {pet_name}</b>\n\n"
         f"🍖 Сытость: "
         f"{pet.get('hunger', 0)}/100\n"
         f"💖 Счастье: "
@@ -1778,8 +1858,15 @@ async def process_eating(
 
     save_inventory_data(data)
 
+    pet_name = (
+        pet.get("pet_name")
+        or pet.get("name")
+        or pet.get("pet_id")
+        or pet.get("pet_type")
+        or "Питомец"
+    )
     await callback.answer(
-        f"😋 Барсичела съел " f"{food_info.get('name', food_id)}!",
+        f"😋 {pet_name} съел {food_info.get('name', food_id)}!",
         show_alert=True,
     )
 
@@ -1795,18 +1882,24 @@ async def process_eating(
     )
 
     if callback.message:
-
-        await callback.message.edit_caption(
-            caption=(
-                f"🐾 <b>Ваш питомец: "
-                f"{pet.get('pet_name', 'Барсичела')}</b>\n\n"
-                f"🍖 Сытость: {pet.get('hunger', 0)}/100\n"
-                f"💖 Счастье: {pet.get('happiness', 0)}/100\n\n"
-                "<i>Барсичела сыт и довольно жмурится! ✨</i>"
-            ),
-            parse_mode="HTML",
-            reply_markup=markup,
+        pet_status = (
+            f"🐾 <b>Ваш питомец: {pet_name}</b>\n\n"
+            f"🍖 Сытость: {pet.get('hunger', 0)}/100\n"
+            f"💖 Счастье: {pet.get('happiness', 0)}/100\n\n"
         )
+
+        if callback.message.caption is not None:
+            await callback.message.edit_caption(
+                caption=pet_status,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
+        else:
+            await callback.message.edit_text(
+                text=pet_status,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
 
 
 # ============================================================
