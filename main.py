@@ -1421,6 +1421,116 @@ async def send_pet_selection(message: Message):
 ADMIN_ID = "8990488378"
 
 
+@router.message(Command("reset"))
+async def reset_account_handler(message: Message) -> None:
+    if str(message.from_user.id) != ADMIN_ID:
+        return
+
+    parts = (message.text or "").split(maxsplit=1)
+    target_arg = parts[1].strip() if len(parts) > 1 else ""
+    document = load_users_document()
+    users = document.get("users", {})
+    if not isinstance(users, dict):
+        users = {}
+        document["users"] = users
+
+    target_ids = set()
+    target_user_keys = set()
+
+    if not target_arg:
+        target_ids.add(str(message.from_user.id))
+    elif target_arg.isdigit():
+        target_ids.add(target_arg)
+    else:
+        target_username = target_arg.lstrip("@").lower()
+        for key, user in users.items():
+            if not isinstance(user, dict):
+                continue
+            if (
+                str(key).lower() == target_username
+                or str(user.get("username", "")).lower() == target_username
+            ):
+                target_user_keys.add(str(key))
+                if user.get("telegram_id") is not None:
+                    target_ids.add(str(user["telegram_id"]))
+        if not target_user_keys:
+            await message.answer("Аккаунт не найден. Укажите Telegram ID или @username.")
+            return
+
+    target_refs = target_ids | target_user_keys
+    removed_keys = {
+        str(key)
+        for key, user in users.items()
+        if str(key) in target_user_keys
+        or str(key) in target_ids
+        or str(key) in {f"id_{user_id}" for user_id in target_ids}
+        or (
+            isinstance(user, dict)
+            and str(user.get("telegram_id", "")) in target_ids
+        )
+    }
+    for key in removed_keys:
+        users.pop(key, None)
+
+    chat_profiles = document.get("chat_profiles", {})
+    if isinstance(chat_profiles, dict):
+        for key, profile in list(chat_profiles.items()):
+            if (
+                isinstance(profile, dict)
+                and str(profile.get("user_id", "")) in target_ids
+            ) or any(str(key).endswith(f":{user_id}") for user_id in target_ids):
+                chat_profiles.pop(key, None)
+
+    transactions = document.get("transactions", [])
+    if isinstance(transactions, list):
+        document["transactions"] = [
+            transaction
+            for transaction in transactions
+            if not isinstance(transaction, dict)
+            or not (
+                str(transaction.get("sender_user_id", "")) in target_ids
+                or str(transaction.get("recipient_user_id", "")) in target_ids
+            )
+        ]
+
+    if not save_users_document(document):
+        await message.answer("Не удалось сбросить аккаунт в базе данных.")
+        return
+
+    inventory_data = load_inventory_data()
+    for user_id in target_ids:
+        inventory_data.get("users_pets", {}).pop(user_id, None)
+    save_inventory_data(inventory_data)
+
+    scores = load_scores()
+    for game_scores in scores.values():
+        if isinstance(game_scores, dict):
+            for identity in target_refs:
+                game_scores.pop(identity, None)
+    save_scores(scores)
+
+    if target_refs:
+        placeholders = ", ".join("?" for _ in target_refs)
+        refs = tuple(target_refs)
+        with db_connection() as connection:
+            connection.execute(
+                f"DELETE FROM pets WHERE user_id IN ({placeholders})", refs
+            )
+            connection.execute(
+                f"DELETE FROM scores WHERE user_id IN ({placeholders})", refs
+            )
+            connection.execute(
+                f"DELETE FROM inventory WHERE record_type = 'item' "
+                f"AND user_id IN ({placeholders})",
+                refs,
+            )
+
+    target_label = target_arg or str(message.from_user.id)
+    await message.answer(
+        f"Аккаунт {target_label} сброшен. Для начала игры отправьте /start."
+    )
+
+
 @router.message(Command("players"))
 async def list_players_handler(message: Message) -> None:
     if str(message.from_user.id) != ADMIN_ID:
@@ -1618,7 +1728,7 @@ async def pet_status_command(
                 url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
             )
         await message.answer(
-            f"🐾 {message.from_user.full_name}, профиль активирован в этом чате!\n"
+            f" {message.from_user.full_name}, профиль активирован в этом чате!\n"
             f"Отношения: {profile['relationship_rp']} RP · Баланс: {profile['balance_r']} R$",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[profile_button]]),
         )
@@ -5017,7 +5127,7 @@ async def cmd_start(message: Message):
 
     await message.answer(
         "🎮 <b>Твой друг уже заждался!</b>\n\n"
-        "Заходи в игру, чтобы следить за состоянием питомца, сыграть в мини-игры и забрать свои награды 🐾"
+        "Заходи в игру, чтобы следить за его состоянием, сыграй в мини-игры и забирай свои награды!"
         f"{activation_note}",
         reply_markup=keyboard,
         parse_mode="HTML",
