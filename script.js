@@ -1254,7 +1254,7 @@ async function savePetName(event) {
     }
 }
 
-function updatePetView() {
+function updatePetView({ allowStatRecovery = false } = {}) {
     const sleepBtnText = document.getElementById('sleepBtnText');
     const sleepBtnIcon = document.getElementById('sleepBtnIcon');
     const isSleeping = Boolean(userData.pet?.is_sleeping);
@@ -1319,7 +1319,7 @@ function updatePetView() {
         }
     }
 
-                capturePetStatsProjectionBase();
+            capturePetStatsProjectionBase(allowStatRecovery);
 
     const levelValue = document.getElementById('pet-level-value');
     const levelBar = document.getElementById('pet-level-bar');
@@ -1348,20 +1348,36 @@ function updatePetView() {
     });
 }
 
-function capturePetStatsProjectionBase() {
+function capturePetStatsProjectionBase(allowRecovery = false) {
     const pet = userData.pet;
     if (!pet) {
         petStatsProjectionBase = null;
         return;
     }
 
-    petStatsProjectionBase = {
-        updatedAt: Number(pet.last_stat_update) || Date.now() / 1000,
+    const incoming = {
         health: Number(pet.health ?? 100),
         hunger: Number(pet.hunger ?? 100),
         happiness: Number(pet.happiness ?? 100),
         energy: Number(pet.energy ?? 100),
         isSleeping: Boolean(pet.is_sleeping)
+    };
+    const isSamePet = petStatsProjectionBase?.petId === pet.id;
+    const current = isSamePet && !allowRecovery ? getProjectedPetStats() : null;
+
+    if (current) {
+        incoming.health = Math.min(incoming.health, current.health);
+        incoming.hunger = Math.min(incoming.hunger, current.hunger);
+        incoming.happiness = Math.min(incoming.happiness, current.happiness);
+        incoming.energy = incoming.isSleeping && current.isSleeping
+            ? Math.max(incoming.energy, current.energy)
+            : Math.min(incoming.energy, current.energy);
+    }
+
+    petStatsProjectionBase = {
+        ...incoming,
+        petId: pet.id,
+        updatedAt: Date.now() / 1000
     };
 }
 
@@ -1991,7 +2007,7 @@ async function feedPet(foodId) {
         renderFeedItems();
         renderShop();
         renderFoodInventory();
-        updatePetView();
+                updatePetView({ allowStatRecovery: true });
         if (tg?.HapticFeedback) {
             tg.HapticFeedback.notificationOccurred('success');
         }
@@ -2417,8 +2433,8 @@ async function putPetToSleep() {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
-        userData.pet = normalizePetData(data.pet);
-        updatePetView();
+                userData.pet = normalizePetData(data.pet);
+        updatePetView({ allowStatRecovery: true });
     } catch (error) {
         console.error('Pet sleep update failed:', error);
         showAppAlert(error.message || 'Не удалось изменить режим сна.');
@@ -2475,8 +2491,8 @@ async function putPetToSleep() {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
-        userData.pet = normalizePetData(data.pet);
-        updatePetView();
+                userData.pet = normalizePetData(data.pet);
+        updatePetView({ allowStatRecovery: true });
     } catch (error) {
         console.error('Pet sleep update failed:', error);
         showAppAlert(error.message || 'Не удалось изменить режим сна.');
