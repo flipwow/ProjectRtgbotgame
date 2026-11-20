@@ -1263,12 +1263,14 @@ function updatePetView() {
             sleepBtnIcon.textContent = '⏰';
         } else {
             sleepBtnText.textContent = 'Уложить спать';
-            sleepBtnIcon.textContent = '💤';
+                        sleepBtnIcon.textContent = '💤';
         }
     }
 
     const petDisplay = document.getElementById('petDisplay');
     if (!petDisplay) return;
+
+    petDisplay.classList.toggle('is-sleeping', isSleeping);
 
     if (!userData.pet?.id) {
         const petNameInput = document.getElementById('pet-name');
@@ -1343,7 +1345,7 @@ function updatePetView() {
         element.style.width = `${progress.width}%`;
         element.setAttribute('aria-valuemin', '0');
         element.setAttribute('aria-valuemax', String(progress.max));
-        element.setAttribute('aria-valuenow', String(progress.value));
+                element.setAttribute('aria-valuenow', String(progress.value));
     });
 
     petDisplay.innerHTML = `
@@ -1352,6 +1354,7 @@ function updatePetView() {
             alt="${escapeHtml(userData.pet?.name || activePet.name)}"
             class="active-pet-image"
         >
+        ${isSleeping ? '<span class="sleeping-indicator" role="status" aria-label="Питомец спит"><span aria-hidden="true">💤</span> Спит</span>' : ''}
     `;
 
     petDisplay.querySelectorAll('img').forEach(image => {
