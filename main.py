@@ -2596,6 +2596,11 @@ async def api_chat_profile(request):
                 "balance_r": profile.get("balance_r", 0),
                 "status": profile.get("status", "активен"),
             },
+            "currency": (
+                user_info.get("r_currency", user_info.get("balance_r", 0))
+                if isinstance(user_info, dict)
+                else 0
+            ),
             "pet": pet,
             "pet_catalog": pet_catalog,
             "owned_pets": owned_pets,

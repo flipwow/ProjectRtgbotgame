@@ -14,6 +14,7 @@ const tg = window.Telegram?.WebApp;
 
 let userData = {
     currency: 0,
+    chatCurrency: 0,
     registry: [],
     leaderboard: [],
     foodCatalog: [],
@@ -621,6 +622,7 @@ function applyPersonalProfile(data) {
     };
     userData.registry = [];
     userData.currency = balance;
+    userData.chatCurrency = balance;
     userData.leaderboard = Array.isArray(data.leaderboard) ? data.leaderboard : [];
 }
 
@@ -634,7 +636,8 @@ function applyChatProfile(data) {
         : Array.isArray(data.participants)
             ? data.participants
             : [];
-    userData.currency = Number(profile.balance_r ?? data.balance_r ?? 0);
+    userData.chatCurrency = Number(profile.balance_r ?? data.balance_r ?? 0);
+    userData.currency = Number(data.currency ?? userData.chatCurrency);
     userData.owned_pets = data.owned_pets && typeof data.owned_pets === 'object' ? data.owned_pets : {};
     userData.petCatalog = Array.isArray(data.pet_catalog) ? data.pet_catalog : (userData.petCatalog || []);
 }
@@ -841,8 +844,8 @@ function openGiftModal(member) {
     if (!title || !note || !amount || !modal) return;
 
     title.textContent = member.display_name || member.username || 'Участник';
-    note.textContent = `Доступно: ${userData.currency} R$`;
-    amount.max = String(userData.currency);
+    note.textContent = `Баланс этого чата: ${userData.chatCurrency} R$`;
+    amount.max = String(userData.chatCurrency);
     amount.value = '';
     if (feedback) feedback.textContent = '';
     modal.style.display = 'flex';
@@ -860,7 +863,7 @@ async function sendGift() {
     const amount = Number(document.getElementById('gift-amount')?.value);
     const feedback = document.getElementById('gift-feedback');
     const button = document.getElementById('gift-submit');
-    if (!recipient || !Number.isInteger(amount) || amount <= 0 || amount > userData.currency) {
+    if (!recipient || !Number.isInteger(amount) || amount <= 0 || amount > userData.chatCurrency) {
         if (feedback) feedback.textContent = 'Укажи целую сумму в пределах баланса.';
         return;
     }
