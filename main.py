@@ -5513,7 +5513,18 @@ def update_pet_stats_with_time(pet_data, now=None):
     if now is None:
         now = time.time()
 
-    last_update = pet_data.get("last_stat_update", now)
+    try:
+        last_update = float(pet_data.get("last_stat_update", 0) or 0)
+    except (TypeError, ValueError):
+        last_update = 0
+
+    # Older pet rows can have the schema default (0) or an invalid/future
+    # timestamp. Treat those as a fresh stat baseline rather than applying
+    # decay for the entire Unix epoch on the next update (for example, when
+    # the pet is put to sleep).
+    if last_update != last_update or last_update <= 0 or last_update > now:
+        pet_data["last_stat_update"] = now
+        return pet_data, True
 
     elapsed_seconds = now - last_update
     if elapsed_seconds <= 1:
