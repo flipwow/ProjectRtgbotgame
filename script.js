@@ -1365,13 +1365,20 @@ function capturePetStatsProjectionBase(allowRecovery = false) {
     const isSamePet = petStatsProjectionBase?.petId === pet.id;
     const current = isSamePet && !allowRecovery ? getProjectedPetStats() : null;
 
-    if (current) {
-        incoming.health = Math.min(incoming.health, current.health);
-        incoming.hunger = Math.min(incoming.hunger, current.hunger);
-        incoming.happiness = Math.min(incoming.happiness, current.happiness);
-        incoming.energy = incoming.isSleeping && current.isSleeping
-            ? Math.max(incoming.energy, current.energy)
-            : Math.min(incoming.energy, current.energy);
+        if (current) {
+        if (incoming.isSleeping && !current.isSleeping) {
+            incoming.health = current.health;
+            incoming.hunger = current.hunger;
+            incoming.happiness = current.happiness;
+            incoming.energy = current.energy;
+        } else {
+            incoming.health = Math.min(incoming.health, current.health);
+            incoming.hunger = Math.min(incoming.hunger, current.hunger);
+            incoming.happiness = Math.min(incoming.happiness, current.happiness);
+            incoming.energy = incoming.isSleeping && current.isSleeping
+                ? Math.max(incoming.energy, current.energy)
+                : Math.min(incoming.energy, current.energy);
+        }
     }
 
     petStatsProjectionBase = {
@@ -2434,9 +2441,9 @@ async function putPetToSleep() {
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
                 userData.pet = normalizePetData(data.pet);
-        updatePetView({ allowStatRecovery: true });
+                updatePetView();
     } catch (error) {
-        console.error('Pet sleep update failed:', error);
+                console.error('Pet sleep update failed:', error);
         showAppAlert(error.message || 'Не удалось изменить режим сна.');
     } finally {
         if (button) button.disabled = false;
@@ -2492,9 +2499,9 @@ async function putPetToSleep() {
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
 
                 userData.pet = normalizePetData(data.pet);
-        updatePetView({ allowStatRecovery: true });
+                updatePetView();
     } catch (error) {
-        console.error('Pet sleep update failed:', error);
+                console.error('Pet sleep update failed:', error);
         showAppAlert(error.message || 'Не удалось изменить режим сна.');
     } finally {
         if (button) button.disabled = false;
