@@ -287,7 +287,7 @@ BOT_ID = None
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", "8080"))
 
-WEBAPP_ORIGIN = "https://sslip.io"
+WEBAPP_ORIGIN = "https://31-56-27-98.sslip.io"
 
 # ============================================================
 # SCORES
@@ -1454,7 +1454,9 @@ async def reset_account_handler(message: Message) -> None:
                 if user.get("telegram_id") is not None:
                     target_ids.add(str(user["telegram_id"]))
         if not target_user_keys:
-            await message.answer("Аккаунт не найден. Укажите Telegram ID или @username.")
+            await message.answer(
+                "Аккаунт не найден. Укажите Telegram ID или @username."
+            )
             return
 
     target_refs = target_ids | target_user_keys
@@ -1464,10 +1466,7 @@ async def reset_account_handler(message: Message) -> None:
         if str(key) in target_user_keys
         or str(key) in target_ids
         or str(key) in {f"id_{user_id}" for user_id in target_ids}
-        or (
-            isinstance(user, dict)
-            and str(user.get("telegram_id", "")) in target_ids
-        )
+        or (isinstance(user, dict) and str(user.get("telegram_id", "")) in target_ids)
     }
     for key in removed_keys:
         users.pop(key, None)
@@ -3762,7 +3761,10 @@ async def api_create_game(request):
             "success": True,
             "room_id": room_id,
             "url": duel_url,
-            "ws_url": (f"wss://" f"pawbot-45eq.onrender.com" f"/ws/game/{room_id}"),
+            "ws_url": (
+                f"{'wss' if urlsplit(WEBAPP_ORIGIN).scheme == 'https' else 'ws'}://"
+                f"{urlsplit(WEBAPP_ORIGIN).netloc}/ws/game/{room_id}"
+            ),
         }
     )
 
@@ -5088,10 +5090,9 @@ async def cmd_balance(message: Message):
 @router.callback_query(F.data == "start_rules")
 async def start_rules_callback(callback: CallbackQuery):
     rules = (
-        "📖 <b>Как играть</b>\n\n"
-        "Заботьтесь о питомце, покупайте ему еду за R$ и играйте в крестики-нолики. "
-        "За победу в онлайн-дуэли начисляется 30–60 RP; ничья не награждается.\n\n"
-        "RP можно обменять на R$ по курсу 100 RP = 10 R$. В дуэли ходите только в свой ход. "
+        "📖 <b>Об игре</b>\n\n"
+        "Следи за своим приятелем и за приятелями своих приятелей в групповых чатах, не забывай следить за их состоянием и играйте в мини-игры."
+        "За победу в мини-играх будет начисляться игровая валюта за которую можно купить еду и не только.\n\n"
         "Играйте честно и уважайте других участников."
     )
     if callback.message:

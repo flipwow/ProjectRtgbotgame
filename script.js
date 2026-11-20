@@ -69,7 +69,7 @@ const englishText = {
     'Режимы': 'Modes', 'Ходит: X': 'Turn: X', 'Победа:': 'Winner:', 'Ничья! 🤝': 'Draw! 🤝', 'Ожидание соперника...': 'Waiting for opponent...', 'Твой ход!': 'Your turn!', 'Победил': 'Winner', 'Ты победил! 🎉': 'You won! 🎉', 'Награда:': 'Reward:', 'Твой ход': 'Your turn',
     'Твой любимый дерзкий пушистик': 'Your favorite sassy fluffball', 'Питомец участника': 'MEMBER PET', 'Участник': 'Member', 'Участники пока не активировали бота': 'Members have not activated the bot yet',
     'Доступно:': 'Available:', 'Сумма перевода': 'Transfer amount', 'Например, 25': 'For example, 25', 'Отправить подарок': 'Send gift', 'Перевод R$': 'Transfer R$', 'Закрыть': 'Close',
-    'Ракурс': 'View', 'Назад': 'Back', 'Уровень питомца': 'Pet level', 'Синхронизация с питомцем... Наш сервер на Render просыпается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾': 'Syncing with your pet... The server is waking up and may take about a minute. Please keep the app open 🐾',
+    'Ракурс': 'View', 'Назад': 'Back', 'Уровень питомца': 'Pet level', 'Синхронизация с питомцем... Сервер запускается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾': 'Syncing with your pet... The server is starting up and may take about a minute. Please keep the app open 🐾',
     'Барсичела': 'Barsichela', 'PAWK1NS PET': 'PAWK1NS PET', 'Переименовать питомца': 'Rename pet', 'Имя питомца': 'Pet name', 'Новое имя': 'New name', 'Отмена': 'Cancel', 'Сохранить': 'Save',
     'Сменить питомца': 'Change pet', 'Покормить питомца': 'Feed pet', 'Сытость': 'Satiety', 'Выбери лакомство из инвентаря:': 'Choose a treat from your inventory:',
     'Очки за победы в онлайн-крестиках-ноликах': 'Points for online tic-tac-toe wins', 'Сразись с другими пешками': 'Challenge other players', 'Играй с ботом или устрой дуэль с другом': 'Play the bot or challenge a friend',
@@ -426,8 +426,8 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = API_REQUEST_TIMEO
     }
 }
 
-function showRenderWakeupLoader() {
-    let loader = document.getElementById('renderWakeupLoader');
+function showServerWakeupLoader() {
+    let loader = document.getElementById('serverWakeupLoader');
 
     if (loader) {
         loader.hidden = false;
@@ -435,9 +435,9 @@ function showRenderWakeupLoader() {
     }
 
     const style = document.createElement('style');
-    style.id = 'renderWakeupLoaderStyle';
+    style.id = 'serverWakeupLoaderStyle';
     style.textContent = `
-        #renderWakeupLoader {
+        #serverWakeupLoader {
             position: fixed;
             inset: 0;
             z-index: 99999;
@@ -449,8 +449,8 @@ function showRenderWakeupLoader() {
             text-align: center;
             font-family: system-ui, sans-serif;
         }
-        #renderWakeupLoader[hidden] { display: none; }
-        #renderWakeupLoader .render-wakeup-card {
+        #serverWakeupLoader[hidden] { display: none; }
+        #serverWakeupLoader .server-wakeup-card {
             width: min(100%, 360px);
             padding: 32px 24px;
             border: 1px solid rgba(132, 76, 156, .14);
@@ -458,46 +458,46 @@ function showRenderWakeupLoader() {
             background: rgba(255, 255, 255, .92);
             box-shadow: 0 18px 60px rgba(82, 43, 103, .14);
         }
-        #renderWakeupLoader .render-wakeup-paw {
+        #serverWakeupLoader .server-wakeup-paw {
             margin-bottom: 14px;
             font-size: 48px;
-            animation: render-wakeup-bounce 1.2s ease-in-out infinite;
+            animation: server-wakeup-bounce 1.2s ease-in-out infinite;
         }
-        #renderWakeupLoader .render-wakeup-spinner {
+        #serverWakeupLoader .server-wakeup-spinner {
             width: 34px;
             height: 34px;
             margin: 20px auto 0;
             border: 4px solid #ead9f2;
             border-top-color: #a34ec4;
             border-radius: 50%;
-            animation: render-wakeup-spin .8s linear infinite;
+            animation: server-wakeup-spin .8s linear infinite;
         }
-        #renderWakeupLoader p { margin: 0; line-height: 1.55; }
-        @keyframes render-wakeup-spin { to { transform: rotate(360deg); } }
-        @keyframes render-wakeup-bounce { 50% { transform: translateY(-6px); } }
+        #serverWakeupLoader p { margin: 0; line-height: 1.55; }
+        @keyframes server-wakeup-spin { to { transform: rotate(360deg); } }
+        @keyframes server-wakeup-bounce { 50% { transform: translateY(-6px); } }
     `;
     document.head.appendChild(style);
 
     loader = document.createElement('div');
-    loader.id = 'renderWakeupLoader';
+    loader.id = 'serverWakeupLoader';
     loader.hidden = true;
     loader.setAttribute('role', 'status');
     loader.setAttribute('aria-live', 'polite');
 
     const card = document.createElement('div');
-    card.className = 'render-wakeup-card';
+    card.className = 'server-wakeup-card';
 
     const paw = document.createElement('div');
-    paw.className = 'render-wakeup-paw';
+    paw.className = 'server-wakeup-paw';
     paw.setAttribute('aria-hidden', 'true');
     paw.textContent = '🐾';
 
     const message = document.createElement('p');
     message.textContent =
-        'Синхронизация с питомцем... Наш сервер на Render просыпается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾';
+        'Синхронизация с питомцем... Сервер запускается, это может занять около минуты. Пожалуйста, не закрывайте приложение 🐾';
 
     const spinner = document.createElement('div');
-    spinner.className = 'render-wakeup-spinner';
+    spinner.className = 'server-wakeup-spinner';
     spinner.setAttribute('aria-hidden', 'true');
 
     card.append(paw, message, spinner);
@@ -506,8 +506,8 @@ function showRenderWakeupLoader() {
     loader.hidden = false;
 }
 
-function hideRenderWakeupLoader() {
-    const loader = document.getElementById('renderWakeupLoader');
+function hideServerWakeupLoader() {
+    const loader = document.getElementById('serverWakeupLoader');
     if (loader) loader.hidden = true;
 }
 
