@@ -4525,6 +4525,9 @@ async def api_pet_sleep(request):
     if not username or not telegram_user:
         return web.json_response({"error": "Unauthorized"}, status=401)
 
+    payload = await read_json_object(request) or {}
+    requested_sleeping = payload.get("is_sleeping")
+
     try:
         with db_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -4535,7 +4538,9 @@ async def api_pet_sleep(request):
             if pet_row is None:
                 return web.json_response({"error": "Pet not found"}, status=404)
 
-            if pet["is_sleeping"] and pet["energy"] >= 100:
+            if isinstance(requested_sleeping, bool):
+                pet["is_sleeping"] = 1 if requested_sleeping else 0
+            elif pet["is_sleeping"] and pet["energy"] >= 100:
                 pet["is_sleeping"] = 0
             else:
                 pet["is_sleeping"] = 0 if pet["is_sleeping"] else 1

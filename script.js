@@ -1366,7 +1366,7 @@ function capturePetStatsProjectionBase(allowRecovery = false) {
     const current = isSamePet && !allowRecovery ? getProjectedPetStats() : null;
 
         if (current) {
-        if (incoming.isSleeping && !current.isSleeping) {
+        if (incoming.isSleeping !== current.isSleeping) {
             incoming.health = current.health;
             incoming.hunger = current.hunger;
             incoming.happiness = current.happiness;
@@ -2435,7 +2435,9 @@ async function putPetToSleep() {
                 'Content-Type': 'application/json',
                 'X-Telegram-Init-Data': tg?.initData || ''
             },
-            body: JSON.stringify({})
+            body: JSON.stringify({
+                is_sleeping: !Boolean(userData.pet?.is_sleeping)
+            })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
@@ -2493,7 +2495,9 @@ async function putPetToSleep() {
                 'Content-Type': 'application/json',
                 'X-Telegram-Init-Data': tg?.initData || ''
             },
-            body: JSON.stringify({})
+            body: JSON.stringify({
+                is_sleeping: !Boolean(userData.pet?.is_sleeping)
+            })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
