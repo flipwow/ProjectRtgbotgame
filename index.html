@@ -37,7 +37,7 @@
         <!-- Основной контент -->
         <div class="content-area">
 
-            <!-- Питомец -->
+            <!-- Приятель -->
             <div id="tab-home" class="tab-content active">
 
                 <div class="pet-section-header">
@@ -317,7 +317,7 @@
         <div class="glass-card bottom-nav">
             <button class="nav-item active" onclick="switchTab('home')">
                 <span class="nav-icon">🐾</span>
-                <span>Питомец</span>
+                <span>Приятель</span>
             </button>
 
             <button class="nav-item" onclick="switchTab('play')">
@@ -475,24 +475,24 @@
                 </button>
             </div>
             <div class="member-pet-summary">
-                <img id="member-pet-image" src="/Pets/Снежный барсик.png" alt="Питомец">
+                <img id="member-pet-image" src="/Pets/Снежный барсик.png" alt="Приятель">
                 <div>
-                    <strong id="member-pet-name">Питомец</strong>
+                    <strong id="member-pet-name">Приятель</strong>
                     <span>Уровень <b id="member-pet-level">1</b></span>
                 </div>
             </div>
             <div class="profile-pet-stats">
                 <div class="profile-stat-row">
                     <div><span>Здоровье</span><strong id="member-pet-health-value">100 / 100</strong></div>
-                    <div class="profile-stat-track" role="progressbar" aria-label="Здоровье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Здоровье приятеля" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-health-bar" class="profile-stat-fill health-fill"></span></div>
                 </div>
                 <div class="profile-stat-row">
                     <div><span>Сытость</span><strong id="member-pet-hunger-value">100 / 100</strong></div>
-                    <div class="profile-stat-track" role="progressbar" aria-label="Сытость питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Сытость приятеля" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-hunger-bar" class="profile-stat-fill hunger-fill"></span></div>
                 </div>
                 <div class="profile-stat-row">
                                         <div><span>Счастье</span><strong id="member-pet-happiness-value">100 / 100</strong></div>
-                    <div class="profile-stat-track" role="progressbar" aria-label="Счастье питомца" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="member-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
+                    <div class="profile-stat-track" role="progressbar" aria-label="Счастье приятеля" aria-valuemin="0" aria-valuemax="100" ariavaluenow="100"><span id="member-pet-happiness-bar" class="profile-stat-fill happiness-fill"></span></div>
                 </div>
             </div>
         </section>
@@ -555,7 +555,7 @@
         </div>
     </div>
 
-    <script src="/script.js?v=pet-sleep-indicator-1" defer></script>
+    <script src="/script.js?v=pet-stats-live-1" defer></script>
     <script src="/leaderboard-ui.js" defer></script>
 
     <!-- Модальное окно с информацией о питомце -->
@@ -580,7 +580,7 @@
             <h3 style="color: var(--accent-color);">Выберите своего первого друга</h3>
         </div>
         <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
-            Твой пушистый спутник уже ждет тебя! Выбери одного из четырех стартовых питомцев:
+            Твой приятель уже ждет тебя! Выбери одного из четырех стартовых друзей:
         </p>
         <div class="pet-choices-grid" id="firstPetChoicesGrid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;"></div>
     </div>

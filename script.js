@@ -29,6 +29,8 @@ let selectedLeaderboardMode = 'online';
 let currentPetId = 'bars';
 let chatContext = { chatId: null, userId: null };
 let chatMembersRefreshInFlight = false;
+let petStatsProjectionBase = null;
+
 
 let tttMode = 'solo';
 let tttBoard = Array(9).fill(null);
@@ -1275,6 +1277,7 @@ function updatePetView() {
     if (!userData.pet?.id) {
         const petNameInput = document.getElementById('pet-name');
         if (petNameInput) petNameInput.value = '';
+        petStatsProjectionBase = null;
         petDisplay.replaceChildren();
         return;
     }
@@ -1286,10 +1289,8 @@ function updatePetView() {
         image: '/Pets/Slava.png'
     };
     const maxLevel = Math.max(1, Number(userData.pet?.max_level || 10));
-    const level = Math.max(1, Number(userData.pet?.level || 1));
-    const health = Math.max(0, Math.min(100, Number(userData.pet?.health ?? 100)));
-    const hunger = Math.max(0, Math.min(100, Number(userData.pet?.hunger ?? 100)));
-    const happiness = Math.max(0, Math.min(100, Number(userData.pet?.happiness ?? 100)));
+        const level = Math.max(1, Number(userData.pet?.level || 1));
+
     const petName = document.getElementById('pet-name');
     if (petName) {
         petName.value = userData.pet?.custom_name
@@ -1318,35 +1319,18 @@ function updatePetView() {
         }
     }
 
-    const statValues = {
-        'pet-level-value': `${level} / ${maxLevel}`,
-        'pet-health-value': `${health} / 100`,
-        'pet-hunger-value': `${hunger} / 100`,
-        'pet-happiness-value': `${happiness} / 100`,
-        'pet-energy-value': `${Number(userData.pet?.energy ?? 100)} / 100`
-    };
-    const statProgress = {
-        'pet-level-bar': { value: level, max: maxLevel, width: Math.min(level / maxLevel * 100, 100) },
-        'pet-health-bar': { value: health, max: 100, width: health },
-        'pet-hunger-bar': { value: hunger, max: 100, width: hunger },
-        'pet-happiness-bar': { value: happiness, max: 100, width: happiness },
-        'pet-energy-bar': { value: Number(userData.pet?.energy ?? 100), max: 100, width: Number(userData.pet?.energy ?? 100) }
-    };
+                capturePetStatsProjectionBase();
 
-    Object.entries(statValues).forEach(([id, value]) => {
-        const element = document.getElementById(id);
-        if (element) element.textContent = value;
-    });
-
-    Object.entries(statProgress).forEach(([id, progress]) => {
-        const element = document.getElementById(id);
-        if (!element) return;
-
-        element.style.width = `${progress.width}%`;
-        element.setAttribute('aria-valuemin', '0');
-        element.setAttribute('aria-valuemax', String(progress.max));
-                element.setAttribute('aria-valuenow', String(progress.value));
-    });
+    const levelValue = document.getElementById('pet-level-value');
+    const levelBar = document.getElementById('pet-level-bar');
+    if (levelValue) levelValue.textContent = `${level} / ${maxLevel}`;
+    if (levelBar) {
+        const levelPercent = Math.min(level / maxLevel * 100, 100);
+        levelBar.style.width = `${levelPercent}%`;
+        levelBar.setAttribute('aria-valuemin', '0');
+        levelBar.setAttribute('aria-valuemax', String(maxLevel));
+        levelBar.setAttribute('aria-valuenow', String(level));
+    }
 
     petDisplay.innerHTML = `
         <img
@@ -1357,9 +1341,95 @@ function updatePetView() {
         ${isSleeping ? '<span class="sleeping-indicator" role="status" aria-label="Питомец спит"><span aria-hidden="true">💤</span> Спит</span>' : ''}
     `;
 
+    renderPetStatsProjection();
+
     petDisplay.querySelectorAll('img').forEach(image => {
         image.onerror = () => image.replaceWith(document.createTextNode('🐾'));
     });
+}
+
+function capturePetStatsProjectionBase() {
+    const pet = userData.pet;
+    if (!pet) {
+        petStatsProjectionBase = null;
+        return;
+    }
+
+    petStatsProjectionBase = {
+        updatedAt: Number(pet.last_stat_update) || Date.now() / 1000,
+        health: Number(pet.health ?? 100),
+        hunger: Number(pet.hunger ?? 100),
+        happiness: Number(pet.happiness ?? 100),
+        energy: Number(pet.energy ?? 100),
+        isSleeping: Boolean(pet.is_sleeping)
+    };
+}
+
+function getProjectedPetStats(now = Date.now() / 1000) {
+    if (!petStatsProjectionBase) return null;
+
+    const base = petStatsProjectionBase;
+    const stats = { ...base };
+    const elapsedSeconds = Math.max(0, now - base.updatedAt);
+        const elapsedHours = (elapsedSeconds * 120) / 3600;
+
+    if (stats.isSleeping) {
+        stats.energy = Math.min(100, stats.energy + Math.floor(elapsedHours * 50));
+        stats.hunger = Math.max(0, stats.hunger - Math.floor(elapsedHours * 2));
+        if (stats.energy >= 100) stats.isSleeping = false;
+    } else {
+        stats.hunger = Math.max(0, stats.hunger - Math.floor(elapsedHours * 20));
+        const happinessDecay = stats.hunger < 30 ? 15 : 5;
+        stats.happiness = Math.max(0, stats.happiness - Math.floor(elapsedHours * happinessDecay));
+        stats.energy = Math.max(0, stats.energy - Math.floor(elapsedHours * 15));
+    }
+
+    if (stats.hunger === 0) {
+        stats.health = Math.max(0, stats.health - Math.floor(elapsedHours * 10));
+    }
+
+    return stats;
+}
+
+function renderPetStatsProjection() {
+    const stats = getProjectedPetStats();
+    if (!stats) return;
+
+    const values = {
+        'pet-health-value': stats.health,
+        'pet-hunger-value': stats.hunger,
+        'pet-happiness-value': stats.happiness,
+        'pet-energy-value': stats.energy
+    };
+
+    Object.entries(values).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = `${value} / 100`;
+
+        const bar = document.getElementById(`pet-${id.replace('pet-', '').replace('-value', '')}-bar`);
+                if (bar) {
+            bar.style.width = `${value}%`;
+            bar.setAttribute('aria-valuemin', '0');
+            bar.setAttribute('aria-valuemax', '100');
+            bar.setAttribute('aria-valuenow', String(value));
+        }
+    });
+
+    const petDisplay = document.getElementById('petDisplay');
+    if (petDisplay) {
+        petDisplay.classList.toggle('is-sleeping', stats.isSleeping);
+        const indicator = petDisplay.querySelector('.sleeping-indicator');
+        if (stats.isSleeping && !indicator) {
+            const badge = document.createElement('span');
+            badge.className = 'sleeping-indicator';
+            badge.setAttribute('role', 'status');
+            badge.setAttribute('aria-label', 'Питомец спит');
+            badge.innerHTML = '<span aria-hidden="true">💤</span> Спит';
+            petDisplay.appendChild(badge);
+        } else if (!stats.isSleeping) {
+            indicator?.remove();
+        }
+    }
 }
 
 function renderShop() {
@@ -2491,8 +2561,23 @@ function switchPlaySubTab(subTab) {
     }
 }
 
+
+
 setInterval(() => {
     if (!document.hidden) {
-        fetchUserData();
+        renderPetStatsProjection();
+    }
+}, 1000);
+
+setInterval(() => {
+    if (!document.hidden) {
+        void fetchUserData();
     }
 }, 15000);
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        renderPetStatsProjection();
+        void fetchUserData();
+    }
+});
