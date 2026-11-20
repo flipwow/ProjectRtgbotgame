@@ -31,8 +31,6 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-import google.generativeai as genai
-
 SHOP_ITEMS = {
     "meat": {
         "name": "🥩 стейк",
@@ -231,7 +229,9 @@ init_db()
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4.1-flash")
+DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "").strip().lower()
@@ -251,10 +251,6 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
 
 # ============================================================
 # PATHS
@@ -1280,42 +1276,44 @@ def build_companion_system_prompt(chat_id, sender_id, companion):
 
 
 def request_openai_compatible(messages):
-    if not GEMINI_API_KEY:
-        raise RuntimeError("Переменная окружения GEMINI_API_KEY не задана.")
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("Переменная окружения DEEPSEEK_API_KEY не задана.")
     if not isinstance(messages, list) or not messages:
-        raise ValueError("Для Gemini требуется непустой список сообщений.")
+        raise ValueError("Для DeepSeek требуется непустой список сообщений.")
 
-    system_prompt = next(
-        (item.get("content", "") for item in messages if item.get("role") == "system"),
-        "",
-    )
-    user_text = next(
-        (
-            item.get("content", "")
-            for item in reversed(messages)
-            if item.get("role") == "user"
-        ),
-        "",
-    )
-    if not isinstance(user_text, str) or not user_text.strip():
-        raise ValueError("Текст пользователя для Gemini пуст.")
-
-    model = genai.GenerativeModel(
-        model_name="gemini-3.5-flash-lite",
-        system_instruction=system_prompt,
-    )
-    response = model.generate_content(
-        user_text,
-        generation_config={"temperature": 0.75, "max_output_tokens": 350},
+    payload = {
+        "model": DEEPSEEK_MODEL,
+        "messages": messages,
+        "temperature": 0.75,
+        "max_tokens": 350,
+    }
+    request = urllib.request.Request(
+        DEEPSEEK_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
     )
     try:
-        answer = response.text
-    except (AttributeError, ValueError) as error:
-        raise RuntimeError("Gemini не вернула текстовый ответ.") from error
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Ошибка API DeepSeek ({error.code}): {details}") from error
+    except urllib.error.URLError as error:
+        raise RuntimeError(
+            f"Не удалось подключиться к API DeepSeek: {error}"
+        ) from error
 
+    try:
+        answer = result["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as error:
+        raise RuntimeError("DeepSeek вернул ответ в неожиданном формате.") from error
     if not isinstance(answer, str) or not answer.strip():
-        raise RuntimeError("Gemini вернула пустой ответ.")
-    return answer.strip()
+        raise RuntimeError("DeepSeek вернул пустой текстовый ответ.")
+        return answer.strip()
 
 
 async def generate_companion_reply(system_prompt, text):

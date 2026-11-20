@@ -1,4 +1,3 @@
 pyTelegramBotAPI
 python-dotenv
 aiogram
-google-generativeai
