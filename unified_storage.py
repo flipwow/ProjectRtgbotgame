@@ -172,7 +172,9 @@ def install(ns):
                 sql = (
                     "SELECT "
                     + ",".join(fields)
-                    + " FROM pets WHERE chat_id='' AND user_id IN (?,?)"
+                    + " FROM pets WHERE chat_id='' AND user_id IN ("
+                    + ",".join("?" for _ in legacy_user_ids)
+                    + ")"
                 )
                 args = list(legacy_user_ids)
                 if "pet_id" in columns:
@@ -311,10 +313,28 @@ def install(ns):
                 states = latest.setdefault("pet_states", {})
                 for pet_id, state in profile.get("pet_states", {}).items():
                     previous = states.get(pet_id, {})
-                    if not previous or float(
-                        state.get("last_stat_update", 0) or 0
-                    ) >= float(previous.get("last_stat_update", 0) or 0):
-                        states[pet_id] = state
+                    if not isinstance(previous, dict):
+                        previous = {}
+                    if not isinstance(state, dict):
+                        continue
+                    try:
+                        incoming_ts = float(state.get("last_stat_update", 0) or 0)
+                    except (TypeError, ValueError):
+                        incoming_ts = 0.0
+                    try:
+                        previous_ts = float(previous.get("last_stat_update", 0) or 0)
+                    except (TypeError, ValueError):
+                        previous_ts = 0.0
+                    # Only let an incoming snapshot roll the stored state back
+                    # when it carries an explicitly older, non-zero timestamp.
+                    # Updates without a timestamp (or with 0) are merged field by
+                    # field so a partial pet update is never silently dropped.
+                    if incoming_ts and incoming_ts < previous_ts:
+                        continue
+                    merged = {**previous, **state}
+                    if previous_ts and not incoming_ts:
+                        merged["last_stat_update"] = previous["last_stat_update"]
+                    states[pet_id] = merged
                 owned = latest.setdefault("owned_pets", {})
                 for pet_id, value in profile.get("owned_pets", {}).items():
                     if isinstance(value, dict):
@@ -334,13 +354,16 @@ def install(ns):
         return profile
 
     def pet_view(profile):
+        # Pure read projection: decay is computed on a throwaway copy so that
+        # rendering the pet never mutates the persisted pet_states snapshot and
+        # never advances last_stat_update in the database.
         pet_id = profile.get("active_pet_id")
         if not pet_id:
             return None
         catalog = ns["load_pets_data"]()
         definition = catalog.get(pet_id, {})
-        states = profile.setdefault("pet_states", {})
-        state = states.get(str(pet_id))
+        states = profile.get("pet_states")
+        state = states.get(str(pet_id)) if isinstance(states, dict) else None
         if not isinstance(state, dict):
             owned = profile.get("owned_pets", {}).get(pet_id, {})
             stats = definition.get("stats", {}) if isinstance(definition, dict) else {}
@@ -359,10 +382,7 @@ def install(ns):
                 "last_stat_update": time.time(),
                 "is_sleeping": 0,
             }
-            states[str(pet_id)] = state
-        projected, changed = old_stats(dict(state))
-        if changed:
-            states[str(pet_id)] = projected
+        projected, _changed = old_stats(dict(state))
         return {
             **projected,
             "id": pet_id,
@@ -412,7 +432,6 @@ def install(ns):
             return error
         profile = get_profile(user["id"], username)
         pet = pet_view(profile)
-        save_profile(user["id"], profile)
         catalog = ns["load_pets_data"]()
         return ns["web"].json_response(
             {
@@ -871,7 +890,6 @@ def install(ns):
             return error
         profile = get_profile(user["id"], username)
         pet = pet_view(profile)
-        save_profile(user["id"], profile)
         return ns["web"].json_response(
             {
                 "owned": bool(pet),
@@ -1061,7 +1079,6 @@ def install(ns):
                     member["balance_r"] = profile.get("balance", 0)
         data["pet"] = pet_view(profile)
         data["food_catalog"] = ns["build_food_catalog"](profile.get("inventory", {}))
-        save_profile(tg_id, profile)
         return ns["web"].json_response(data)
 
     ns["api_chat_profile_legacy"] = ns["api_chat_profile"]

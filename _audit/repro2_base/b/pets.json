@@ -1,0 +1,1 @@
+{"cat": {"name": "Cat", "type": "Cat", "level": 1, "max_level": 10, "image": "cat.png", "stats": {"health": 100, "hunger": 100, "happiness": 100, "energy": 100}}, "dog": {"name": "Dog", "type": "Dog", "level": 1, "max_level": 10, "image": "dog.png", "stats": {"health": 100, "hunger": 100, "happiness": 100, "energy": 100}}}

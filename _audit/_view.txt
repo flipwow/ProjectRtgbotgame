@@ -1,0 +1,64 @@
+ 5533: def update_pet_stats_with_time(pet_data, now=None):
+ 5534:     if now is None:
+ 5535:         now = time.time()
+ 5536: 
+ 5537:     try:
+ 5538:         last_update = float(pet_data.get("last_stat_update", 0) or 0)
+ 5539:     except (TypeError, ValueError):
+ 5540:         last_update = 0
+ 5541: 
+ 5542:     # Older pet rows can have the schema default (0) or an invalid/future
+ 5543:     # timestamp. Treat those as a fresh stat baseline rather than applying
+ 5544:     # decay for the entire Unix epoch on the next update (for example, when
+ 5545:     # the pet is put to sleep).
+ 5546:     if last_update != last_update or last_update <= 0 or last_update > now:
+ 5547:         pet_data["last_stat_update"] = now
+ 5548:         return pet_data, True
+ 5549: 
+ 5550:     elapsed_seconds = now - last_update
+ 5551:     if elapsed_seconds <= 1:
+ 5552:         return pet_data, False
+ 5553: 
+ 5554:     elapsed_hours = (elapsed_seconds * 120) / 3600.0
+ 5555: 
+ 5556:     health = pet_data.get("health", 100)
+ 5557:     hunger = pet_data.get("hunger", 100)
+ 5558:     happiness = pet_data.get("happiness", 100)
+ 5559:     energy = pet_data.get("energy", 100)
+ 5560:     is_sleeping = bool(pet_data.get("is_sleeping", 0))
+ 5561: 
+ 5562:     if is_sleeping:
+ 5563:         energy_gain = int(elapsed_hours * 50)
+ 5564:         energy = min(100, energy + energy_gain)
+ 5565: 
+ 5566:         hunger_loss = int(elapsed_hours * 2)
+ 5567:         hunger = max(0, hunger - hunger_loss)
+ 5568: 
+ 5569:         if energy >= 100:
+ 5570:             is_sleeping = False
+ 5571:     else:
+ 5572:         hunger_loss = int(elapsed_hours * 20)
+ 5573:         hunger = max(0, hunger - hunger_loss)
+ 5574: 
+ 5575:         happiness_decay = 15 if hunger < 30 else 5
+ 5576:         happiness_loss = int(elapsed_hours * happiness_decay)
+ 5577:         happiness = max(0, happiness - happiness_loss)
+ 5578: 
+ 5579:         energy_loss = int(elapsed_hours * 15)
+ 5580:         energy = max(0, energy - energy_loss)
+ 5581: 
+ 5582:     if hunger == 0:
+ 5583:         health_loss = int(elapsed_hours * 10)
+ 5584:         health = max(0, health - health_loss)
+ 5585: 
+ 5586:     pet_data["health"] = health
+ 5587:     pet_data["hunger"] = hunger
+ 5588:     pet_data["happiness"] = happiness
+ 5589:     pet_data["energy"] = energy
+ 5590:     pet_data["is_sleeping"] = 1 if is_sleeping else 0
+ 5591:     pet_data["last_stat_update"] = now
+ 5592: 
+ 5593:     return pet_data, True
+ 5594: 
+ 5595: 
+ 5596: # Install the Telegram-ID keyed personal profile store only after all existing
