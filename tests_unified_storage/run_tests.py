@@ -1,7 +1,9 @@
-"""Runner for the stage-2 unified_storage isolation suite.
+"""Runner for the stage-3 unified_storage + pet_system suite.
 
     python run_tests.py
 
+Includes the stage-2 isolation regressions plus stage-3 import/compatibility
+checks for the relocated stat engine (``pet_system.pet_stats``).
 Uses a disposable SQLite file under tests_unified_storage/_run/ only.
 """
 
@@ -19,11 +21,15 @@ import test_pets  # noqa: E402
 import test_isolation  # noqa: E402
 import test_persistence  # noqa: E402
 import test_session  # noqa: E402
+import test_stats_time  # noqa: E402
+import test_sleep  # noqa: E402
+import test_sync  # noqa: E402
+import test_stage3_imports  # noqa: E402
 
 
 def main():
     print("=" * 72)
-    print("STAGE 2 - unified_storage.py isolation suite")
+    print("STAGE 3 - unified_storage.py isolation + pet_system import suite")
     print(f"DB root: {HERE / '_run'} (throwaway)")
     print("=" * 72)
 
@@ -33,6 +39,10 @@ def main():
         + test_session.ALL
         + test_persistence.ALL
         + test_isolation.ALL
+        + test_stats_time.ALL
+        + test_sleep.ALL
+        + test_sync.ALL
+        + test_stage3_imports.ALL
     )
     for test in tests:
         try:

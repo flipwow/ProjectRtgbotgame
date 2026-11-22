@@ -353,6 +353,60 @@ def install(ns):
             _save(tg_id, profile, con)
         return profile
 
+    def feed_pet_atomic(tg_id, food_id, food_info):
+        """Consume food and update the selected pet in one SQLite transaction."""
+        with db() as con:
+            con.execute("BEGIN IMMEDIATE")
+            row = con.execute(
+                "SELECT profile_json FROM game_profiles WHERE telegram_id=?",
+                (str(tg_id),),
+            ).fetchone()
+            profile = (
+                decode(row["profile_json"]) if row else _legacy_profile(tg_id, "", con)
+            )
+            pet_id = profile.get("active_pet_id")
+            states = profile.get("pet_states", {})
+            state = states.get(pet_id) if pet_id and isinstance(states, dict) else None
+            if not isinstance(state, dict):
+                return {"ok": False, "reason": "pet_missing"}
+
+            inventory = profile.setdefault("inventory", {})
+            try:
+                quantity = int(inventory.get(food_id, 0) or 0)
+            except (TypeError, ValueError):
+                quantity = 0
+            if quantity <= 0:
+                return {"ok": False, "reason": "food_missing"}
+
+            inventory[food_id] = quantity - 1
+            if inventory[food_id] <= 0:
+                inventory.pop(food_id, None)
+            state["hunger"] = min(
+                100,
+                state.get("hunger", 0) + food_info.get("hunger_restore", 0),
+            )
+            state["happiness"] = min(
+                100,
+                state.get("happiness", 0) + food_info.get("happiness_restore", 0),
+            )
+            state["last_stat_update"] = time.time()
+            _save(tg_id, profile, con)
+            definition = ns["load_pets_data"]().get(pet_id, {})
+            return {
+                "ok": True,
+                "pet": {
+                    **state,
+                    "id": pet_id,
+                    "pet_id": pet_id,
+                    "pet_name": state.get("name", pet_id),
+                    "type": definition.get("type", pet_id),
+                    "pet_type": pet_id,
+                },
+                "inventory": dict(inventory),
+            }
+
+    ns["feed_pet_atomic"] = feed_pet_atomic
+
     def pet_view(profile):
         # Pure read projection: decay is computed on a throwaway copy so that
         # rendering the pet never mutates the persisted pet_states snapshot and
@@ -1306,23 +1360,33 @@ def install(ns):
             rows = con.execute(
                 "SELECT telegram_id,profile_json FROM game_profiles"
             ).fetchall()
+        snapshots = {}
         for row in rows:
-            profile = decode(row["profile_json"])
+            raw_profile = row["profile_json"]
+            profile = decode(raw_profile)
             pet_id = profile.get("active_pet_id")
             if not pet_id:
                 continue
             state = profile.get("pet_states", {}).get(pet_id, {})
-            pets[str(row["telegram_id"])] = {
+            tg_id = str(row["telegram_id"])
+            pets[tg_id] = {
                 **state,
                 "pet_id": pet_id,
                 "pet_name": state.get("name", pet_id),
                 "pet_type": pet_id,
                 "inventory": profile.get("inventory", {}),
             }
+            snapshots[tg_id] = raw_profile
+        document["_game_profile_snapshots"] = snapshots
         return document
 
     def save_inventory_unified(document):
         pets = document.get("users_pets", {}) if isinstance(document, dict) else {}
+        snapshots = (
+            document.get("_game_profile_snapshots", {})
+            if isinstance(document, dict)
+            else {}
+        )
         if not isinstance(pets, dict):
             return
         for tg_id, pet in pets.items():
@@ -1334,35 +1398,78 @@ def install(ns):
                     "SELECT profile_json FROM game_profiles WHERE telegram_id=?",
                     (str(tg_id),),
                 ).fetchone()
-                profile = (
-                    decode(row["profile_json"])
-                    if row
-                    else _legacy_profile(tg_id, "", con)
-                )
+                if row:
+                    current_raw = row["profile_json"]
+                    # Documents created by load_inventory_unified carry a raw
+                    # profile snapshot. Reject that document if the canonical
+                    # profile changed after load. Older callers may pass only the
+                    # public legacy shape; those are merged below using the pet
+                    # timestamp guard, never as an inventory authority.
+                    if isinstance(snapshots, dict) and str(tg_id) in snapshots:
+                        if snapshots[str(tg_id)] != current_raw:
+                            continue
+                    profile = decode(current_raw)
+                else:
+                    # Do not resurrect a profile that existed when this snapshot
+                    # was loaded but has since been removed.
+                    if isinstance(snapshots, dict) and str(tg_id) in snapshots:
+                        continue
+                    profile = _legacy_profile(tg_id, "", con)
                 pet_id = str(pet.get("pet_id") or profile.get("active_pet_id") or "")
+                changed = False
                 if pet_id:
-                    profile["active_pet_id"] = pet_id
-                    state = profile.setdefault("pet_states", {}).setdefault(pet_id, {})
-                    for field in (
-                        "health",
-                        "hunger",
-                        "happiness",
-                        "energy",
-                        "level",
-                        "experience",
-                        "is_sleeping",
-                        "last_stat_update",
-                    ):
-                        if field in pet:
-                            state[field] = pet[field]
-                    if pet.get("pet_name"):
-                        state["name"] = pet["pet_name"]
-                    profile.setdefault("owned_pets", {}).setdefault(
-                        pet_id, {"count": 1}
-                    )["custom_name"] = state.get("name", pet_id)
-                if isinstance(pet.get("inventory"), dict):
-                    profile["inventory"] = pet["inventory"]
-                _save(tg_id, profile, con)
+                    if profile.get("active_pet_id") != pet_id:
+                        profile["active_pet_id"] = pet_id
+                        changed = True
+                    states = profile.setdefault("pet_states", {})
+                    state = states.get(pet_id)
+                    if not isinstance(state, dict):
+                        state = {}
+                        states[pet_id] = state
+                        changed = True
+                    incoming_ts = pet.get("last_stat_update")
+                    try:
+                        incoming_ts = float(incoming_ts or 0)
+                    except (TypeError, ValueError):
+                        incoming_ts = 0.0
+                    try:
+                        current_ts = float(state.get("last_stat_update", 0) or 0)
+                    except (TypeError, ValueError):
+                        current_ts = 0.0
+                    # Older/undated compatibility snapshots must not roll back
+                    # pet state. Newer snapshots retain the legacy field behavior.
+                    can_apply = (
+                        incoming_ts and incoming_ts >= current_ts
+                    ) or not current_ts
+                    if can_apply:
+                        for field in (
+                            "health",
+                            "hunger",
+                            "happiness",
+                            "energy",
+                            "level",
+                            "experience",
+                            "is_sleeping",
+                            "last_stat_update",
+                        ):
+                            if field in pet and state.get(field) != pet[field]:
+                                state[field] = pet[field]
+                                changed = True
+                        if pet.get("pet_name") and state.get("name") != pet["pet_name"]:
+                            state["name"] = pet["pet_name"]
+                            changed = True
+                        owned = profile.setdefault("owned_pets", {})
+                        owned_item = owned.setdefault(pet_id, {"count": 1})
+                        if isinstance(owned_item, dict) and owned_item.get(
+                            "custom_name"
+                        ) != state.get("name", pet_id):
+                            owned_item["custom_name"] = state.get("name", pet_id)
+                            changed = True
+                # Inventory is canonical profile data. Never replace it from
+                # this legacy-shaped snapshot, which may have been loaded before
+                # a concurrent purchase or consumption.
+                if changed:
+                    _save(tg_id, profile, con)
         # Intentionally do not write inventory.json: it remains an untouched backup.
 
     ns["get_or_create_user"] = get_or_create_user

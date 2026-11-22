@@ -1,0 +1,200 @@
+1:                     else InlineKeyboardButton(
+2:                         text="👤 Открыть профиль",
+3:                         url=get_main_app_url(f"profile_{chat_id}_{user_id}"),
+4:                     )
+5:                 )
+6:             ]
+7:         ]
+8:     )
+9:     await message.answer(
+10:         "Открой профиль и участников этого чата в Mini App:",
+11:         reply_markup=keyboard,
+12:     )
+13: 
+14: 
+15: @router.callback_query(F.data == "open_feed_menu")
+16: async def feed_menu_callback(
+17:     callback: CallbackQuery,
+18: ):
+19: 
+20:     user_id = str(callback.from_user.id)
+21: 
+22:     data = load_inventory_data()
+23: 
+24:     pet = data["users_pets"].get(user_id)
+25: 
+26:     if not pet:
+27:         await callback.answer(
+28:             "Сначала выберите Барсичелу.",
+29:             show_alert=True,
+30:         )
+31:         return
+32: 
+33:     inventory = pet.get(
+34:         "inventory",
+35:         {},
+36:     )
+37: 
+38:     if not inventory:
+39:         await callback.answer(
+40:             "🥺 Холодильник пуст!",
+41:             show_alert=True,
+42:         )
+43:         return
+44: 
+45:     buttons = []
+46: 
+47:     for food_id, count in inventory.items():
+48: 
+49:         food_info = data["food_items"].get(food_id)
+50: 
+51:         if not food_info:
+52:             continue
+53: 
+54:         buttons.append(
+55:             [
+56:                 InlineKeyboardButton(
+57:                     text=(f"{food_info.get('name', food_id)} " f"(x{count})"),
+58:                     callback_data=f"eat_{food_id}",
+59:                 )
+60:             ]
+61:         )
+62: 
+63:     if not buttons:
+64:         await callback.answer(
+65:             "🥺 В инвентаре нет доступной еды.",
+66:             show_alert=True,
+67:         )
+68:         return
+69: 
+70:     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+71: 
+72:     if callback.message:
+73: 
+74:         await callback.message.edit_caption(
+75:             caption=("🥣 <b>Выберите, чем " "угостить Барсичелу:</b>"),
+76:             parse_mode="HTML",
+77:             reply_markup=markup,
+78:         )
+79: 
+80:     await callback.answer()
+81: 
+82: 
+83: @router.callback_query(F.data.startswith("eat_"))
+84: async def process_eating(
+85:     callback: CallbackQuery,
+86: ):
+87: 
+88:     user_id = str(callback.from_user.id)
+89: 
+90:     food_id = callback.data[4:]
+91: 
+92:     data = load_inventory_data()
+93: 
+94:     pet = data["users_pets"].get(user_id)
+95: 
+96:     if not pet:
+97:         await callback.answer(
+98:             "Питомец не найден.",
+99:             show_alert=True,
+100:         )
+101:         return
+102: 
+103:     food_info = data["food_items"].get(food_id)
+104: 
+105:     if not food_info:
+106:         await callback.answer(
+107:             "Эта еда не найдена.",
+108:             show_alert=True,
+109:         )
+110:         return
+111: 
+112:     inventory = pet.setdefault(
+113:         "inventory",
+114:         {},
+115:     )
+116: 
+117:     count = inventory.get(
+118:         food_id,
+119:         0,
+120:     )
+121: 
+122:     if count <= 0:
+123:         await callback.answer(
+124:             "❌ У вас больше нет этой еды.",
+125:             show_alert=True,
+126:         )
+127:         return
+128: 
+129:     inventory[food_id] = count - 1
+130: 
+131:     if inventory[food_id] <= 0:
+132:         del inventory[food_id]
+133: 
+134:     pet["hunger"] = min(
+135:         100,
+136:         pet.get("hunger", 0)
+137:         + food_info.get(
+138:             "hunger_restore",
+139:             0,
+140:         ),
+141:     )
+142: 
+143:     pet["happiness"] = min(
+144:         100,
+145:         pet.get("happiness", 0)
+146:         + food_info.get(
+147:             "happiness_restore",
+148:             0,
+149:         ),
+150:     )
+151: 
+152:     data["users_pets"][user_id] = pet
+153: 
+154:     save_inventory_data(data)
+155: 
+156:     pet_name = (
+157:         pet.get("pet_name")
+158:         or pet.get("name")
+159:         or pet.get("pet_id")
+160:         or pet.get("pet_type")
+161:         or "Питомец"
+162:     )
+163:     await callback.answer(
+164:         f"😋 {pet_name} съел {food_info.get('name', food_id)}!",
+165:         show_alert=True,
+166:     )
+167: 
+168:     markup = InlineKeyboardMarkup(
+169:         inline_keyboard=[
+170:             [
+171:                 InlineKeyboardButton(
+172:                     text="🥣 Покормить ещё",
+173:                     callback_data="open_feed_menu",
+174:                 )
+175:             ]
+176:         ]
+177:     )
+178: 
+179:     if callback.message:
+180:         pet_status = (
+181:             f"🐾 <b>Ваш питомец: {pet_name}</b>\n\n"
+182:             f"🍖 Сытость: {pet.get('hunger', 0)}/100\n"
+183:             f"💖 Счастье: {pet.get('happiness', 0)}/100\n\n"
+184:         )
+185: 
+186:         if callback.message.caption is not None:
+187:             await callback.message.edit_caption(
+188:                 caption=pet_status,
+189:                 parse_mode="HTML",
+190:                 reply_markup=markup,
+191:             )
+192:         else:
+193:             await callback.message.edit_text(
+194:                 text=pet_status,
+195:                 parse_mode="HTML",
+196:                 reply_markup=markup,
+197:             )
+198: 
+199: 
+200: # ============================================================

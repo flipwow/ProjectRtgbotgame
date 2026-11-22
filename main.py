@@ -24,6 +24,12 @@ from dotenv import load_dotenv
 
 import unified_storage
 
+# Stage 3: the canonical pet stat engine now lives in the ``pet_system`` package.
+# Import it under its historical name so every existing call site in this module
+# (and ``unified_storage.install(globals())``) keeps working without duplicating
+# the gameplay formulas.
+from pet_system.pet_stats import update_pet_stats_with_time
+
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import (
@@ -1925,7 +1931,7 @@ async def process_eating(
 
     data = load_inventory_data()
 
-    pet = data["users_pets"].get(user_id)
+    pet = get_pet_for_user(user_id)
 
     if not pet:
         await callback.answer(
@@ -1943,49 +1949,16 @@ async def process_eating(
         )
         return
 
-    inventory = pet.setdefault(
-        "inventory",
-        {},
-    )
+    feed_result = feed_pet_atomic(user_id, food_id, food_info)
 
-    count = inventory.get(
-        food_id,
-        0,
-    )
-
-    if count <= 0:
+    if not feed_result["ok"]:
         await callback.answer(
             "❌ У вас больше нет этой еды.",
             show_alert=True,
         )
         return
 
-    inventory[food_id] = count - 1
-
-    if inventory[food_id] <= 0:
-        del inventory[food_id]
-
-    pet["hunger"] = min(
-        100,
-        pet.get("hunger", 0)
-        + food_info.get(
-            "hunger_restore",
-            0,
-        ),
-    )
-
-    pet["happiness"] = min(
-        100,
-        pet.get("happiness", 0)
-        + food_info.get(
-            "happiness_restore",
-            0,
-        ),
-    )
-
-    data["users_pets"][user_id] = pet
-
-    save_inventory_data(data)
+    pet = feed_result["pet"]
 
     pet_name = (
         pet.get("pet_name")
@@ -5530,67 +5503,10 @@ async def main():
 RARITY_ORDER = ["Common", "Epic", "Legendary", "Bo$$"]
 
 
-def update_pet_stats_with_time(pet_data, now=None):
-    if now is None:
-        now = time.time()
-
-    try:
-        last_update = float(pet_data.get("last_stat_update", 0) or 0)
-    except (TypeError, ValueError):
-        last_update = 0
-
-    # Older pet rows can have the schema default (0) or an invalid/future
-    # timestamp. Treat those as a fresh stat baseline rather than applying
-    # decay for the entire Unix epoch on the next update (for example, when
-    # the pet is put to sleep).
-    if last_update != last_update or last_update <= 0 or last_update > now:
-        pet_data["last_stat_update"] = now
-        return pet_data, True
-
-    elapsed_seconds = now - last_update
-    if elapsed_seconds <= 1:
-        return pet_data, False
-
-    elapsed_hours = (elapsed_seconds * 120) / 3600.0
-
-    health = pet_data.get("health", 100)
-    hunger = pet_data.get("hunger", 100)
-    happiness = pet_data.get("happiness", 100)
-    energy = pet_data.get("energy", 100)
-    is_sleeping = bool(pet_data.get("is_sleeping", 0))
-
-    if is_sleeping:
-        energy_gain = int(elapsed_hours * 50)
-        energy = min(100, energy + energy_gain)
-
-        hunger_loss = int(elapsed_hours * 2)
-        hunger = max(0, hunger - hunger_loss)
-
-        if energy >= 100:
-            is_sleeping = False
-    else:
-        hunger_loss = int(elapsed_hours * 20)
-        hunger = max(0, hunger - hunger_loss)
-
-        happiness_decay = 15 if hunger < 30 else 5
-        happiness_loss = int(elapsed_hours * happiness_decay)
-        happiness = max(0, happiness - happiness_loss)
-
-        energy_loss = int(elapsed_hours * 15)
-        energy = max(0, energy - energy_loss)
-
-    if hunger == 0:
-        health_loss = int(elapsed_hours * 10)
-        health = max(0, health - health_loss)
-
-    pet_data["health"] = health
-    pet_data["hunger"] = hunger
-    pet_data["happiness"] = happiness
-    pet_data["energy"] = energy
-    pet_data["is_sleeping"] = 1 if is_sleeping else 0
-    pet_data["last_stat_update"] = now
-
-    return pet_data, True
+# Stage 3: ``update_pet_stats_with_time`` moved to ``pet_system.pet_stats`` and
+# is imported at the top of this module. The name stays bound here (and in the
+# ``globals()`` handed to ``unified_storage.install``) for full compatibility;
+# the gameplay formulas are NOT duplicated. See ``pet_system/pet_stats.py``.
 
 
 # Install the Telegram-ID keyed personal profile store only after all existing

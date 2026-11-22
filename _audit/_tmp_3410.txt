@@ -1,0 +1,110 @@
+1:             )
+2: 
+3:     owned_pets = user_info.get("owned_pets")
+4:     if not isinstance(owned_pets, dict):
+5:         owned_pets = {}
+6: 
+7:     if not custom_name:
+8:         existing_owned = owned_pets.get(pet_id)
+9:         if not isinstance(existing_owned, dict):
+10:             existing_owned = {}
+11:         custom_name = (
+12:             existing_owned.get("custom_name") or pet_definition.get("name") or pet_id
+13:         )
+14: 
+15:     stats = pet_definition.get("stats", {})
+16:     if not isinstance(stats, dict):
+17:         stats = {}
+18: 
+19:     initial_stats = {
+20:         "health": stats.get("health", 100),
+21:         "hunger": stats.get("hunger", 100),
+22:         "happiness": stats.get("happiness", 100),
+23:         "energy": stats.get("energy", 100),
+24:     }
+25: 
+26:     data = load_inventory_data()
+27:     users_pets = data.get("users_pets")
+28:     if not isinstance(users_pets, dict):
+29:         users_pets = {}
+30:         data["users_pets"] = users_pets
+31: 
+32:     user_id = str(telegram_user["id"])
+33:     old_pet = users_pets.get(user_id)
+34: 
+35:     if isinstance(old_pet, dict) and old_pet.get("pet_id") == pet_id:
+36:         pet = old_pet
+37:     else:
+38:         pet = {
+39:             **initial_stats,
+40:             "level": pet_definition.get("level", 1),
+41:             "experience": 0,
+42:             "inventory": {},
+43:         }
+44: 
+45:     pet.update(
+46:         {
+47:             "pet_id": pet_id,
+48:             "pet_name": custom_name,
+49:             "pet_type": pet_id,
+50:             "level": pet.get("level", pet_definition.get("level", 1)),
+51:             "experience": pet.get("experience", 0),
+52:         }
+53:     )
+54: 
+55:     for stat_name, default_value in initial_stats.items():
+56:         pet.setdefault(stat_name, default_value)
+57: 
+58:     if not isinstance(pet.get("inventory"), dict):
+59:         pet["inventory"] = {}
+60: 
+61:     users_pets[user_id] = pet
+62: 
+63:     with db_connection() as connection:
+64:         connection.execute(
+65:             """
+66:             INSERT INTO pets (
+67:                 chat_id, user_id, pet_id, name,
+68:                 health, hunger, happiness, energy
+69:             )
+70:             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+71:             ON CONFLICT(chat_id, user_id, pet_id) DO UPDATE SET
+72:                 name = excluded.name,
+73:                 health = excluded.health,
+74:                 hunger = excluded.hunger,
+75:                 happiness = excluded.happiness,
+76:                 energy = excluded.energy
+77:             """,
+78:             (
+79:                 "",
+80:                 user_id,
+81:                 pet_id,
+82:                 custom_name,
+83:                 pet["health"],
+84:                 pet["hunger"],
+85:                 pet["happiness"],
+86:                 pet["energy"],
+87:             ),
+88:         )
+89: 
+90:     save_inventory_data(data)
+91: 
+92:     owned_pets[pet_id] = {"custom_name": custom_name}
+93:     user_info["owned_pets"] = owned_pets
+94:     user_info["pet_id"] = pet_id
+95:     user_info["starter_pet_selected"] = True
+96:     users[username] = user_info
+97:     save_users(users)
+98: 
+99:     return web.json_response(
+100:         {
+101:             "success": True,
+102:             "pet": {
+103:                 **pet,
+104:                 "id": pet_id,
+105:                 "name": custom_name,
+106:                 "pet_name": custom_name,
+107:                 "custom_name": custom_name,
+108:             },
+109:         }
+110:     )

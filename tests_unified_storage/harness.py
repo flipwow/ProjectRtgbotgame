@@ -1,4 +1,4 @@
-"""Self-contained isolated test harness for unified_storage.py (stage 2).
+"""Self-contained isolated test harness for unified_storage.py (stage 3).
 
 Rules honoured:
 * SQLite database is always a temp file inside tests_unified_storage/_run/...
@@ -6,6 +6,8 @@ Rules honoured:
 * Legacy JSON stores (inventory.json / pets.json) are local temp files.
 * Real production functions are extracted from main.py via AST instead of being
   re-implemented, so tests exercise the shipping code paths.
+* The pet stat engine is imported from its real module ``pet_system.pet_stats``
+  (stage 3 relocation), never copied, so the formulas under test are shipping.
 * unified_storage.install() is installed against a synthetic namespace, exactly
   the way main.py installs it.
 """
@@ -25,6 +27,42 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MAIN = ROOT / "main.py"
+PET_STATS = ROOT / "pet_system" / "pet_stats.py"
+
+
+# --------------------------------------------------------------------------- #
+# Fake clock (controlled test time)
+# --------------------------------------------------------------------------- #
+class FakeClock:
+    """A minimal stand-in for the ``time`` module with a manipulable clock.
+
+    Exposes ``time()`` so it can be dropped into any namespace that expects the
+    ``time`` module (``ns["time"]`` in the extracted main.py functions and the
+    ``time`` global of the loaded ``unified_storage`` module). Advancing the
+    clock lets tests simulate hours of decay/awakening without real waiting.
+    """
+
+    def __init__(self, now=None):
+        self._now = float(now if now is not None else time.time())
+
+    def time(self):
+        return self._now
+
+    # -- control ---------------------------------------------------------- #
+    def set(self, now):
+        self._now = float(now)
+        return self._now
+
+    def advance(self, seconds):
+        self._now += float(seconds)
+        return self._now
+
+    def advance_hours(self, hours):
+        return self.advance(float(hours) * 3600.0)
+
+    @property
+    def now(self):
+        return self._now
 
 
 # --------------------------------------------------------------------------- #
@@ -94,6 +132,21 @@ class FakeRequest:
 
     async def json(self):
         return self._payload
+
+
+class _FakeBotMessage:
+    """Minimal aiogram-style Message for callback handlers (edit_caption/edit_text)."""
+
+    def __init__(self, caption=""):
+        self.caption = caption
+        self.edited = None
+
+    async def edit_caption(self, caption=None, parse_mode=None, reply_markup=None):
+        self.caption = caption
+        self.edited = ("caption", caption)
+
+    async def edit_text(self, text=None, parse_mode=None, reply_markup=None):
+        self.edited = ("text", text)
 
 
 # --------------------------------------------------------------------------- #
@@ -167,9 +220,13 @@ class Harness:
         seed_pets=None,
         seed_inventory=None,
         reset=True,
+        clock=None,
     ):
         self.base_dir = Path(base_dir)
         self._reset = reset
+        # Optional controlled clock; when omitted the real ``time`` module is
+        # used exactly as before, so existing tests keep their behaviour.
+        self.clock = clock
         if reset:
             if self.base_dir.exists():
                 shutil.rmtree(self.base_dir)
@@ -197,12 +254,78 @@ class Harness:
         )
         self.mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.mod)
+        if self.clock is not None:
+            # Redirect the module's clock before install() so every handler and
+            # helper (which call time.time()) observes the controlled time.
+            self.mod.time = self.clock
         self.mod.install(self.ns)
+        self._install_bot_bridge()
+
+    def _install_bot_bridge(self):
+        """After install, make the namespace usable by the shipping bot handlers.
+
+        * ``main.load_inventory_data`` always injects ``food_items`` from
+          ``SHOP_ITEMS``. The unified replacement only rebuilds ``users_pets``,
+          so we mirror that injection on top of it (test-only, no prod change).
+        * The extracted ``process_eating`` handler needs the same shape the bot
+          sees at runtime.
+        """
+        unified_loader = self.ns["load_inventory_data"]
+
+        def load_inventory_with_food():
+            document = unified_loader()
+            if not isinstance(document, dict):
+                document = {"schema_version": 2, "users_pets": {}}
+            document["food_items"] = {
+                item_id: dict(item) for item_id, item in self.ns["SHOP_ITEMS"].items()
+            }
+            return document
+
+        self.ns["load_inventory_data"] = load_inventory_with_food
+
+        # aiogram keyboard stubs used by the shipping bot handler bodies.
+        class _Button:
+            def __init__(self, text=None, callback_data=None, **kwargs):
+                self.text = text
+                self.callback_data = callback_data
+
+        class _Markup:
+            def __init__(self, inline_keyboard=None, **kwargs):
+                self.inline_keyboard = inline_keyboard or []
+
+        self.ns.setdefault("InlineKeyboardButton", _Button)
+        self.ns.setdefault("InlineKeyboardMarkup", _Markup)
+
+    # -- bot handler bridge ------------------------------------------------ #
+    def bot_pet(self, tg_id):
+        """The pet dict returned to the bot (unified ``get_pet_for_user``)."""
+        return self.ns["get_pet_for_user"](tg_id)
+
+    def run_process_eating(self, tg_id, food_id):
+        """Invoke the *shipping* ``process_eating`` handler for a food callback.
+
+        Only the pieces it reads (``from_user.id``, ``data``,
+        ``callback.message``, ``answer``) are faked; the handler body is the real
+        code extracted from ``main.py``.
+        """
+        from_user = type("U", (), {"id": int(tg_id)})()
+        message = _FakeBotMessage()
+        answer_calls = []
+
+        async def answer(text=None, show_alert=False):
+            answer_calls.append((text, show_alert))
+
+        callback = type(
+            "C", (), {"from_user": from_user, "data": f"eat_{food_id}",
+                      "message": message, "answer": staticmethod(answer)}
+        )()
+        self.run(self.ns["process_eating"](callback))
+        return {"answers": answer_calls, "message": message}
 
     @classmethod
-    def reopen(cls, base_dir, *, usernames=None):
+    def reopen(cls, base_dir, *, usernames=None, clock=None):
         """Simulate an application restart: reinstall on the SAME database."""
-        return cls(base_dir, usernames=usernames, reset=False)
+        return cls(base_dir, usernames=usernames, reset=False, clock=clock)
 
     # -- catalog ----------------------------------------------------------- #
     @staticmethod
@@ -388,13 +511,14 @@ class Harness:
     def _build_ns(self):
         nodes = extract_nodes(
             {
-                "update_pet_stats_with_time",
                 "create_default_user",
                 "SHOP_ITEMS",
                 "PET_PACKS",
                 "RP_CEILINGS",
                 "build_food_catalog",
                 "RARITY_ORDER",
+                "process_eating",
+                "feed_menu_callback",
             }
         )
         ns = {
@@ -403,7 +527,7 @@ class Harness:
             "INVENTORY_FILE": str(self.inventory_file),
             "PETS_FILE": str(self.pets_file),
             "DEFAULT_PET_ID": None,
-            "time": time,
+            "time": self.clock if self.clock is not None else time,
             "json": json,
             "load_pets_data": lambda: json.loads(
                 self.pets_file.read_text(encoding="utf-8")
@@ -424,6 +548,18 @@ class Harness:
         }
         for name, code in nodes.items():
             exec(compile(code, "<main-extract>", "exec"), ns)
+        # Stage 3: the stat engine lives in its own module now. Load the
+        # real code and point its module-level clock at the controlled
+        # FakeClock so decay/recovery observe simulated time (production
+        # keeps using the real ``time`` module unchanged).
+        stats_spec = importlib.util.spec_from_file_location(
+            f"pet_stats_run_{id(self)}", str(PET_STATS)
+        )
+        stats_mod = importlib.util.module_from_spec(stats_spec)
+        stats_spec.loader.exec_module(stats_mod)
+        if self.clock is not None:
+            stats_mod.time = self.clock
+        ns["update_pet_stats_with_time"] = stats_mod.update_pet_stats_with_time
         _pets_path = self.pets_file
         ns["load_pets_data"] = lambda: json.loads(
             Path(_pets_path).read_text(encoding="utf-8")

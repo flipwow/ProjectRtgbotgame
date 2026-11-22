@@ -1,0 +1,130 @@
+1: 
+2:     if profile.get("status") == "обижен" and now >= profile.get("offended_until", 0):
+3:         profile["status"] = "активен"
+4: 
+5:     last_award = profile.get("last_rp_award_time", 0)
+6:     if now - last_award >= 300:
+7:         profile["relationship_rp"] = profile.get("relationship_rp", 0) + 1
+8:         profile["convertible_rp"] = profile.get("convertible_rp", 0) + 1
+9:         profile["last_rp_award_time"] = now
+10:         return "awarded"
+11: 
+12:     return "cooldown"
+13: 
+14: 
+15: def get_pet_status_for_chat(chat_id, user_id):
+16:     pets_data = load_pets_data()
+17:     pet = (
+18:         pets_data.get("users_pets", {}).get(
+19:             chat_member_key(chat_id, user_id),
+20:             {},
+21:         )
+22:         if isinstance(pets_data.get("users_pets", {}), dict)
+23:         else {}
+24:     )
+25:     if not isinstance(pet, dict):
+26:         pet = {}
+27: 
+28:     user_info = next(
+29:         (
+30:             user
+31:             for user in load_users().values()
+32:             if isinstance(user, dict)
+33:             and str(user.get("telegram_id", "")) == str(user_id)
+34:         ),
+35:         {},
+36:     )
+37:     selected_pet_id = user_info.get("pet_id") if isinstance(user_info, dict) else None
+38:     selected_definition = pets_data.get(selected_pet_id, {})
+39:     owned_pets = user_info.get("owned_pets", {}) if isinstance(user_info, dict) else {}
+40:     selected_pet = (
+41:         owned_pets.get(selected_pet_id, {}) if isinstance(owned_pets, dict) else {}
+42:     )
+43:     selected_name = (
+44:         selected_pet.get("custom_name") if isinstance(selected_pet, dict) else None
+45:     ) or (
+46:         selected_definition.get("name")
+47:         if isinstance(selected_definition, dict)
+48:         else None
+49:     )
+50: 
+51:     return {
+52:         "name": selected_name or pet.get("name", "Приятель"),
+53:         "health": pet.get("health", 100),
+54:         "hunger": pet.get("hunger", 100),
+55:         "happiness": pet.get("happiness", 100),
+56:         "energy": pet.get("energy", 100),
+57:     }
+58: 
+59: 
+60: def find_chat_companion(chat_id, sender_id, text):
+61:     pets_data = load_pets_data()
+62:     instances = pets_data.get("users_pets", {})
+63:     if not isinstance(instances, dict):
+64:         instances = {}
+65: 
+66:     companions = []
+67:     chat_prefix = f"{chat_id}:"
+68:     default_pet_id = DEFAULT_PET_ID if DEFAULT_PET_ID in pets_data else None
+69:     default_definition = pets_data.get(default_pet_id, {}) if default_pet_id else {}
+70: 
+71:     with db_connection() as connection:
+72:         pet_rows = connection.execute(
+73:             """
+74:             SELECT user_id, name, health, hunger, happiness, energy
+75:             FROM pets WHERE chat_id = ?
+76:             """,
+77:             (str(chat_id),),
+78:         ).fetchall()
+79: 
+80:     for row in pet_rows:
+81:         owner_id = str(row["user_id"])
+82:         companions.append(
+83:             (
+84:                 owner_id,
+85:                 {
+86:                     "pet_id": default_pet_id or DEFAULT_PET_ID,
+87:                     "name": row["name"],
+88:                     "health": row["health"],
+89:                     "hunger": row["hunger"],
+90:                     "happiness": row["happiness"],
+91:                     "energy": row["energy"],
+92:                 },
+93:                 default_definition,
+94:             )
+95:         )
+96: 
+97:     for key, pet in instances.items():
+98:         if not isinstance(pet, dict) or not str(key).startswith(chat_prefix):
+99:             continue
+100:         owner_id = str(key).split(":", 1)[1]
+101:         if any(existing_owner == owner_id for existing_owner, _, _ in companions):
+102:             continue
+103:         pet_id = pet.get("pet_id", DEFAULT_PET_ID)
+104:         definition = pets_data.get(pet_id, {})
+105:         companions.append((owner_id, pet, definition))
+106: 
+107:     for key, pet in pets_data.items():
+108:         if key == "users_pets" or not isinstance(pet, dict):
+109:             continue
+110:         owner_id = str(pet.get("owner_user_id", ""))
+111:         if not owner_id and str(key).startswith("user_id_"):
+112:             owner_id = str(key)[len("user_id_") :]
+113:         if not owner_id or not owner_id.isdigit():
+114:             continue
+115:         pet_chat_id = pet.get("chat_id")
+116:         if pet_chat_id is not None and str(pet_chat_id) != str(chat_id):
+117:             continue
+118:         if pet_chat_id is None and str(chat_id) != str(sender_id):
+119:             if not get_chat_relationship(chat_id, owner_id):
+120:                 continue
+121:         if not any(existing_owner == owner_id for existing_owner, _, _ in companions):
+122:             companions.append((owner_id, pet, {}))
+123: 
+124:     normalized_text = (text or "").casefold()
+125:     addressed = [
+126:         companion
+127:         for companion in companions
+128:         if (companion[1].get("name") or "").strip()
+129:         and str(companion[1].get("name")).casefold() in normalized_text
+130:     ]
