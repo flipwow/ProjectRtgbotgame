@@ -357,6 +357,9 @@ def install(ns):
         """Consume food and update the selected pet in one SQLite transaction."""
         with db() as con:
             con.execute("BEGIN IMMEDIATE")
+            # One clock reading for the whole operation: the elapsed decay and
+            # the persisted timestamp must never disagree.
+            now = time.time()
             row = con.execute(
                 "SELECT profile_json FROM game_profiles WHERE telegram_id=?",
                 (str(tg_id),),
@@ -378,6 +381,12 @@ def install(ns):
             if quantity <= 0:
                 return {"ok": False, "reason": "food_missing"}
 
+            # Apply the canonical real-time decay first so the food bonus is
+            # layered on top of the up-to-date state (elapsed real time is not
+            # lost). The engine mutates ``state`` in place and stamps the single
+            # ``now`` we already captured into ``last_stat_update``.
+            old_stats(state, now)
+
             inventory[food_id] = quantity - 1
             if inventory[food_id] <= 0:
                 inventory.pop(food_id, None)
@@ -389,7 +398,7 @@ def install(ns):
                 100,
                 state.get("happiness", 0) + food_info.get("happiness_restore", 0),
             )
-            state["last_stat_update"] = time.time()
+            state["last_stat_update"] = now
             _save(tg_id, profile, con)
             definition = ns["load_pets_data"]().get(pet_id, {})
             return {
@@ -679,15 +688,27 @@ def install(ns):
                 return ns["web"].json_response(
                     {"error": "Food is not compatible with this pet"}, status=400
                 )
+            # One clock reading for the whole feed: fold in the real elapsed
+            # time through the canonical engine first, so the food bonus is
+            # layered on the up-to-date state and the persisted timestamp
+            # shares the exact same ``now``.
+            now = time.time()
+            old_stats(state, now)
             inventory[food_id] = int(inventory[food_id]) - 1
+            # Preserve fractional stats produced by the engine: use float()
+            # so the food bonus never truncates the decayed values (int()
+            # would silently drop the decimal part). Only the food *quantity*
+            # stays integral.
             state["hunger"] = min(
-                100, int(state.get("hunger", 0)) + int(item.get("hunger_restore", 0))
+                100,
+                float(state.get("hunger", 0)) + float(item.get("hunger_restore", 0)),
             )
             state["happiness"] = min(
                 100,
-                int(state.get("happiness", 0)) + int(item.get("happiness_restore", 0)),
+                float(state.get("happiness", 0))
+                + float(item.get("happiness_restore", 0)),
             )
-            state["last_stat_update"] = time.time()
+            state["last_stat_update"] = now
             _save(user["id"], profile, con)
         return ns["web"].json_response(
             {
@@ -704,6 +725,9 @@ def install(ns):
         payload = await ns["read_json_object"](request) or {}
         with db() as con:
             con.execute("BEGIN IMMEDIATE")
+            # Single clock reading shared by the decay engine and the
+            # persisted timestamp.
+            now = time.time()
             row = con.execute(
                 "SELECT profile_json FROM game_profiles WHERE telegram_id=?",
                 (str(user["id"]),),
@@ -717,13 +741,21 @@ def install(ns):
             state = profile.get("pet_states", {}).get(pet_id) if pet_id else None
             if not state:
                 return ns["web"].json_response({"error": "Pet not found"}, status=404)
+            # One clock reading for the whole sleep change: apply the real
+            # elapsed time through the canonical engine before touching the
+            # sleep flag, then reuse the same ``now`` for last_stat_update.
+            # The toggle (no explicit flag) is decided from the *pre-engine*
+            # stored value so an automatic transition performed by the engine
+            # cannot silently flip the user's intent.
             requested = payload.get("is_sleeping")
+            was_sleeping = state.get("is_sleeping")
+            old_stats(state, now)
             state["is_sleeping"] = (
                 (1 if requested else 0)
                 if isinstance(requested, bool)
-                else (0 if state.get("is_sleeping") else 1)
+                else (0 if was_sleeping else 1)
             )
-            state["last_stat_update"] = time.time()
+            state["last_stat_update"] = now
             _save(user["id"], profile, con)
         return ns["web"].json_response(
             {"success": True, "pet": {**state, "id": pet_id}}

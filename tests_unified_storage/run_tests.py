@@ -25,6 +25,8 @@ import test_stats_time  # noqa: E402
 import test_sleep  # noqa: E402
 import test_sync  # noqa: E402
 import test_stage3_imports  # noqa: E402
+import test_feed_regression  # noqa: E402
+import test_http_feed_sleep  # noqa: E402
 
 
 def main():
@@ -43,6 +45,8 @@ def main():
         + test_sleep.ALL
         + test_sync.ALL
         + test_stage3_imports.ALL
+        + test_feed_regression.ALL
+        + test_http_feed_sleep.ALL
     )
     for test in tests:
         try:

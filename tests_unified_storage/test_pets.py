@@ -6,10 +6,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from harness import Harness  # noqa: E402
+from harness import FakeClock, Harness  # noqa: E402
 from support import Check, seed_balance  # noqa: E402
 
 RUN = Path(__file__).resolve().parent / "_run"
+
+T0 = 1_700_000_000.0
 
 
 def test_buy_food():
@@ -89,7 +91,7 @@ def test_rename_pet():
 
 def test_feed_pet():
     c = Check("9. Кормление питомца")
-    h = Harness(RUN / "t09", usernames={"1009": "ivy"})
+    h = Harness(RUN / "t09", usernames={"1009": "ivy"}, clock=FakeClock(T0))
     h.get_profile("1009", "ivy")
     seed_balance(h, "1009", "ivy", 100)
     h.login("1009")
@@ -97,8 +99,10 @@ def test_feed_pet():
     prof = h.get_profile("1009", "ivy")
     prof["pet_states"]["cat"]["hunger"] = 10
     prof["pet_states"]["cat"]["happiness"] = 10
+    prof["pet_states"]["cat"]["last_stat_update"] = T0
     h.ns["save_user_game_profile"]("1009", prof)
     h.run(h.ns["api_buy_food"](h.request(match_info={"food_id": "bone"})))
+    # Feed at the same clock instant -> no decay, exactly +15 bone.
     resp = h.run(h.ns["api_pet_feed"](h.request({"food_id": "bone"})))
     prof2 = h.get_profile("1009", "ivy")
     state = prof2["pet_states"]["cat"]
