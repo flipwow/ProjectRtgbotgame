@@ -3024,16 +3024,6 @@ async def api_profile(request):
         }
     )
 
-    if pet_row is not None:
-        pet.update(
-            {
-                "health": pet_row["health"],
-                "hunger": pet_row["hunger"],
-                "happiness": pet_row["happiness"],
-                "energy": pet_row["energy"],
-            }
-        )
-
     food_inventory = {}
     inventory_details = []
 
