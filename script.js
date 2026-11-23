@@ -28,6 +28,7 @@ let userData = {
 
 let selectedLeaderboardMode = 'online';
 let currentPetId = 'bars';
+let profileFetchSequence = 0;
 let chatContext = { chatId: null, userId: null };
 let chatMembersRefreshInFlight = false;
 
@@ -517,6 +518,7 @@ function delay(milliseconds) {
 }
 
 async function fetchUserData() {
+    const requestId = ++profileFetchSequence;
     try {
         if (chatContext.chatId && !chatContext.userId) {
             showProfileFeedback('Открой профиль через кнопку бота в нужном чате.', 'error');
@@ -539,6 +541,7 @@ async function fetchUserData() {
             API_REQUEST_TIMEOUT_MS
         );
         const data = await response.json().catch(() => ({}));
+        if (requestId !== profileFetchSequence) return;
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -575,7 +578,8 @@ async function fetchUserData() {
                     `/api/chat/profile?chat_id=${encodeURIComponent(chatContext.chatId)}`,
                     { headers }, API_REQUEST_TIMEOUT_MS
                 );
-                                const chatData = await chatResponse.json().catch(() => ({}));
+                const chatData = await chatResponse.json().catch(() => ({}));
+                if (requestId !== profileFetchSequence) return;
                 if (!chatResponse.ok) {
                     throw new Error(chatData.error || `HTTP ${chatResponse.status}`);
                 }
@@ -585,9 +589,8 @@ async function fetchUserData() {
                 userData.chat = chatData.chat;
                 userData.chatProfile = { ...chatData.profile, balance_r: data.currency };
                 userData.registry = chatData.members;
-            } catch (chatError) {
-
-
+                        } catch (chatError) {
+                if (requestId !== profileFetchSequence) return;
 
                 console.warn('Group-only profile data is unavailable:', chatError);
                 showProfileFeedback(
@@ -615,13 +618,16 @@ async function fetchUserData() {
         renderChatRegistry();
 
     } catch (error) {
-        console.error('Не удалось загрузить данные профиля:', error);
-                showProfileFeedback('Could not load the profile. Please try again later.', 'error');
+        if (requestId !== profileFetchSequence) return;
 
+        console.error('Не удалось загрузить данные профиля:', error);
+        showProfileFeedback('Could not load the profile. Please try again later.', 'error');
         renderChatRegistry();
     } finally {
-        const status = document.getElementById('profile-status');
-        if (status && !userData.user) status.textContent = 'Unavailable';
+        if (requestId === profileFetchSequence) {
+            const status = document.getElementById('profile-status');
+            if (status && !userData.user) status.textContent = 'Unavailable';
+        }
     }
 }
 
@@ -770,7 +776,7 @@ function renderProfilePet(pet) {
         const value = Math.max(0, Math.min(100, Number(pet[key] ?? 100)));
         const valueEl = document.getElementById(`profile-pet-${key}-value`);
         const bar = document.getElementById(`profile-pet-${key}-bar`);
-        if (valueEl) valueEl.textContent = `${value} / 100`;
+        if (valueEl) valueEl.textContent = `${Math.round(value)} / 100`;
         if (bar) {
             bar.style.width = `${value}%`;
             bar.parentElement.setAttribute('aria-valuenow', String(value));
@@ -981,7 +987,7 @@ function renderMemberPet(member, pet) {
         const value = Math.max(0, Math.min(100, Number(pet[key] ?? 100)));
         const valueElement = document.getElementById(`member-pet-${key}-value`);
         const bar = document.getElementById(`member-pet-${key}-bar`);
-        if (valueElement) valueElement.textContent = `${value} / 100`;
+        if (valueElement) valueElement.textContent = `${Math.round(value)} / 100`;
         if (bar) {
             bar.style.width = `${value}%`;
             bar.parentElement.setAttribute('aria-valuenow', String(value));
@@ -1240,6 +1246,7 @@ function renderPetChoices() {
                 if (!response.ok) {
                     throw new Error(data.error || 'Pet selection failed');
                 }
+                profileFetchSequence++;
 
                 userData.pet = normalizePetData(data.pet);
                 currentPetId = userData.pet.id;
@@ -2123,6 +2130,7 @@ function openFirstPetSelector() {
                 if (!response.ok) {
                     throw new Error(data.error || 'Starter pet selection failed');
                 }
+                profileFetchSequence++;
 
                 userData.pet = normalizePetData(data.pet);
                 currentPetId = userData.pet.id;
